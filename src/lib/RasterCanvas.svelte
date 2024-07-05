@@ -133,6 +133,12 @@
 			const height = bounds.height / resolution;
 			const size = new paper.Size(width, height);
 
+			new paper.Path.Rectangle({
+				point: bounds.topLeft,
+				size: bounds.size,
+				fillColor: 'white'
+			});
+
 			let info = new paper.PointText({
 				point: [20 / getPixelRatio(), paper.view.center.y - (fontSize/getPixelRatio()*3)],
 				content: `initial resolution: ${resolution}x${resolution}\ngrouping iterations: ${iterations}\nsimilarity tolerance: ${tolerance}\nmax. lines per area: ${blockLineCount}\n\nDepending on the numbers above,\nand your device,\nthis might take a while.`,
