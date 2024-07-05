@@ -1,15 +1,7 @@
 <script>
 	import * as Card from "$lib/components/ui/card";
-	import { Button } from '$lib/components/ui/button/index.ts';
-	import RasterCanvas from '$lib/components/RasterCanvas.svelte';
-	import { Input } from '$lib/components/ui/input/index.ts';
-
-	let selectedFile = null;
-
-	function handleFileChange(event) {
-		if (!event.target.files) return;
-		selectedFile = event.target.files[0];
-	}
+	import RasterCanvas from '$lib/RasterCanvas.svelte';
+	import RasterConfig from '$lib/RasterConfig.svelte';
 
 </script>
 
@@ -22,7 +14,7 @@
 				<Card.Description>Creative Image Rasterization For Plotters</Card.Description>
 			</Card.Header>
 			<Card.Content>
-				<RasterCanvas imageFile={selectedFile}/>
+				<RasterCanvas/>
 			</Card.Content>
 		</Card.Root>
 	</main>
@@ -33,8 +25,7 @@
 				<Card.Title>RSTR Configuration</Card.Title>
 			</Card.Header>
 			<Card.Content>
-				<Input id="picture" type="file" class="short-file-input" on:change={handleFileChange}/>
-				<Button type="file" accept="image/*">Render</Button>
+				<RasterConfig />
 			</Card.Content>
 		</Card.Root>
 	</div>
