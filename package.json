@@ -1,6 +1,9 @@
 {
 	"name": "rstr",
 	"version": "0.0.1",
+	"engines": {
+		"node": ">=18.17"
+	},
 	"private": true,
 	"scripts": {
 		"dev": "vite dev",
