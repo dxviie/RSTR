@@ -6,14 +6,22 @@
 	import { derived } from 'svelte/store';
 
 	let imageFile = $derived(config.file);
-	let currentConfig = $derived(config);
+	let resolution = $derived(config.resolution);
+	let iterations = $derived(config.iterations);
+	let tolerance = $derived(config.tolerance);
+	let blockLineCount = $derived(config.blockLineCount);
 	let img = null;
 
-	$effect(() => {
-		console.log('config:: ', currentConfig);
-		if (project) project.view.play();
-	})
 
+	$effect(() => {
+		if (resolution || iterations || tolerance || blockLineCount) {
+			console.log('config changed', resolution, iterations, tolerance, blockLineCount);
+			if (project) {
+				console.log('requesting render on config change')
+				project.view.play();
+			}
+		}
+	})
 
 	$effect(() => {
 		if (imageFile && project) {
@@ -24,7 +32,7 @@
 				img = new Image();
 				img.src = event.target.result as string;
 				img.onload = () => {
-					console.log('image ready for rendering')
+					console.log('requesting render on image load')
 					project.view.play();
 				};
 			};
@@ -113,6 +121,7 @@
     project = paper.project;
 
     project.view.onFrame = (event: { time: number; delta: number; count: number }) => {
+			console.log('rendering', 'time', event.time, 'delta', event.delta, 'count', event.count);
 			if (!paper || !paper.project || !paper.project.activeLayer) {
 				return;
 			}
@@ -120,13 +129,13 @@
 
 			const bounds = paper.view.bounds.scale(0.9);
 			const offset = bounds.width * 0.05;
-			const width = bounds.width / currentConfig.resolution;
-			const height = bounds.height / currentConfig.resolution;
+			const width = bounds.width / resolution;
+			const height = bounds.height / resolution;
 			const size = new paper.Size(width, height);
 
 			let info = new paper.PointText({
 				point: [20 / getPixelRatio(), paper.view.center.y - (fontSize/getPixelRatio()*3)],
-				content: `initial currentConfig.resolution: ${currentConfig.resolution}x${currentConfig.resolution}\ngrouping iterations: ${currentConfig.iterations}\nsimilarity tolerance: ${currentConfig.tolerance}\nmax. lines per area: ${currentConfig.blockLineCount}\n\nDepending on the numbers above,\nand your device,\nthis might take a while.`,
+				content: `initial resolution: ${resolution}x${resolution}\ngrouping iterations: ${iterations}\nsimilarity tolerance: ${tolerance}\nmax. lines per area: ${blockLineCount}\n\nDepending on the numbers above,\nand your device,\nthis might take a while.`,
 				fillColor: 'black',
 				fontSize: fontSize / getPixelRatio(),
 				fontFamily: 'courier new'
@@ -135,9 +144,9 @@
 			let blocks = [];
 
 			// build base raster
-			for (let i = 0; i < currentConfig.resolution; i++) {
+			for (let i = 0; i < resolution; i++) {
 				let x = offset + width * i;
-				for (let j = 0; j < currentConfig.resolution; j++) {
+				for (let j = 0; j < resolution; j++) {
 					let y = offset + height * j;
 					let block = new paper.Path.Rectangle({
 						point:  [x, y],
@@ -171,7 +180,7 @@
 				vera.fitBounds(bounds);
 
 				// group blocks in iterations
-				for (let i = 0; i < currentConfig.iterations; i++) {
+				for (let i = 0; i < iterations; i++) {
 					console.log("grouping iteration", i)
 					let toRemove = [];
 					let toAdd = [];
@@ -193,7 +202,7 @@
 						if (minIndex >= 0) {
 							let neighbor = neighbors[minIndex];
 							let neighborColor = vera.getAverageColor(neighbor.bounds);
-							if (blockColor && neighborColor && Math.abs(blockColor.gray - neighborColor.gray) < currentConfig.tolerance) {
+							if (blockColor && neighborColor && Math.abs(blockColor.gray - neighborColor.gray) < tolerance) {
 								toRemove.push(block);
 								toRemove.push(neighbor);
 								block.used = true;
@@ -245,7 +254,7 @@
 					let pattern = 2;
 					if (diffAsc < diffDesc) {
 						// descending
-						if (diffDesc > currentConfig.tolerance/2) {
+						if (diffDesc > tolerance/2) {
 							pattern = topLeft.gray > bottomRight.gray ? 0 : 1;
 						}
 						start = new paper.Point(block.bounds.x, block.bounds.y);
@@ -253,7 +262,7 @@
 					}
 					else {
 						// ascending
-						if (diffAsc > currentConfig.tolerance/2) {
+						if (diffAsc > tolerance/2) {
 							pattern = topRight.gray > bottomLeft.gray ? 0 : 1;
 						}
 						start = new paper.Point(block.bounds.x, block.bounds.y + block.bounds.height);
@@ -261,7 +270,7 @@
 					}
 					let averageColor = vera.getAverageColor(block.bounds);
 					// map average color to linecount
-					let lineCount = Math.floor((1- averageColor.gray) * currentConfig.blockLineCount);
+					let lineCount = Math.floor((1- averageColor.gray) * blockLineCount);
 					hatchFillRectangle(paper, debug, start, end,  block, lineCount, pattern);
 				}
 
@@ -269,9 +278,9 @@
 					vera.remove();
 					blocks.forEach(b => b.remove());
 				}
-				paper.view.pause();
 				console.log('done')
 			}
+			project.view.pause();
     };
   });
 

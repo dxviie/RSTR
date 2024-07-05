@@ -1,4 +1,4 @@
-export let config = $state({
+export const config = $state({
 	// image
 	file: null,
 	// grid building
