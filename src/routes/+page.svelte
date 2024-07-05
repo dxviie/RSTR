@@ -1,9 +1,67 @@
 <script>
+	import * as Card from "$lib/components/ui/card";
 	import { Button } from '$lib/components/ui/button/index.ts';
 	import RasterCanvas from '$lib/components/RasterCanvas.svelte';
+	import { Input } from '$lib/components/ui/input/index.ts';
+
+	let selectedFile = null;
+
+	function handleFileChange(event) {
+		if (!event.target.files) return;
+		selectedFile = event.target.files[0];
+	}
+
 </script>
 
-<h1>Welcome to SvelteKit</h1>
-<p>Visit <a href="https://kit.svelte.dev">kit.svelte.dev</a> to read the documentation</p>
-<Button>PUSH IT</Button>
-<RasterCanvas />
+<div class="app-container">
+
+	<main class="raster">
+		<Card.Root>
+			<Card.Header>
+				<Card.Title>RSTR</Card.Title>
+				<Card.Description>Creative Image Rasterization For Plotters</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<RasterCanvas imageFile={selectedFile}/>
+			</Card.Content>
+		</Card.Root>
+	</main>
+
+	<div class="config">
+		<Card.Root>
+			<Card.Header>
+				<Card.Title>RSTR Configuration</Card.Title>
+			</Card.Header>
+			<Card.Content>
+				<Input id="picture" type="file" class="short-file-input" on:change={handleFileChange}/>
+				<Button type="file" accept="image/*">Render</Button>
+			</Card.Content>
+		</Card.Root>
+	</div>
+</div>
+
+<style>
+	.app-container {
+		display: flex;
+		flex-direction: row;
+		height: 100vh;
+		justify-content: center;
+	}
+
+	.raster {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		padding: 1rem;
+	}
+
+	.config {
+		padding: 1rem;
+			max-width: 30rem;
+	}
+
+  :global(.short-file-input) {
+      max-width: 15rem;
+      white-space: nowrap;
+  }
+</style>

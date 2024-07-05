@@ -3,32 +3,42 @@
   import paper from "paper";
   import {onMount} from "svelte";
 
+	let {imageFile = null} = $props();
+	let img = null;
+
+	$effect(() => {
+		if (imageFile && project) {
+			console.log('image file', imageFile)
+			const reader = new FileReader();
+			reader.onload = (event) => {
+				console.log('image loaded')
+				img = new Image();
+				img.src = event.target.result as string;
+				img.onload = () => {
+					console.log('image ready for rendering')
+					project.view.play();
+				};
+			};
+			reader.readAsDataURL(imageFile);
+		}
+	});
+
 	/** Genuary constants **/
-	const MIN_RESOLUTION = 3;
-	const MAX_RESOLUTION = 81 / getPixelRatio();
-	const MAX_ITERATIONS = 10;
-	const MIN_LINE_COUNT = 5;
-	const MAX_LINE_COUNT = 27;
-	let resolution = 27;
+	let resolution = 81;
 	let iterations = 3;
 	let debugColors = ["yellow", "orange", "orangered", "red", "darkred"];
 	let tolerance = 0.8;
 	let blockLineCount = 9;
 	let fontSize = 30;
 
-	let debug = true;
+	let debug = false;
 
 	/** QR constants **/
   let canvas: HTMLCanvasElement;
   let project: paper.Project;
-  let zoom = 1;
   const PAPERJS_MM_TO_PT = 3.775;
-  const HOR_COLOR = 'orange';
-  const VERT_COLOR = 'green';
 
-  function hasBlockAt(blocks: paper.Path.Rectangle[], point: paper.PointLike): boolean {
-    return blocks.some((block) => block.contains(point));
-  }
+
 
 	function hatchFillRectangle(paper, debug, start, end, rectangle, lineCount, pattern) {
 		let direction = new paper.Path.Line(start, end);
@@ -140,7 +150,7 @@
 
 
 			// image found & edited from https://www.holo.mg/encounters/vera-molnar/
-			let vera = new paper.Raster("/vera.png");
+			let vera = new paper.Raster(img || "/vera.png");
 			vera.opacity = 0;
 			vera.onLoad = () => {
 				console.log("loaded image")
@@ -162,9 +172,11 @@
 							continue;
 						}
 						let blockColor = vera.getAverageColor(block.bounds);
+						if (!blockColor) continue;
 						let neighbors = findValidNeighbors(blocks, block);
 						let neighborDiffs = neighbors.map(n => {
 							let neighborColor = vera.getAverageColor(n.bounds);
+							if (!neighborColor) return 0;
 							return Math.abs(blockColor.gray - neighborColor.gray);
 						});
 						// find the index in neighborDiffs of the smallest element
