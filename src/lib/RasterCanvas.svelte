@@ -261,7 +261,7 @@
 					if (diffAsc < diffDesc) {
 						// descending
 						if (diffDesc > tolerance/2) {
-							pattern = topLeft.gray > bottomRight.gray ? 0 : 1;
+							pattern = topLeft.gray > bottomRight.gray ? 1 : 0;
 						}
 						start = new paper.Point(block.bounds.x, block.bounds.y);
 						end = new paper.Point(block.bounds.x + block.bounds.width, block.bounds.y + block.bounds.height);
@@ -269,7 +269,7 @@
 					else {
 						// ascending
 						if (diffAsc > tolerance/2) {
-							pattern = topRight.gray > bottomLeft.gray ? 0 : 1;
+							pattern = topRight.gray > bottomLeft.gray ? 1 : 0;
 						}
 						start = new paper.Point(block.bounds.x, block.bounds.y + block.bounds.height);
 						end = new paper.Point(block.bounds.x + block.bounds.width, block.bounds.y);

@@ -2,11 +2,11 @@ export const config = $state({
 	// image
 	file: null,
 	// grid building
-	resolution: 27,
-	iterations: 1,
-	tolerance: 0.8,
+	resolution: 33,
+	iterations: 3,
+	tolerance: 0.33,
 	// hatching
-	blockLineCount: 9
+	blockLineCount: 33
 });
 
 // You can add derived values if needed
