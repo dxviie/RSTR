@@ -298,6 +298,7 @@
 <style>
     #raster-canvas {
         display: block;
+				max-height: calc(100vh - 10rem);
         width: calc(100vw - 40rem);
 				aspect-ratio: 1;
         background-color: white;
