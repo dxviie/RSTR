@@ -34,8 +34,6 @@
 <style>
 	.app-container {
 		display: flex;
-		flex-direction: row;
-		height: 100vh;
 		justify-content: center;
 	}
 
