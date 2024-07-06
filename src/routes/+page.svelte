@@ -39,6 +39,12 @@
 		justify-content: center;
 	}
 
+	@media (max-width: 768px) {
+		.app-container {
+			flex-direction: column;
+		}
+  }
+
 	.raster {
 		display: flex;
 		flex-direction: column;

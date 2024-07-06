@@ -83,21 +83,21 @@
     /* Target labels */
     :global(#tweakpane-container .tp-lblv_l) {
         font-family: Poppins, sans-serif; /* Change to your preferred font */
-        font-size: 20px;
+        font-size: 1rem;
     }
 
     /* Target folder titles */
     :global(#tweakpane-container .tp-fldv_t) {
         font-family: Bitter, serif; /* Change to your preferred font */
-        font-size: 16px; /* Slightly larger for titles */
+        font-size: 1.1rem; /* Slightly larger for titles */
         font-weight: bold;
+				text-align: center;
 
     }
 
     /* Target Tweakpane buttons */
     :global(#tweakpane-container .tp-btnv_b) {
         font-family: Bitter, serif; /* Change to your preferred font */
-        font-size: 18px;
         /* Add any other button-specific styles you want */
         font-weight: bold;
         /* You might also want to adjust padding or other properties */
@@ -107,7 +107,7 @@
     /* If you want to style the button text specifically */
     :global(#tweakpane-container .tp-btnv_t) {
         font-family: Bitter, serif; /* Change to your preferred font */
-        font-size: 18px;
+        font-size: 1.2rem;
 				line-height: 1.5;
 				height: 2rem;
     }

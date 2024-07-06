@@ -298,9 +298,16 @@
 <style>
     #raster-canvas {
         display: block;
-        width: calc(100vw - 42rem);
-        aspect-ratio: 1;
+        width: calc(100vw - 40rem);
+				aspect-ratio: 1;
         background-color: white;
         border-radius: .5rem;
+    }
+
+		@media (max-width: 768px) {
+				#raster-canvas {
+						width: 100%;
+						height: 100%;
+				}
     }
 </style>
