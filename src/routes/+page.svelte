@@ -10,8 +10,8 @@
 	<main class="raster">
 		<Card.Root>
 			<Card.Header>
-				<Card.Title>RSTR</Card.Title>
-				<Card.Description>Creative Image Rasterization For Plotters</Card.Description>
+				<Card.Title class="title">RSTR</Card.Title>
+				<Card.Description class="description">Creative Image Rasterization For Plotters</Card.Description>
 			</Card.Header>
 			<Card.Content>
 				<RasterCanvas/>
@@ -22,7 +22,7 @@
 	<div class="config">
 		<Card.Root>
 			<Card.Header>
-				<Card.Title>RSTR Configuration</Card.Title>
+				<Card.Title class="title">Configuration</Card.Title>
 			</Card.Header>
 			<Card.Content>
 				<RasterConfig />
@@ -59,4 +59,12 @@
       max-width: 15rem;
       white-space: nowrap;
   }
+
+	:global(.title) {
+			font-family: Bitter, serif;
+	}
+
+	:global(.description) {
+			font-family: Poppins, sans-serif;
+	}
 </style>
