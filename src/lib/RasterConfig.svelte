@@ -1,15 +1,17 @@
 <script>
 	import { onMount } from 'svelte';
 	import { Pane } from 'tweakpane';
-	import { config, updateConfig } from '$lib/rasterStore.svelte.ts';
+	import { config } from '$lib/config.svelte.ts';
 
 	let fileInput;
+
+	let paneConfig = { ...config.value };
 
 	function handleFileSelect(event) {
 		const file = event.target.files[0];
 		if (file) {
 			console.log('File selected:', file.name);
-			updateConfig({file: file});
+			config.update({file: file});
 			// Handle the file here (e.g., upload it, process it, etc.)
 		}
 	}
@@ -25,17 +27,16 @@
 		});
 
 		const gridFolder = pane.addFolder({ title: 'Grid' });
-		gridFolder.addBinding(config, 'resolution', { min: 1, max: 200, step: 1 });
-		gridFolder.addBinding(config, 'iterations', { min: 1, max: 20, step: 1 });
-		gridFolder.addBinding(config, 'tolerance', { min: 0, max: 1, step: 0.01 });
+		gridFolder.addBinding(paneConfig, 'resolution', { min: 1, max: 200, step: 1 });
+		gridFolder.addBinding(paneConfig, 'iterations', { min: 1, max: 20, step: 1 });
+		gridFolder.addBinding(paneConfig, 'tolerance', { min: 0, max: 1, step: 0.01 });
 
 		const hatchingFolder = pane.addFolder({ title: 'Fill' });
-		hatchingFolder.addBinding(config, 'blockLineCount', { min: 1, max: 50, step: 1 });
+		hatchingFolder.addBinding(paneConfig, 'blockLineCount', { min: 1, max: 50, step: 1 });
 
 		// Listen for changes and emit the updated config
 		pane.on('change', () => {
-			console.log('config', config);
-			updateConfig({ ...config });
+			config.update({ ...paneConfig });
 		});
 
 		return () => {
@@ -53,6 +54,9 @@
 		bind:this={fileInput}
 		on:change={handleFileSelect}
 	/>
+	<h1>
+		{config.value.tolerance}
+	</h1>
 </div>
 
 <style>
