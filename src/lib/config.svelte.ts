@@ -9,21 +9,23 @@ const initialState = {
 	blockLineCount: 33
 };
 
-let state = $state({ ...initialState });
+export const config = $state({ ...initialState });
 
-export const config = {
-	get value() { return state },
+export const configActions = {
+	// get value() { return state },
 	update: (newValues) => {
-		state = {
-			...state,
-			...newValues,
+		for (const [key, value] of Object.entries(newValues)) {
+			if (key in config) {
+				config[key] = value;
+			}
 		}
-		console.log('config UPDATED::', state);
 	},
 	reset: () => {
-		state = {
-			...initialState,
-		};
+		config.file = initialState.file;
+		config.resolution = initialState.resolution;
+		config.iterations = initialState.iterations;
+		config.tolerance = initialState.tolerance;
+		config.blockLineCount = initialState.blockLineCount;
 	},
 };
 

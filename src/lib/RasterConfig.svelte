@@ -1,11 +1,11 @@
 <script>
 	import { onMount } from 'svelte';
 	import { Pane } from 'tweakpane';
-	import { config } from '$lib/config.svelte.ts';
+	import { config, configActions } from '$lib/config.svelte.ts';
 
 	let fileInput;
 
-	let paneConfig = { ...config.value };
+	let paneConfig = { ...config };
 
 	function handleFileSelect(event) {
 		const file = event.target.files[0];
@@ -36,7 +36,7 @@
 
 		// Listen for changes and emit the updated config
 		pane.on('change', () => {
-			config.update({ ...paneConfig });
+			configActions.update({ ...paneConfig });
 		});
 
 		return () => {
@@ -55,7 +55,7 @@
 		on:change={handleFileSelect}
 	/>
 	<h1>
-		{config.value.tolerance}
+		{config.tolerance}
 	</h1>
 </div>
 
