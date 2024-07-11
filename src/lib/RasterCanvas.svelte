@@ -14,6 +14,7 @@
 	} from './fsm.svelte';
 	import Button from './components/ui/button/button.svelte';
 
+	let spinner: HTMLDivElement | null = null;
 	let imageFile = config.file;
 	let img: HTMLImageElement | null = null;
 
@@ -331,8 +332,9 @@
 	const handleExportSVG = () => {
 		console.debug('exporting svg');
 		exporting.action();
+		if (spinner) spinner.style.display = 'block';
 		setTimeout(() => {
-			const svg = project.exportSVG({ asString: true });
+			const svg = project.exportSVG({ asString: true }) as string;
 			const blob = new Blob([svg], { type: 'image/svg+xml' });
 			const url = URL.createObjectURL(blob);
 			const a = document.createElement('a');
@@ -341,12 +343,14 @@
 			a.click();
 			URL.revokeObjectURL(url);
 			exported.action();
+			if (spinner) spinner.style.display = 'none';
 			console.debug('exported svg');
 		}, 100);
 	};
 </script>
 
 <div class="canvas-container">
+	<div id="spinner" class="spinner" style="display: none;" bind:this={spinner}></div>
 	<canvas id="raster-canvas" bind:this={canvas} data-paper-hidpi="off"></canvas>
 	{#if rstrState.status === 'done'}
 		<Button class="font-bold" on:click={handleExportSVG}>EXPORT SVG</Button>
@@ -374,6 +378,29 @@
 		#raster-canvas {
 			width: 100%;
 			height: 100%;
+		}
+	}
+
+	.spinner {
+		width: 50px;
+		height: 50px;
+		border: 5px solid #f3f3f3;
+		border-top: 5px solid darkorange;
+		border-radius: 50%;
+		animation: spin 1s linear infinite;
+		position: fixed;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+		z-index: 1000;
+	}
+
+	@keyframes spin {
+		0% {
+			transform: translate(-50%, -50%) rotate(0deg);
+		}
+		100% {
+			transform: translate(-50%, -50%) rotate(360deg);
 		}
 	}
 </style>
