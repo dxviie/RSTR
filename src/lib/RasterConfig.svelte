@@ -1,20 +1,61 @@
-<script>
+<script lang="ts">
 	import { Pane } from 'tweakpane';
 	import { config, configActions } from '$lib/config.svelte.ts';
+	import Button from './components/ui/button/button.svelte';
+	import {
+		rstrState,
+		getActionsForStatus,
+		type RstrAction,
+		type RstrActionType
+	} from '$lib/fsm.svelte';
 
-	let fileInput;
+	let container: HTMLDivElement;
+	let fileInput: HTMLInputElement;
 
+	let pane: Pane | null = null;
 	let paneConfig = { ...config };
 
-	$effect(() => {
-		const pane = new Pane({
-			container: document.getElementById('tweakpane-container')
-		});
+	let actionButtonLabel = $state('--');
+	let actionButtonAction: null | RstrAction = null;
+	let actionButtonEnabled = $state(true);
+	let selectImageButtonEnabled = $state(true);
+	let configEnabled = $state(true);
 
-		pane.addButton({ title: 'Select File...' }).on('click', () => {
-			console.log('Select File...');
-			fileInput.click();
-		});
+	$effect(() => {
+		if (rstrState.status) {
+			const actions = getActionsForStatus(rstrState.status);
+			selectImageButtonEnabled =
+				actions.find((action) => action.type === ('input' as RstrActionType)) !== undefined;
+			actionButtonEnabled = rstrState.status !== 'loading';
+			actions.forEach((action) => {
+				if (action.type === 'button') {
+					actionButtonAction = action;
+					actionButtonLabel = action.label;
+				}
+			});
+			configEnabled = rstrState.status === 'config';
+			if (pane) {
+				pane.disabled = !configEnabled;
+			}
+			console.debug(
+				'updating state actions',
+				actions,
+				rstrState.status,
+				selectImageButtonEnabled,
+				actionButtonEnabled,
+				configEnabled
+			);
+		}
+	});
+
+	const handleActionButtonClick = () => {
+		if (actionButtonAction) {
+			actionButtonAction.action();
+		}
+	};
+
+	$effect(() => {
+		pane = new Pane({ container: container });
 
 		const gridFolder = pane.addFolder({ title: 'Grid' });
 		gridFolder.addBinding(paneConfig, 'resolution', { min: 1, max: 200, step: 1 });
@@ -30,22 +71,36 @@
 		});
 
 		return () => {
-			pane.dispose();
+			if (pane) pane.dispose();
 		};
-	})
+	});
 
-	function handleFileSelect(event) {
-		const file = event.target.files[0];
+	function handleFileSelect(event: Event) {
+		if (!event.target) return;
+		const input = event.target as HTMLInputElement;
+		if (!input.files) return;
+		const file = input.files[0];
 		if (file) {
 			console.log('File selected:', file.name);
-			configActions.update({file: file});
+			configActions.update({ file: file });
 			// Handle the file here (e.g., upload it, process it, etc.)
 		}
 	}
 </script>
 
-<div>
-	<div id="tweakpane-container" class="tweakpane-container"></div>
+<div class="config-container">
+	<Button
+		class="w-full font-bold"
+		on:click={() => fileInput.click()}
+		disabled={!selectImageButtonEnabled}>SELECT IMAGE</Button
+	>
+	<Button
+		class="w-full font-bold"
+		on:click={() => handleActionButtonClick()}
+		disabled={!actionButtonEnabled}>{actionButtonLabel}</Button
+	>
+
+	<div id="tweakpane-container" class="tweakpane-container" bind:this={container}></div>
 	<input
 		type="file"
 		accept="image/*"
@@ -56,96 +111,101 @@
 </div>
 
 <style>
-    .tweakpane-container {
-				font-size: large !important;
-		}
+	.config-container {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
 
-    :global(.tweakpane-container div) {
-				font-size: x-large !important;
-        /*position: fixed;*/
-        /*top: 10px;*/
-        /*right: 10px;*/
-        /*z-index: 1000;*/
-    }
+	.tweakpane-container {
+		font-size: large !important;
+	}
 
-    /* Target the main Tweakpane container */
-    :global(#tweakpane-container .tp-dfwv) {
-        font-family: Bitter, serif; /* Change to your preferred font */
-        font-size: 14px; /* Adjust the size as needed */
-    }
+	:global(.tweakpane-container div) {
+		font-size: x-large !important;
+		/*position: fixed;*/
+		/*top: 10px;*/
+		/*right: 10px;*/
+		/*z-index: 1000;*/
+	}
 
-    /* Target input elements */
-    :global(#tweakpane-container .tp-txtv_i) {
-        font-family: Bitter, serif; /* Change to your preferred font */
-        font-size: 14px;
-    }
+	/* Target the main Tweakpane container */
+	:global(#tweakpane-container .tp-dfwv) {
+		font-family: Bitter, serif; /* Change to your preferred font */
+		font-size: 14px; /* Adjust the size as needed */
+	}
 
-    /* Target labels */
-    :global(#tweakpane-container .tp-lblv_l) {
-        font-family: Poppins, sans-serif; /* Change to your preferred font */
-        font-size: 1rem;
-    }
+	/* Target input elements */
+	:global(#tweakpane-container .tp-txtv_i) {
+		font-family: Bitter, serif; /* Change to your preferred font */
+		font-size: 14px;
+	}
 
-    /* Target folder titles */
-    :global(#tweakpane-container .tp-fldv_t) {
-        font-family: Bitter, serif; /* Change to your preferred font */
-        font-size: 1.1rem; /* Slightly larger for titles */
-        font-weight: bold;
-				text-align: center;
+	/* Target labels */
+	:global(#tweakpane-container .tp-lblv_l) {
+		font-family: Poppins, sans-serif; /* Change to your preferred font */
+		font-size: 1rem;
+	}
 
-    }
+	/* Target folder titles */
+	:global(#tweakpane-container .tp-fldv_t) {
+		font-family: Bitter, serif; /* Change to your preferred font */
+		font-size: 1.1rem; /* Slightly larger for titles */
+		font-weight: bold;
+		text-align: center;
+	}
 
-    /* Target Tweakpane buttons */
-    :global(#tweakpane-container .tp-btnv_b) {
-        font-family: Bitter, serif; /* Change to your preferred font */
-        /* Add any other button-specific styles you want */
-        font-weight: bold;
-        /* You might also want to adjust padding or other properties */
-        padding: 6px 8px;
-    }
+	/* Target Tweakpane buttons */
+	:global(#tweakpane-container .tp-btnv_b) {
+		font-family: Bitter, serif; /* Change to your preferred font */
+		/* Add any other button-specific styles you want */
+		font-weight: bold;
+		/* You might also want to adjust padding or other properties */
+		padding: 6px 8px;
+	}
 
-    /* If you want to style the button text specifically */
-    :global(#tweakpane-container .tp-btnv_t) {
-        font-family: Bitter, serif; /* Change to your preferred font */
-        font-size: 1.2rem;
-				line-height: 1.5;
-				height: 2rem;
-    }
+	/* If you want to style the button text specifically */
+	:global(#tweakpane-container .tp-btnv_t) {
+		font-family: Bitter, serif; /* Change to your preferred font */
+		font-size: 1.2rem;
+		line-height: 1.5;
+		height: 2rem;
+	}
 
-    /* Increase height for all main control containers */
-    :global(#tweakpane-container .tp-rotv_c) {
-        --tp-base-height: 400px !important; /* Adjust this value as needed */
-    }
+	/* Increase height for all main control containers */
+	:global(#tweakpane-container .tp-rotv_c) {
+		--tp-base-height: 400px !important; /* Adjust this value as needed */
+	}
 
-    /* Adjust input fields */
-    :global(#tweakpane-container .tp-txtv_i) {
-        height: 30px !important; /* Adjust as needed */
-    }
+	/* Adjust input fields */
+	:global(#tweakpane-container .tp-txtv_i) {
+		height: 30px !important; /* Adjust as needed */
+	}
 
-    /* Adjust sliders */
-    :global(#tweakpane-container .tp-sldv_i) {
-        height: 30px !important; /* Adjust as needed */
-    }
+	/* Adjust sliders */
+	:global(#tweakpane-container .tp-sldv_i) {
+		height: 30px !important; /* Adjust as needed */
+	}
 
-    /* Adjust buttons */
-    :global(#tweakpane-container .tp-btnv_b) {
-        height: 40px !important; /* Adjust as needed */
-        line-height: 40px !important; /* To vertically center text */
-    }
+	/* Adjust buttons */
+	:global(#tweakpane-container .tp-btnv_b) {
+		height: 40px !important; /* Adjust as needed */
+		line-height: 40px !important; /* To vertically center text */
+	}
 
-    /* Adjust dropdown menus */
-    :global(#tweakpane-container .tp-lstv_s) {
-        height: 30px !important; /* Adjust as needed */
-    }
+	/* Adjust dropdown menus */
+	:global(#tweakpane-container .tp-lstv_s) {
+		height: 30px !important; /* Adjust as needed */
+	}
 
-    /* Adjust checkbox size */
-    :global(#tweakpane-container .tp-ckbv_i) {
-        width: 20px !important; /* Adjust as needed */
-        height: 20px !important; /* Adjust as needed */
-    }
+	/* Adjust checkbox size */
+	:global(#tweakpane-container .tp-ckbv_i) {
+		width: 20px !important; /* Adjust as needed */
+		height: 20px !important; /* Adjust as needed */
+	}
 
-    /* Adjust the vertical spacing between controls if needed */
-    :global(#tweakpane-container .tp-rotv_c > *:not(:first-child)) {
-        margin-top: 8px !important; /* Adjust as needed */
-    }
+	/* Adjust the vertical spacing between controls if needed */
+	:global(#tweakpane-container .tp-rotv_c > *:not(:first-child)) {
+		margin-top: 8px !important; /* Adjust as needed */
+	}
 </style>

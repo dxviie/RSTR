@@ -9,7 +9,7 @@ const initialState = {
 	blockLineCount: 33
 };
 
-const updateConfig = (newValues) => {
+const updateConfig = (newValues: { [s: string]: unknown; } | ArrayLike<unknown>) => {
 	for (const [key, value] of Object.entries(newValues)) {
 		if (key in config) {
 			config[key] = value;
@@ -17,7 +17,7 @@ const updateConfig = (newValues) => {
 	}
 }
 
-export const config = $state({ ...initialState });
+export const config: { [key: string]: any } = $state({ ...initialState });
 
 export const configActions = {
 	update: updateConfig,
