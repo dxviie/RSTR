@@ -28,7 +28,7 @@
 			const actions = getActionsForStatus(rstrState.status);
 			selectImageButtonEnabled =
 				actions.find((action) => action.type === ('input' as RstrActionType)) !== undefined;
-			actionButtonEnabled = rstrState.status !== 'loading';
+			actionButtonEnabled = rstrState.status !== 'loading' && rstrState.status !== 'exporting';
 			actions.forEach((action) => {
 				if (action.type === 'button') {
 					actionButtonAction = action;

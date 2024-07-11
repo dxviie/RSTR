@@ -3,6 +3,8 @@
 	import { onMount } from 'svelte';
 	import { config } from '$lib/config.svelte.ts';
 	import {
+		exported,
+		exporting,
 		getActionsForStatus,
 		imageLoaded,
 		renderingFinished,
@@ -10,6 +12,7 @@
 		type RstrAction,
 		type RstrActionType
 	} from './fsm.svelte';
+	import Button from './components/ui/button/button.svelte';
 
 	let imageFile = config.file;
 	let img: HTMLImageElement | null = null;
@@ -324,11 +327,40 @@
 			project.view.pause();
 		};
 	});
+
+	const handleExportSVG = () => {
+		console.debug('exporting svg');
+		exporting.action();
+		setTimeout(() => {
+			const svg = project.exportSVG({ asString: true });
+			const blob = new Blob([svg], { type: 'image/svg+xml' });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = 'rstr.svg';
+			a.click();
+			URL.revokeObjectURL(url);
+			exported.action();
+			console.debug('exported svg');
+		}, 100);
+	};
 </script>
 
-<canvas id="raster-canvas" bind:this={canvas} data-paper-hidpi="off"></canvas>
+<div class="canvas-container">
+	<canvas id="raster-canvas" bind:this={canvas} data-paper-hidpi="off"></canvas>
+	{#if rstrState.status === 'done'}
+		<Button class="font-bold" on:click={handleExportSVG}>EXPORT SVG</Button>
+	{/if}
+</div>
 
 <style>
+	.canvas-container {
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		align-items: center;
+	}
+
 	#raster-canvas {
 		display: block;
 		max-height: calc(100vh - 10rem);

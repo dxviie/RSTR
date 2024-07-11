@@ -1,5 +1,5 @@
 export type RstrActionType = 'button' | 'input' | 'system';
-export type RstrState = 'config' | 'render' | 'done' | 'error' | 'loading';
+export type RstrState = 'config' | 'render' | 'done' | 'error' | 'loading' | 'exporting';
 export type RstrAction = {
 	label: string;
 	action: () => boolean;
@@ -68,6 +68,24 @@ const transitions = {
 		}
 		console.warn('Cannot finish loading image from state', rstrState.status);
 		return false;
+	},
+	exporting: () => {
+		if (rstrState.status === 'done') {
+			console.debug('Status update: done -> exporting');
+			rstrState.status = 'exporting';
+			return true;
+		}
+		console.warn('Cannot start exporting from state', rstrState.status);
+		return false;
+	},
+	exported: () => {
+		if (rstrState.status === 'exporting') {
+			console.debug('Status update: exporting -> done');
+			rstrState.status = 'done';
+			return true;
+		}
+		console.warn('Cannot finish exporting from state', rstrState.status);
+		return false;
 	}
 };
 
@@ -101,6 +119,16 @@ const actions = {
 		label: 'IMAGE LOADED',
 		action: transitions.imageLoaded,
 		type: 'system' as RstrActionType
+	},
+	exporting: {
+		label: 'EXPORT',
+		action: transitions.exporting,
+		type: 'button' as RstrActionType
+	},
+	exported: {
+		label: 'EXPORTED',
+		action: transitions.exported,
+		type: 'system' as RstrActionType
 	}
 };
 
@@ -126,3 +154,5 @@ export const getActionsForStatus = (status: string): RstrAction[] => {
 export const renderingFinished: RstrAction = actions.renderingFinished;
 export const loadingImage: RstrAction = actions.loadingImage;
 export const imageLoaded: RstrAction = actions.imageLoaded;
+export const exporting: RstrAction = actions.exporting;
+export const exported: RstrAction = actions.exported;
