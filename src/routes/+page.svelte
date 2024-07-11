@@ -2,6 +2,7 @@
 	import * as Card from '$lib/components/ui/card';
 	import RasterCanvas from '$lib/RasterCanvas.svelte';
 	import RasterConfig from '$lib/RasterConfig.svelte';
+	import { marked } from 'marked';
 
 	const phrases = [
 		'Creative Image Rasterization For Plotters',
@@ -19,33 +20,59 @@
 	$effect(() => {
 		selectedPhrase = phrases[Math.floor(Math.random() * phrases.length)];
 	});
+
+	let footerContent = $state('');
+	async function loadFooter() {
+		const response = await fetch('/md/footer.md');
+		const text = await response.text();
+		// @ts-ignore
+		footerContent = marked(text);
+	}
+	$effect(() => {
+		loadFooter();
+	});
 </script>
 
-<div class="app-container">
-	<main class="raster">
-		<Card.Root>
-			<Card.Header>
-				<Card.Title class="title">RSTR</Card.Title>
-			</Card.Header>
-			<Card.Content>
-				<RasterCanvas />
-			</Card.Content>
-		</Card.Root>
-	</main>
+<div class="page">
+	<div class="app-container">
+		<main class="raster">
+			<Card.Root>
+				<Card.Header>
+					<Card.Title class="title">RSTR</Card.Title>
+				</Card.Header>
+				<Card.Content>
+					<RasterCanvas />
+				</Card.Content>
+			</Card.Root>
+		</main>
 
-	<div class="config">
-		<Card.Root>
-			<Card.Header>
-				<Card.Description class="description">{selectedPhrase}</Card.Description>
-			</Card.Header>
-			<Card.Content>
-				<RasterConfig />
-			</Card.Content>
-		</Card.Root>
+		<div class="config">
+			<Card.Root>
+				<Card.Header>
+					<Card.Description class="description">{selectedPhrase}</Card.Description>
+				</Card.Header>
+				<Card.Content>
+					<RasterConfig />
+				</Card.Content>
+			</Card.Root>
+		</div>
+	</div>
+	<div class="markdown-container">
+		<div class="markdown-content page-footer">
+			{@html footerContent}
+		</div>
 	</div>
 </div>
 
 <style>
+	.page {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		min-height: 100vh;
+		justify-content: space-between;
+	}
+
 	.app-container {
 		display: flex;
 		justify-content: center;
@@ -81,5 +108,22 @@
 
 	:global(.description) {
 		font-family: Poppins, sans-serif;
+	}
+
+	.markdown-container {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.page-footer {
+		margin-top: 1rem;
+		margin-bottom: 1rem;
+		text-align: center;
+		line-height: 14pt;
+	}
+
+	:global(a) {
+		color: darkorange;
+		text-decoration: none;
 	}
 </style>

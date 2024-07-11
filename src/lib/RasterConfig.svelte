@@ -154,19 +154,19 @@
 	/* Target input elements */
 	:global(#tweakpane-container .tp-txtv_i) {
 		font-family: Bitter, serif; /* Change to your preferred font */
-		font-size: 14px;
+		font-size: 12px;
 	}
 
 	/* Target labels */
 	:global(#tweakpane-container .tp-lblv_l) {
 		font-family: Poppins, sans-serif; /* Change to your preferred font */
-		font-size: 1rem;
+		font-size: 0.9rem;
 	}
 
 	/* Target folder titles */
 	:global(#tweakpane-container .tp-fldv_t) {
 		font-family: Bitter, serif; /* Change to your preferred font */
-		font-size: 1.1rem; /* Slightly larger for titles */
+		font-size: 0.9rem; /* Slightly larger for titles */
 		font-weight: bold;
 		text-align: center;
 	}
@@ -183,7 +183,7 @@
 	/* If you want to style the button text specifically */
 	:global(#tweakpane-container .tp-btnv_t) {
 		font-family: Bitter, serif; /* Change to your preferred font */
-		font-size: 1.2rem;
+		font-size: 1rem;
 		line-height: 1.5;
 		height: 2rem;
 	}
