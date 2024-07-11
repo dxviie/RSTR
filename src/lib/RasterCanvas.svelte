@@ -139,7 +139,7 @@
 			}
 			paper.project.activeLayer.removeChildren();
 
-			const bounds = paper.view.bounds.scale(0.9);
+			const bounds = paper.view.bounds; //.scale(0.9);
 			const offset = bounds.width * 0.05;
 			const width = bounds.width / config.resolution;
 			const height = bounds.height / config.resolution;
@@ -339,7 +339,7 @@
 			const url = URL.createObjectURL(blob);
 			const a = document.createElement('a');
 			a.href = url;
-			a.download = 'rstr.svg';
+			a.download = getFrameFileName('svg');
 			a.click();
 			URL.revokeObjectURL(url);
 			exported.action();
@@ -403,7 +403,7 @@
 
 				// Create a temporary link to trigger the download
 				var downloadLink = document.createElement('a');
-				downloadLink.download = getFrameFileName();
+				downloadLink.download = getFrameFileName('png');
 				downloadLink.href = url;
 				downloadLink.target = '_blank';
 				downloadLink.click();
@@ -412,25 +412,34 @@
 		};
 	}
 
-	const getFrameFileName = () => {
+	const getFrameFileName = (ext: string) => {
 		const now = new Date();
 		const timestamp = `${now.getFullYear()}${now.getMonth() + 1}${now.getDate()}-${now.getHours()}${now.getMinutes()}`;
-		return `rstr.d17e.dev-${timestamp}.png`;
+		return `rstr.d17e.dev-${timestamp}.${ext}`;
 	};
 </script>
 
 <div class="canvas-container">
 	<div id="spinner" class="spinner" style="display: none;" bind:this={spinner}></div>
 	<canvas id="raster-canvas" bind:this={canvas} data-paper-hidpi="off"></canvas>
-	{#if rstrState.status === 'done'}
-		<div class="button-container">
+
+	<div class="button-container">
+		{#if rstrState.status === 'done'}
 			<Button class="font-bold" on:click={handleExportSVG}>EXPORT SVG</Button>
 			<Button class="font-bold" on:click={handleSaveImage}>SAVE IMAGE</Button>
-		</div>
-	{/if}
+		{/if}
+	</div>
 </div>
 
 <style>
+	.button-container {
+		margin-top: 1rem;
+		height: 3rem;
+		display: flex;
+		justify-content: center;
+		gap: 1rem;
+	}
+
 	.canvas-container {
 		display: flex;
 		flex-direction: column;

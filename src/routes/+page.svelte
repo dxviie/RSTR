@@ -2,11 +2,23 @@
 	import * as Card from '$lib/components/ui/card';
 	import RasterCanvas from '$lib/RasterCanvas.svelte';
 	import RasterConfig from '$lib/RasterConfig.svelte';
+
+	const phrases = [
+		'Creative Image Rasterization For Plotters',
+		'Innovative Rasterization Techniques for Plotting Images',
+		'Artistic Rasterization for Plotter Devices',
+		'Plotter-Focused Creative Rasterization of Images',
+		'Advanced Image Rasterization for Precision Plotters'
+	];
+	const selectedPhrase = phrases[Math.floor(Math.random() * phrases.length)];
 </script>
 
 <div class="app-container">
 	<main class="raster">
 		<Card.Root>
+			<Card.Header>
+				<Card.Title class="title">RSTR</Card.Title>
+			</Card.Header>
 			<Card.Content>
 				<RasterCanvas />
 			</Card.Content>
@@ -16,10 +28,7 @@
 	<div class="config">
 		<Card.Root>
 			<Card.Header>
-				<Card.Title class="title">RSTR</Card.Title>
-				<Card.Description class="description"
-					>Creative Image Rasterization For Plotters</Card.Description
-				>
+				<Card.Description class="description">{selectedPhrase}</Card.Description>
 			</Card.Header>
 			<Card.Content>
 				<RasterConfig />

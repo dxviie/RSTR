@@ -224,4 +224,29 @@
 	:global(#tweakpane-container .tp-rotv_c > *:not(:first-child)) {
 		margin-top: 8px !important; /* Adjust as needed */
 	}
+
+	@media screen and (max-width: 480px) {
+		.tweakpane-container {
+			font-size: medium !important; /* Smaller font size for mobile */
+		}
+
+		:global(.tweakpane-container div) {
+			font-size: large !important; /* Adjusted for mobile */
+		}
+
+		:global(#tweakpane-container .tp-dfwv),
+		:global(#tweakpane-container .tp-txtv_i),
+		:global(#tweakpane-container .tp-btnv_b),
+		:global(#tweakpane-container .tp-btnv_t) {
+			font-size: 12px; /* Smaller font size for mobile */
+		}
+
+		:global(#tweakpane-container .tp-lblv_l) {
+			font-size: 0.9rem; /* Adjusted for mobile */
+		}
+
+		:global(#tweakpane-container .tp-fldv_t) {
+			font-size: 1rem; /* Adjusted for mobile */
+		}
+	}
 </style>
