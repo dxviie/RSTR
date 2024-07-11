@@ -6,7 +6,9 @@
 		rstrState,
 		getActionsForStatus,
 		type RstrAction,
-		type RstrActionType
+		type RstrActionType,
+		loadingImage,
+		imageLoaded
 	} from '$lib/fsm.svelte';
 
 	let container: HTMLDivElement;
@@ -75,7 +77,13 @@
 		};
 	});
 
-	function handleFileSelect(event: Event) {
+	function handleSelectFileClicked(event: Event) {
+		if (fileInput) fileInput.click();
+		loadingImage.action();
+	}
+
+	function handleFileSelected(event: Event) {
+		console.log('handleFileSelected');
 		if (!event.target) return;
 		const input = event.target as HTMLInputElement;
 		if (!input.files) return;
@@ -84,6 +92,8 @@
 			console.log('File selected:', file.name);
 			configActions.update({ file: file });
 			// Handle the file here (e.g., upload it, process it, etc.)
+		} else {
+			imageLoaded.action();
 		}
 	}
 </script>
@@ -91,9 +101,10 @@
 <div class="config-container">
 	<Button
 		class="w-full font-bold"
-		on:click={() => fileInput.click()}
+		on:click={handleSelectFileClicked}
 		disabled={!selectImageButtonEnabled}>SELECT IMAGE</Button
 	>
+
 	<Button
 		class="w-full font-bold"
 		on:click={() => handleActionButtonClick()}
@@ -101,12 +112,16 @@
 	>
 
 	<div id="tweakpane-container" class="tweakpane-container" bind:this={container}></div>
+
 	<input
 		type="file"
 		accept="image/*"
 		style="display: none;"
 		bind:this={fileInput}
-		onchange={handleFileSelect}
+		onchange={handleFileSelected}
+		onabort={() => imageLoaded.action()}
+		onerror={() => imageLoaded.action()}
+		oncancel={() => imageLoaded.action()}
 	/>
 </div>
 
@@ -119,6 +134,7 @@
 
 	.tweakpane-container {
 		font-size: large !important;
+		margin-top: 1rem;
 	}
 
 	:global(.tweakpane-container div) {

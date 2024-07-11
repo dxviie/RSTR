@@ -17,7 +17,7 @@ const transitions = {
 			rstrState.status = 'render';
 			return true;
 		}
-		console.warn('Cannot start rendering from state', rstrState);
+		console.warn('Cannot start rendering from state', rstrState.status);
 		return false;
 	},
 	renderingFinished: () => {
@@ -26,7 +26,7 @@ const transitions = {
 			rstrState.status = 'done';
 			return true;
 		}
-		console.warn('Cannot finish rendering from state', rstrState);
+		console.warn('Cannot finish rendering from state', rstrState.status);
 		return false;
 	},
 	renderingStopped: () => {
@@ -35,7 +35,7 @@ const transitions = {
 			rstrState.status = 'done';
 			return true;
 		}
-		console.warn('Cannot stop rendering from state', rstrState);
+		console.warn('Cannot stop rendering from state', rstrState.status);
 		return false;
 	},
 	error: (err: string) => {
@@ -44,11 +44,11 @@ const transitions = {
 	},
 	reset: () => {
 		if (rstrState.status === 'done' || rstrState.status === 'error') {
-			console.debug('Status update: done/error -> ``config');
+			console.debug('Status update: done/error -> config');
 			rstrState.status = 'config';
 			return true;
 		}
-		console.warn('Cannot reset from state', rstrState);
+		console.warn('Cannot reset from state', rstrState.status);
 		return false;
 	},
 	loadingImage: () => {
@@ -57,7 +57,7 @@ const transitions = {
 			rstrState.status = 'loading';
 			return true;
 		}
-		console.warn('Cannot start loading image from state', rstrState);
+		console.warn('Cannot start loading image from state', rstrState.status);
 		return false;
 	},
 	imageLoaded: () => {
@@ -66,7 +66,7 @@ const transitions = {
 			rstrState.status = 'config';
 			return true;
 		}
-		console.warn('Cannot finish loading image from state', rstrState);
+		console.warn('Cannot finish loading image from state', rstrState.status);
 		return false;
 	}
 };
@@ -122,3 +122,7 @@ export const getActionsForStatus = (status: string): RstrAction[] => {
 	}
 	return [];
 }
+
+export const renderingFinished: RstrAction = actions.renderingFinished;
+export const loadingImage: RstrAction = actions.loadingImage;
+export const imageLoaded: RstrAction = actions.imageLoaded;
