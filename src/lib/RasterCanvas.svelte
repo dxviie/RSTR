@@ -5,6 +5,7 @@
 	import {
 		getActionsForStatus,
 		imageLoaded,
+		renderingFinished,
 		rstrState,
 		type RstrAction,
 		type RstrActionType
@@ -318,6 +319,7 @@
 					blocks.forEach((b) => b.remove());
 				}
 				console.log('done');
+				renderingFinished.action();
 			};
 			project.view.pause();
 		};
