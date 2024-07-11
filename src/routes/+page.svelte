@@ -8,9 +8,17 @@
 		'Innovative Rasterization Techniques for Plotting Images',
 		'Artistic Rasterization for Plotter Devices',
 		'Plotter-Focused Creative Rasterization of Images',
-		'Advanced Image Rasterization for Precision Plotters'
+		'Advanced Image Rasterization for Precision Plotters',
+		'Artistic Scribbles for High-Tech Doodlers',
+		'Pixel-Wrangling for Plotter Jockeys',
+		'Crafty Pixel Magic for Plotter Wizards',
+		'Plotter Shenanigans: Artistic Pixel Mischief',
+		'From Pixels to Plots: The Artistic Alchemy'
 	];
-	const selectedPhrase = phrases[Math.floor(Math.random() * phrases.length)];
+	let selectedPhrase = $state('');
+	$effect(() => {
+		selectedPhrase = phrases[Math.floor(Math.random() * phrases.length)];
+	});
 </script>
 
 <div class="app-container">

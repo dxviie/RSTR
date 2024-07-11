@@ -14,9 +14,15 @@
 	} from './fsm.svelte';
 	import Button from './components/ui/button/button.svelte';
 
+	const pics = ['brasa.png', 'kelb.png', 'knest.png'];
+	let selectedPic = $state('');
 	let spinner: HTMLDivElement | null = null;
 	let imageFile = config.file;
 	let img: HTMLImageElement | null = null;
+
+	$effect(() => {
+		selectedPic = pics[Math.floor(Math.random() * pics.length)];
+	});
 
 	$effect(() => {
 		console.debug('>>>> rstrState', rstrState.status);
@@ -184,7 +190,7 @@
 			}
 
 			// image found & edited from https://www.holo.mg/encounters/vera-molnar/
-			let vera = new paper.Raster(img || '/me_wa.png');
+			let vera = new paper.Raster(img || selectedPic);
 			vera.opacity = 0;
 			vera.onLoad = () => {
 				console.log('loaded image');
