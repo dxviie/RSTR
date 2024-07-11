@@ -1,5 +1,4 @@
 <script>
-	import { onMount } from 'svelte';
 	import { Pane } from 'tweakpane';
 	import { config, configActions } from '$lib/config.svelte.ts';
 
@@ -7,16 +6,7 @@
 
 	let paneConfig = { ...config };
 
-	function handleFileSelect(event) {
-		const file = event.target.files[0];
-		if (file) {
-			console.log('File selected:', file.name);
-			config.update({file: file});
-			// Handle the file here (e.g., upload it, process it, etc.)
-		}
-	}
-
-	onMount(() => {
+	$effect(() => {
 		const pane = new Pane({
 			container: document.getElementById('tweakpane-container')
 		});
@@ -42,7 +32,16 @@
 		return () => {
 			pane.dispose();
 		};
-	});
+	})
+
+	function handleFileSelect(event) {
+		const file = event.target.files[0];
+		if (file) {
+			console.log('File selected:', file.name);
+			configActions.update({file: file});
+			// Handle the file here (e.g., upload it, process it, etc.)
+		}
+	}
 </script>
 
 <div>
@@ -52,11 +51,8 @@
 		accept="image/*"
 		style="display: none;"
 		bind:this={fileInput}
-		on:change={handleFileSelect}
+		onchange={handleFileSelect}
 	/>
-	<h1>
-		{config.tolerance}
-	</h1>
 </div>
 
 <style>
@@ -64,7 +60,7 @@
 				font-size: large !important;
 		}
 
-    .tweakpane-container div {
+    :global(.tweakpane-container div) {
 				font-size: x-large !important;
         /*position: fixed;*/
         /*top: 10px;*/

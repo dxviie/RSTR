@@ -18,7 +18,7 @@
 	})
 
 	$effect(() => {
-		if (imageFile !== config.file && project) {
+		if (config.file && project) {
 			console.log('image file', config.file)
 			imageFile = config.file;
 			const reader = new FileReader();
