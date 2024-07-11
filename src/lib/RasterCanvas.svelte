@@ -347,13 +347,32 @@
 			console.debug('exported svg');
 		}, 100);
 	};
+
+	const handleSaveImage = () => {
+		console.debug('saving image');
+		exporting.action();
+		if (spinner) spinner.style.display = 'block';
+		setTimeout(() => {
+			const dataUrl = canvas.toDataURL('image/png');
+			const a = document.createElement('a');
+			a.href = dataUrl;
+			a.download = 'rstr.png';
+			a.click();
+			exported.action();
+			if (spinner) spinner.style.display = 'none';
+			console.debug('saved image');
+		}, 100);
+	};
 </script>
 
 <div class="canvas-container">
 	<div id="spinner" class="spinner" style="display: none;" bind:this={spinner}></div>
 	<canvas id="raster-canvas" bind:this={canvas} data-paper-hidpi="off"></canvas>
 	{#if rstrState.status === 'done'}
-		<Button class="font-bold" on:click={handleExportSVG}>EXPORT SVG</Button>
+		<div class="button-container">
+			<Button class="font-bold" on:click={handleExportSVG}>EXPORT SVG</Button>
+			<Button class="font-bold" on:click={handleSaveImage}>SAVE IMAGE</Button>
+		</div>
 	{/if}
 </div>
 
