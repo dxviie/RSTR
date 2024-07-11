@@ -145,7 +145,7 @@
 			}
 			paper.project.activeLayer.removeChildren();
 
-			const bounds = paper.view.bounds; //.scale(0.9);
+			const bounds = paper.view.bounds.scale(0.9);
 			const offset = bounds.width * 0.05;
 			const width = bounds.width / config.resolution;
 			const height = bounds.height / config.resolution;
