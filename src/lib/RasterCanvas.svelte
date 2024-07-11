@@ -353,15 +353,69 @@
 		exporting.action();
 		if (spinner) spinner.style.display = 'block';
 		setTimeout(() => {
-			const dataUrl = canvas.toDataURL('image/png');
-			const a = document.createElement('a');
-			a.href = dataUrl;
-			a.download = 'rstr.png';
-			a.click();
+			downloadFrame();
 			exported.action();
 			if (spinner) spinner.style.display = 'none';
 			console.debug('saved image');
 		}, 100);
+	};
+
+	export function downloadFrame() {
+		if (!canvas) {
+			return;
+		}
+		var tempCanvas = document.createElement('canvas');
+		tempCanvas.width = canvas.width;
+		tempCanvas.height = canvas.height;
+
+		const ctx = tempCanvas.getContext('2d');
+		if (!ctx) {
+			console.warn('Could not get 2d context');
+			return;
+		}
+
+		// Fill the temp canvas with white background
+		ctx.fillStyle = '#ffffff'; // Set color to white
+		ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+		// Draw the original canvas onto the temp canvas
+		ctx.drawImage(canvas, 0, 0);
+
+		// Load and draw the watermark
+		var watermark = new Image();
+		watermark.src = 'watermark.png'; // Path to your watermark image
+		watermark.onload = function () {
+			// Set the desired width and height for the watermark
+			var scale = 0.5; // Example scale factor (50%)
+			var watermarkWidth = watermark.width * scale;
+			var watermarkHeight = watermark.height * scale;
+
+			// Position the watermark at the bottom right corner, adjust as needed
+			var x = tempCanvas.width - watermarkWidth - 10; // 10px padding from right
+			var y = tempCanvas.height - watermarkHeight - 10; // 10px padding from bottom
+
+			ctx.drawImage(watermark, x, y, watermarkWidth, watermarkHeight);
+
+			// Convert the canvas to a Blob
+			tempCanvas.toBlob(function (blob) {
+				// Create an object URL for the blob
+				var url = URL.createObjectURL(blob);
+
+				// Create a temporary link to trigger the download
+				var downloadLink = document.createElement('a');
+				downloadLink.download = getFrameFileName();
+				downloadLink.href = url;
+				downloadLink.target = '_blank';
+				downloadLink.click();
+				downloadLink.remove();
+			});
+		};
+	}
+
+	const getFrameFileName = () => {
+		const now = new Date();
+		const timestamp = `${now.getFullYear()}${now.getMonth() + 1}${now.getDate()}-${now.getHours()}${now.getMinutes()}`;
+		return `rstr.d17e.dev-${timestamp}.png`;
 	};
 </script>
 
