@@ -70,3 +70,39 @@ export function hatchRectangle(
 
 	h.remove();
 }
+
+
+// Original hatching implementation from the genuary project :
+// function hatchFillRectangle(paper, debug, start, end, rectangle, lineCount, pattern) {
+// 	let direction = new paper.Path.Line(start, end);
+// 	if (pattern === 0) {
+// 		direction = new paper.Path.Line(start, direction.getPointAt(direction.length / 2));
+// 	} else if (pattern === 1) {
+// 		direction = new paper.Path.Line(direction.getPointAt(direction.length / 2), end);
+// 	}
+// 	if (debug) {
+// 		direction.strokeColor = 'red';
+// 	}
+// 	for (var i = 0; i < lineCount; i++) {
+// 		let linePoint = direction.getPointAt((i * direction.length) / (lineCount - 1));
+// 		if (!linePoint) {
+// 			continue;
+// 		}
+// 		if (debug) {
+// 			let circle = new paper.Path.Circle(linePoint, 2);
+// 			circle.fillColor = 'red';
+// 		}
+// 		// draw a line perpendicular to direction through linePoint
+// 		let perpendicular = direction.getNormalAt((i * direction.length) / (lineCount - 1));
+// 		let lineStart = linePoint.subtract(perpendicular.multiply(direction.length));
+// 		let lineEnd = linePoint.add(perpendicular.multiply(direction.length));
+//
+// 		let line = new paper.Path.Line(lineStart, lineEnd);
+// 		let hrs = rectangle.getIntersections(line);
+// 		if (hrs && hrs.length > 0) {
+// 			line.remove();
+// 			line = new paper.Path.Line(hrs[0].point, hrs[hrs.length - 1].point);
+// 		}
+// 		line.strokeColor = 'black';
+// 	}
+// }

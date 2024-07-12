@@ -2,11 +2,11 @@ const initialState = {
 	// image
 	file: null,
 	// grid building
-	resolution: 33,
+	resolution: 10,
 	iterations: 3,
-	tolerance: 0.33,
+	tolerance: 0.5,
 	// hatching
-	blockLineCount: 33
+	blockLineCount: 27
 };
 
 const updateConfig = (newValues: { [s: string]: unknown; } | ArrayLike<unknown>) => {

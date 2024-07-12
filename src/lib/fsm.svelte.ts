@@ -9,6 +9,7 @@ export type RstrAction = {
 const initialState = { status: 'config' as RstrState };
 
 export const rstrState: { status: RstrState } = $state(initialState);
+let preExportState: RstrState = 'done';
 
 const transitions = {
 	startRendering: () => {
@@ -70,7 +71,7 @@ const transitions = {
 		return false;
 	},
 	imageLoaded: () => {
-		if (rstrState.status === 'loading') {
+		if (rstrState.status === 'loading' || rstrState.status === 'config') {
 			console.debug('Status update: loading -> config');
 			rstrState.status = 'config';
 			return true;
@@ -79,7 +80,8 @@ const transitions = {
 		return false;
 	},
 	exporting: () => {
-		if (rstrState.status === 'done') {
+		if (rstrState.status === 'done' || rstrState.status === 'config') {
+			preExportState = rstrState.status;
 			console.debug('Status update: done -> exporting');
 			rstrState.status = 'exporting';
 			return true;
@@ -89,8 +91,8 @@ const transitions = {
 	},
 	exported: () => {
 		if (rstrState.status === 'exporting') {
-			console.debug('Status update: exporting -> done');
-			rstrState.status = 'done';
+			console.debug('Status update: exporting ->', preExportState);
+			rstrState.status = preExportState;
 			return true;
 		}
 		console.warn('Cannot finish exporting from state', rstrState.status);

@@ -60,7 +60,7 @@
 		pane = new Pane({ container: container });
 
 		const gridFolder = pane.addFolder({ title: 'GRID' });
-		gridFolder.addBinding(paneConfig, 'resolution', { min: 1, max: 200, step: 1 });
+		gridFolder.addBinding(paneConfig, 'resolution', { min: 10, max: 100, step: 1 });
 		gridFolder.addBinding(paneConfig, 'iterations', { min: 1, max: 20, step: 1 });
 		gridFolder.addBinding(paneConfig, 'tolerance', { min: 0, max: 1, step: 0.01 });
 
