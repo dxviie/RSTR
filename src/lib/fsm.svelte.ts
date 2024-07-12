@@ -51,8 +51,17 @@ const transitions = {
 		console.warn('Cannot reset from state', rstrState.status);
 		return false;
 	},
+	resetAndRender: () => {
+		if (rstrState.status === 'done' || rstrState.status === 'error') {
+			console.debug('Status update: done/error -> render');
+			rstrState.status = 'render';
+			return true;
+		}
+		console.warn('Cannot reset and render from state', rstrState.status);
+		return false;
+	},
 	loadingImage: () => {
-		if (rstrState.status === 'config') {
+		if (rstrState.status === 'config' || rstrState.status === 'done' || rstrState.status === 'error') {
 			console.debug('Status update: config -> loading');
 			rstrState.status = 'loading';
 			return true;
@@ -110,6 +119,11 @@ const actions = {
 		action: transitions.reset,
 		type: 'button' as RstrActionType
 	},
+	resetAndRender: {
+		label: 'RENDER',
+		action: transitions.resetAndRender,
+		type: 'button' as RstrActionType
+	},
 	loadingImage: {
 		label: 'SELECT IMAGE',
 		action: transitions.loadingImage,
@@ -140,10 +154,10 @@ export const getActionsForStatus = (status: string): RstrAction[] => {
 		return [actions.renderingFinished, actions.renderingStopped];
 	}
 	if (status === 'done') {
-		return [actions.reset];
+		return [actions.resetAndRender, actions.loadingImage];
 	}
 	if (status === 'error') {
-		return [actions.reset];
+		return [actions.resetAndRender, actions.loadingImage];
 	}
 	if (status === 'loading') {
 		return [actions.imageLoaded];

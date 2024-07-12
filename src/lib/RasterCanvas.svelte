@@ -5,12 +5,9 @@
 	import {
 		exported,
 		exporting,
-		getActionsForStatus,
 		imageLoaded,
 		renderingFinished,
-		rstrState,
-		type RstrAction,
-		type RstrActionType
+		rstrState
 	} from './fsm.svelte';
 	import Button from './components/ui/button/button.svelte';
 
@@ -25,8 +22,8 @@
 	});
 
 	$effect(() => {
-		console.debug('>>>> rstrState', rstrState.status);
-		if (project && (rstrState.status === 'render' || rstrState.status === 'config')) {
+		console.debug('canvas status update: ', rstrState.status);
+		if (rstrState.status && project && (rstrState.status === 'render' || rstrState.status === 'config')) {
 			console.debug('---- rendering ----');
 			project.view.play();
 		}
@@ -34,17 +31,18 @@
 
 	$effect(() => {
 		if (config.file && project) {
-			console.log('image file', config.file);
+			console.debug('image selected', config.file);
 			imageFile = config.file;
 			const reader = new FileReader();
 			reader.onload = (event) => {
-				console.log('image loaded');
+				console.debug('image file reader ready');
 				if (event.target) {
 					img = new Image();
 					img.src = event.target.result as string;
 					img.onload = () => {
-						console.log('signaling image loaded');
+						console.log('image loaded');
 						imageLoaded.action();
+						project.view.play();
 					};
 				}
 			};

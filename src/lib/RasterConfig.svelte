@@ -35,7 +35,7 @@
 					actionButtonLabel = action.label;
 				}
 			});
-			configEnabled = rstrState.status === 'config';
+			configEnabled = rstrState.status === 'config' || rstrState.status === 'done';
 			if (pane) {
 				pane.disabled = !configEnabled;
 			}
@@ -59,12 +59,12 @@
 	$effect(() => {
 		pane = new Pane({ container: container });
 
-		const gridFolder = pane.addFolder({ title: 'Grid' });
+		const gridFolder = pane.addFolder({ title: 'GRID' });
 		gridFolder.addBinding(paneConfig, 'resolution', { min: 1, max: 200, step: 1 });
 		gridFolder.addBinding(paneConfig, 'iterations', { min: 1, max: 20, step: 1 });
 		gridFolder.addBinding(paneConfig, 'tolerance', { min: 0, max: 1, step: 0.01 });
 
-		const hatchingFolder = pane.addFolder({ title: 'Fill' });
+		const hatchingFolder = pane.addFolder({ title: 'FILL' });
 		hatchingFolder.addBinding(paneConfig, 'blockLineCount', { min: 1, max: 50, step: 1 });
 
 		// Listen for changes and emit the updated config
@@ -133,22 +133,25 @@
 	}
 
 	.tweakpane-container {
-		font-size: large !important;
 		margin-top: 1rem;
 	}
 
 	:global(.tweakpane-container div) {
-		font-size: x-large !important;
-		/*position: fixed;*/
-		/*top: 10px;*/
-		/*right: 10px;*/
-		/*z-index: 1000;*/
+      font-size: 1.1rem !important;
+      line-height: 1.25rem;
+      font-weight: 700;
 	}
 
 	/* Target the main Tweakpane container */
 	:global(#tweakpane-container .tp-dfwv) {
 		font-family: Bitter, serif; /* Change to your preferred font */
-		font-size: 14px; /* Adjust the size as needed */
+      font-size: 0.875rem;
+      line-height: 1.25rem;
+			font-weight: 700;
+	}
+
+	:global(*) {
+      --bld-br: 5px;
 	}
 
 	/* Target input elements */
@@ -160,8 +163,15 @@
 	/* Target labels */
 	:global(#tweakpane-container .tp-lblv_l) {
 		font-family: Poppins, sans-serif; /* Change to your preferred font */
-		font-size: 0.9rem;
+		font-size: 0.95rem !important;
+			font-weight: 100;
 	}
+
+	/* Target folder buttons */
+  :global(#tweakpane-container .tp-fldv_b) {
+		height: 2.2rem;
+			border-radius: 10px 10px 0 0;
+  }
 
 	/* Target folder titles */
 	:global(#tweakpane-container .tp-fldv_t) {
