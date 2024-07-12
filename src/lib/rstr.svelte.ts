@@ -26,12 +26,11 @@ export class Rstr {
 			this.image.fitBounds(this.project.view.bounds);
 			console.debug('Image fitted', this.image.bounds);
 			imageLoaded.action();
-			setTimeout(() => this.updateGrid(config.resolution), 100);
 		};
 	}
 
 	updateGrid(xResolution: number) {
-		console.log('---- updateGrid', xResolution);
+		this.cleanupGrid();
 		if (!this.image) return;
 		if (this.gridLayer) {
 			this.gridLayer.remove();
@@ -57,7 +56,17 @@ export class Rstr {
 		}
 	}
 
+	cleanupGrid() {
+		if (this.gridLayer) {
+			this.gridLayer.remove();
+		}
+		else {
+			this.grid.forEach(row => row.forEach(pixel => pixel.rect.remove()));
+		}
+	}
+
 	cleanup() {
+		this.cleanupGrid();
 		if (this.project) {
 			this.project.remove();
 		}

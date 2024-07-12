@@ -1,6 +1,6 @@
 const initialState = {
 	// image
-	file: null,
+	file: "",
 	// grid building
 	resolution: 10,
 	iterations: 3,

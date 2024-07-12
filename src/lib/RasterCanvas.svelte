@@ -10,9 +10,6 @@
 	import { Rstr } from '$lib/rstr.svelte.ts';
 
 	const debugColors = ['yellow', 'orange', 'orangered', 'red', 'darkred'];
-	// TODO ---> set back
-	const pics = ['test-rstr.png'];// ['brasa.png', 'kelb.png', 'knest.png'];
-	let selectedPic = $state('');
 
 	let canvas: HTMLCanvasElement | null = null;
 	let spinner: HTMLDivElement | null = null;
@@ -27,24 +24,13 @@
 
 	let rstr : Rstr | null;
 
-	// $effect(() => {
-	// 	if (window) {
-	// 		paper.install(window);
-	// 		console.info('paper installed');
-	// 	}
-	// });
+	// TODO ---> set back
+	const pics = ['test-rstr.png'];// ['brasa.png', 'kelb.png', 'knest.png'];
+	let selectedPic = $state('');
 
 	$effect(() => {
-		selectedPic = pics[0];//Math.floor(Math.random() * pics.length)];
+		selectedPic = pics[Math.floor(Math.random() * pics.length)];
 	});
-
-	// $effect(() => {
-	// 	console.debug('canvas status update: ', rstrState.status);
-	// 	if (rstrState.status && project && (rstrState.status === 'render' || rstrState.status === 'config')) {
-	// 		console.debug('---- rendering ----');
-	// 		project.view.play();
-	// 	}
-	// });
 
 	$effect(() => {
 		if (config.file) {
@@ -109,6 +95,7 @@
 			console.log('project setup', canvasWidth, canvasHeight, canvas.width, canvas.height, paper.view.bounds);
 			rstr = new Rstr(paper);
 			rstr.loadImage(img || selectedPic);
+			debouncedGridUpdate();
 		}
 	});
 
