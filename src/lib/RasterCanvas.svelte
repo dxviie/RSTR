@@ -433,7 +433,7 @@
 		border-radius: 0.5rem;
 	}
 
-	@media (max-width: 768px) {
+	@media (max-width: 850px) {
 		#raster-canvas {
 			width: 100%;
 			height: 100%;

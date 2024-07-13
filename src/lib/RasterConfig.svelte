@@ -178,7 +178,7 @@
 	/* Target folder titles */
 	:global(#tweakpane-container .tp-fldv_t) {
 		font-family: Bitter, serif; /* Change to your preferred font */
-		font-size: 0.9rem; /* Slightly larger for titles */
+		font-size: 0.875rem !important; /* Slightly larger for titles */
 		font-weight: bold;
 		text-align: center;
 	}
@@ -243,7 +243,7 @@
 		}
 
 		:global(.tweakpane-container div) {
-			font-size: large !important; /* Adjusted for mobile */
+			/*font-size: large !important; !* Adjusted for mobile *!*/
 		}
 
 		:global(#tweakpane-container .tp-dfwv),

@@ -78,9 +78,10 @@
 		justify-content: center;
 	}
 
-	@media (max-width: 768px) {
+	@media (max-width: 850px) {
 		.app-container {
 			flex-direction: column;
+				align-items: center;
 		}
 	}
 
