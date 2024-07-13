@@ -1,60 +1,31 @@
 <script lang="ts">
 	import { Pane } from 'tweakpane';
 	import { config, configActions } from '$lib/config.svelte.ts';
-	import Button from './components/ui/button/button.svelte';
 	import {
 		rstrState,
-		getActionsForStatus,
-		type RstrAction,
-		type RstrActionType,
 		loadingImage,
 		imageLoaded
 	} from '$lib/fsm.svelte';
 
 	let container: HTMLDivElement;
-	let fileInput: HTMLInputElement;
 
 	let pane: Pane | null = null;
 	let paneConfig = { ...config };
 
-	let actionButtonLabel = $state('--');
-	let actionButtonAction: null | RstrAction = null;
-	let actionButtonEnabled = $state(true);
-	let selectImageButtonEnabled = $state(true);
 	let configEnabled = $state(true);
 
 	$effect(() => {
 		if (rstrState.status) {
-			const actions = getActionsForStatus(rstrState.status);
-			selectImageButtonEnabled =
-				actions.find((action) => action.type === ('input' as RstrActionType)) !== undefined;
-			actionButtonEnabled = rstrState.status !== 'loading' && rstrState.status !== 'exporting';
-			actions.forEach((action) => {
-				if (action.type === 'button') {
-					actionButtonAction = action;
-					actionButtonLabel = action.label;
-				}
-			});
 			configEnabled = rstrState.status === 'config' || rstrState.status === 'done';
 			if (pane) {
 				pane.disabled = !configEnabled;
 			}
 			console.debug(
-				'updating state actions',
-				actions,
-				rstrState.status,
-				selectImageButtonEnabled,
-				actionButtonEnabled,
+				'updating config',
 				configEnabled
 			);
 		}
 	});
-
-	const handleActionButtonClick = () => {
-		if (actionButtonAction) {
-			actionButtonAction.action();
-		}
-	};
 
 	$effect(() => {
 		pane = new Pane({ container: container });
@@ -78,53 +49,12 @@
 			if (pane) pane.dispose();
 		};
 	});
-
-	function handleSelectFileClicked(event: Event) {
-		if (fileInput) fileInput.click();
-		loadingImage.action();
-	}
-
-	function handleFileSelected(event: Event) {
-		console.log('handleFileSelected');
-		if (!event.target) return;
-		const input = event.target as HTMLInputElement;
-		if (!input.files) return;
-		const file = input.files[0];
-		if (file) {
-			console.log('File selected:', file.name);
-			configActions.update({ file: file });
-			// Handle the file here (e.g., upload it, process it, etc.)
-		} else {
-			imageLoaded.action();
-		}
-	}
 </script>
 
 <div class="config-container">
-	<Button
-		class="w-full font-bold"
-		on:click={handleSelectFileClicked}
-		disabled={!selectImageButtonEnabled}>SELECT IMAGE</Button
-	>
-
-	<Button
-		class="w-full font-bold"
-		on:click={() => handleActionButtonClick()}
-		disabled={!actionButtonEnabled}>{actionButtonLabel}</Button
-	>
 
 	<div id="tweakpane-container" class="tweakpane-container" bind:this={container}></div>
 
-	<input
-		type="file"
-		accept="image/*"
-		style="display: none;"
-		bind:this={fileInput}
-		onchange={handleFileSelected}
-		onabort={() => imageLoaded.action()}
-		onerror={() => imageLoaded.action()}
-		oncancel={() => imageLoaded.action()}
-	/>
 </div>
 
 <style>

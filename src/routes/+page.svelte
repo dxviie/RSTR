@@ -3,6 +3,7 @@
 	import RasterCanvas from '$lib/RasterCanvas.svelte';
 	import RasterConfig from '$lib/RasterConfig.svelte';
 	import { marked } from 'marked';
+	import RasterActions from '$lib/RasterActions.svelte';
 
 	const phrases = [
 		'Creative Image Rasterization For Plotters',
@@ -39,17 +40,21 @@
 			<Card.Root>
 				<Card.Header>
 					<Card.Title class="title">RSTR</Card.Title>
+					<Card.Description class="description">{selectedPhrase}</Card.Description>
 				</Card.Header>
 				<Card.Content>
 					<RasterCanvas />
 				</Card.Content>
+				<Card.Footer>
+					<RasterActions />
+				</Card.Footer>
 			</Card.Root>
 		</main>
 
 		<div class="config">
 			<Card.Root>
 				<Card.Header>
-					<Card.Description class="description">{selectedPhrase}</Card.Description>
+					<Card.Description class="description">Configuration</Card.Description>
 				</Card.Header>
 				<Card.Content>
 					<RasterConfig />
