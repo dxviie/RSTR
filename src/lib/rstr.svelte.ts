@@ -113,7 +113,8 @@ export class Rstr {
 			const clr = new paper.Path.Rectangle({
 				from: from,
 				to: pixel.rect.bounds.bottomRight,
-				fillColor: 'darkorange'
+				fillColor: 'darkorange',
+				opacity: 0.7
 			});
 			this.gridAverageColorLayer.addChild(clr);
 			this.gridColorsCalculated++;
