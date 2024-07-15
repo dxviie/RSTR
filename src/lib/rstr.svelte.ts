@@ -10,6 +10,16 @@ export class Rstr {
 	gridLayer: paper.Layer | null = null;
 	grid: RstrPixel[][] = [];
 
+	xResolution: number = config.resolution;
+	yResolution: number = 0;
+	xStep: number = 0;
+	yStep: number = 0;
+
+	pixelCount: number = 0;
+	gridColorsCalculated: number = 0;
+	gridAverageColorValues: number[][] = [];
+	gridAverageColorLayer: paper.Layer = new paper.Layer();
+
 	constructor(paper: paper.PaperScope) {
 		this.paper = paper;
 		this.project = paper.project;
@@ -37,17 +47,19 @@ export class Rstr {
 		}
 		this.gridLayer = new paper.Layer();
 		this.grid = [];
-		const xStep = this.image.bounds.width / xResolution;
-		const yResolution = Math.round(this.image.bounds.height / xStep);
-		const yStep = this.image.bounds.height / yResolution;
+		this.xResolution = xResolution;
+		this.xStep = this.image.bounds.width / xResolution;
+		this.yResolution = Math.round(this.image.bounds.height / this.xStep);
+		this.pixelCount = this.xResolution * this.yResolution;
+		this.yStep = this.image.bounds.height / this.yResolution;
 		for (let x = 0; x < xResolution; x++) {
 			const row: RstrPixel[] = [];
-			for (let y = 0; y < yResolution; y++) {
+			for (let y = 0; y < this.yResolution; y++) {
 				const pixel = new RstrPixel(
-					x * xStep + this.image.bounds.x,
-					y * yStep + this.image.bounds.y,
-					xStep,
-					yStep,
+					x * this.xStep + this.image.bounds.x,
+					y * this.yStep + this.image.bounds.y,
+					this.xStep,
+					this.yStep,
 					this.gridLayer
 				);
 				row.push(pixel);
@@ -59,8 +71,7 @@ export class Rstr {
 	cleanupGrid() {
 		if (this.gridLayer) {
 			this.gridLayer.remove();
-		}
-		else {
+		} else {
 			this.grid.forEach(row => row.forEach(pixel => pixel.rect.remove()));
 		}
 	}
@@ -69,6 +80,43 @@ export class Rstr {
 		this.cleanupGrid();
 		if (this.project) {
 			this.project.remove();
+		}
+	}
+
+	getXForIndex(index: number): number {
+		return Math.floor(index / this.yResolution);
+	}
+
+	getYForIndex(index: number): number {
+		return index % this.yResolution;
+	}
+
+	getIndexForXY(x: number, y: number): number {
+		return x * this.yResolution + y;
+	}
+
+	render() {
+		if (this.gridColorsCalculated < this.pixelCount) {
+			const x = this.getXForIndex(this.gridColorsCalculated);
+			const y = this.getYForIndex(this.gridColorsCalculated);
+			const pixel = this.grid[x][y];
+			let avg = this.image.getAverageColor(pixel);
+			let avgPct = (avg.red + avg.green + avg.blue) / 3;
+			if (!this.gridAverageColorValues[x]) {
+				this.gridAverageColorValues[x] = [];
+			}
+			this.gridAverageColorValues[x][y] = avg;
+			const from = new paper.Point({
+				x: pixel.rect.bounds.topLeft.x,
+				y: pixel.rect.bounds.topLeft.y + ((1 - avgPct) * pixel.rect.bounds.height)
+			});
+			const clr = new paper.Path.Rectangle({
+				from: from,
+				to: pixel.rect.bounds.bottomRight,
+				fillColor: 'darkorange'
+			});
+			this.gridAverageColorLayer.addChild(clr);
+			this.gridColorsCalculated++;
 		}
 	}
 }

@@ -1,6 +1,6 @@
 const initialState = {
 	// image
-	file: "",
+	file: '',
 	// grid building
 	resolution: 10,
 	iterations: 3,
@@ -15,7 +15,7 @@ const updateConfig = (newValues: { [s: string]: unknown; } | ArrayLike<unknown>)
 			config[key] = value;
 		}
 	}
-}
+};
 
 export const config: { [key: string]: any } = $state({ ...initialState });
 

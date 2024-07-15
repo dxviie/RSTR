@@ -3,7 +3,7 @@
 	import { config } from '$lib/config.svelte.ts';
 	import {
 		exported,
-		exporting
+		exporting, rstrState
 	} from './fsm.svelte';
 	import { Rstr } from '$lib/rstr.svelte.ts';
 	import RasterActions from '$lib/RasterActions.svelte';
@@ -16,7 +16,8 @@
 	let rstr: Rstr | null = $state(null);
 
 	// TODO ---> set back
-	const pics = ['test-rstr.png'];// ['brasa.png', 'kelb.png', 'knest.png'];
+	// const pics = ['test-rstr.png'];
+	const pics = ['brasa.png', 'kelb.png', 'knest.png'];
 	let selectedPic = $state('');
 
 	$effect(() => {
@@ -44,26 +45,6 @@
 		}
 	});
 
-	function debounce(func, delay) {
-		let timeoutId;
-		return (...args) => {
-			console.debug('debouncing', func, delay, args);
-			clearTimeout(timeoutId);
-			timeoutId = setTimeout(() => func(...args), delay);
-		};
-	}
-
-	const debouncedGridUpdate = debounce(() => {
-		if (rstr) {
-			exporting.action();
-			setTimeout(() => {
-				rstr.updateGrid(config.resolution);
-				exported.action();
-				console.debug('exported svg');
-			}, 100);
-		}
-	}, 500);
-
 	$effect(() => {
 		if (config.resolution && rstr) {
 			debouncedGridUpdate();
@@ -90,6 +71,47 @@
 
 		}
 	});
+
+	$effect(() => {
+		if (rstrState.status === 'render') {
+			requestAnimationFrame(frame);
+		}
+	});
+
+	function frame() {
+		if (!rstr) {
+			console.error('no rstr on frame!?');
+			return;
+		}
+		const budget = 10; // ms
+		const start = performance.now();
+		while (performance.now() - start < budget) {
+			rstr.render();
+		}
+		if (rstrState.status === 'render') {
+			requestAnimationFrame(frame);
+		}
+	}
+
+	function debounce(func, delay) {
+		let timeoutId;
+		return (...args) => {
+			console.debug('debouncing', func, delay, args);
+			clearTimeout(timeoutId);
+			timeoutId = setTimeout(() => func(...args), delay);
+		};
+	}
+
+	const debouncedGridUpdate = debounce(() => {
+		if (rstr) {
+			exporting.action();
+			setTimeout(() => {
+				rstr.updateGrid(config.resolution);
+				exported.action();
+				console.debug('exported svg');
+			}, 100);
+		}
+	}, 500);
 
 	// onMount(() => {
 	// 	paper.setup(canvas);
