@@ -316,6 +316,13 @@
         max-height: 1280px;
     }
 
+    @media (max-width: 850px) {
+        .canvas-container {
+            width: 100%;
+            height: 50vh
+        }
+    }
+
     .canvas-wrapper {
         width: 100%; /* or any desired width */
         height: 100%; /* maintain aspect ratio */

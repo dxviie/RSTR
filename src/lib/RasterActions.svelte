@@ -34,23 +34,26 @@
 
 	$effect(() => {
 		if (rstrState.status) {
-			const actions = getActionsForStatus(rstrState.status);
-			selectImageButtonEnabled =
-				actions.find((action) => action.type === ('input' as RstrActionType)) !== undefined;
-			actionButtonEnabled = rstrState.status !== 'loading' && rstrState.status !== 'exporting';
-			actions.forEach((action) => {
-				if (action.type === 'button') {
-					actionButtonAction = action;
-					actionButtonLabel = action.label;
-				}
-			});
-			console.debug(
-				'updating actions',
-				actions,
-				rstrState.status,
-				selectImageButtonEnabled,
-				actionButtonEnabled
-			);
+			setTimeout(() => {
+
+				const actions = getActionsForStatus(rstrState.status);
+				selectImageButtonEnabled =
+					actions.find((action) => action.type === ('input' as RstrActionType)) !== undefined;
+				actionButtonEnabled = rstrState.status !== 'loading' && rstrState.status !== 'exporting';
+				actions.forEach((action) => {
+					if (action.type === 'button') {
+						actionButtonAction = action;
+						actionButtonLabel = action.label;
+					}
+				});
+				console.debug(
+					'updating actions',
+					actions,
+					rstrState.status,
+					selectImageButtonEnabled,
+					actionButtonEnabled
+				);
+			}, 10);
 		}
 	});
 
