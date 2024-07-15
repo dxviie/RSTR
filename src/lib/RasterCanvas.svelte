@@ -296,8 +296,9 @@
 </script>
 
 <div class="canvas-container">
-
-	<canvas id="raster-canvas" bind:this={canvas} data-paper-hidpi="off" width={canvasWidth} height={canvasHeight}></canvas>
+	<div class="canvas-wrapper">
+		<canvas id="raster-canvas" bind:this={canvas} data-paper-hidpi="off" width={canvasWidth} height={canvasHeight}></canvas>
+	</div>
 	<RasterActions {canvas} {rstr} />
 </div>
 
@@ -309,15 +310,26 @@
         flex-direction: column;
         justify-content: center;
         align-items: center;
+        width: 60vw;
+        max-width: 1280px;
+        height: 80vh;
+        max-height: 1280px;
+    }
+
+    .canvas-wrapper {
+        width: 100%; /* or any desired width */
+        height: 100%; /* maintain aspect ratio */
+        position: relative;
+        overflow: hidden;
     }
 
     #raster-canvas {
-        display: block;
-        max-height: calc(100vh - 10rem);
-        width: calc(100vw - 40rem);
-        aspect-ratio: 1;
-        background-color: white;
-        border-radius: 0.5rem;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
     }
 
     @media (max-width: 850px) {

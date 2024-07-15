@@ -21,7 +21,10 @@
 	let selectImageButtonEnabled = $state(true);
 
 	function isMobileDevice() {
-		return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+		const ua = navigator.userAgent;
+		return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua) ||
+			('maxTouchPoints' in navigator && navigator.maxTouchPoints > 0) ||
+			('msMaxTouchPoints' in navigator && navigator.msMaxTouchPoints > 0);
 	}
 
 	let isMobile = $state(false);
@@ -190,7 +193,7 @@
 	>
 
 	{#if rstrState.status === 'done'}
-		{#if isMobile}
+		{#if !isMobile}
 			<Button class="font-bold" on:click={handleExportSVG}>
 				<svg width="20" height="20" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
 					<rect x="10" y="10" width="80" height="80" rx="10" ry="10" fill="none" stroke="white" stroke-width="10" />
@@ -208,7 +211,9 @@
 							stroke-linejoin="round" />
 				<path d="M30 70 L70 70" stroke="white" stroke-width="7" stroke-linecap="round" />
 			</svg>
-			<p class="ml-1.5">PNG</p>
+			{#if !isMobile}
+				<p class="ml-1.5">PNG</p>
+			{/if}
 		</Button>
 	{/if}
 
