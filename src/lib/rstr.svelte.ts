@@ -111,6 +111,9 @@ export class Rstr {
 		const y = this.getYForIndex(this.gridColorsCalculated);
 		const pixel = this.grid[x][y];
 		const avg = this.image.getAverageColor(pixel);
+		if (!avg) {
+			return `0. no color found for pixel ${x}, ${y}`;
+		}
 		if (!this.gridAverageColorValues[x]) {
 			this.gridAverageColorValues[x] = [];
 		}
