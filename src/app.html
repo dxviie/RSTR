@@ -24,21 +24,30 @@
 	<meta name="publisher" content="d17e.dev" />
 	<!-- Keywords -->
 	<meta name="keywords"
-		content="rasterization, plotters, creative imaging, digital art, creative coding, plotter art, axidraw" />
+				content="rasterization, plotters, creative imaging, digital art, creative coding, plotter art, axidraw" />
 	<!-- Robots -->
 	<meta name="robots" content="index, follow" />
 	<!-- Description -->
 	<meta name="description" content="Creative Image Rasterization For Plotters" />
 	<title>RSTR</title>
 	<!-- Umami -->
-<!--	// TODO -&ndash;&gt; set back -->
-<!--	<script async src="https://umami.d17e.dev/script.js"-->
-<!--		data-website-id="c542a7b5-3443-4563-a6a7-dabe42b2c227"></script>-->
+	<!--	// TODO -&ndash;&gt; set back -->
+	<!--	<script async src="https://umami.d17e.dev/script.js"-->
+	<!--		data-website-id="c542a7b5-3443-4563-a6a7-dabe42b2c227"></script>-->
 	%sveltekit.head%
 </head>
 
 <body data-sveltekit-preload-data="hover">
-	<div style="display: contents">%sveltekit.body%</div>
+<div style="display: contents">%sveltekit.body%</div>
+<script>
+	if ('serviceWorker' in navigator) {
+		navigator.serviceWorker.getRegistrations().then(function(registrations) {
+			for (let registration of registrations) {
+				registration.unregister();
+			}
+		});
+	}
+</script>
 </body>
 
 </html>
