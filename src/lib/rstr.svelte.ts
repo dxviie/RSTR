@@ -111,14 +111,13 @@ export class Rstr {
 		const y = this.getYForIndex(this.gridColorsCalculated);
 		const pixel = this.grid[x][y];
 		const avg = this.image.getAverageColor(pixel);
-		console.log('avg', avg.hue, avg.saturation, avg.brightness, 'light', avg.lightness);
 		if (!this.gridAverageColorValues[x]) {
 			this.gridAverageColorValues[x] = [];
 		}
 		this.gridAverageColorValues[x][y] = avg;
 		const from = new paper.Point({
 			x: pixel.rect.bounds.topLeft.x,
-			y: pixel.rect.bounds.topLeft.y + ((1 - avg.lightness) * pixel.rect.bounds.height)
+			y: pixel.rect.bounds.topLeft.y + ((1 - (avg.lightness || 0)) * pixel.rect.bounds.height)
 		});
 		const clr = new paper.Path.Rectangle({
 			from: from,
