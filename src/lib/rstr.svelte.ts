@@ -1,5 +1,5 @@
 import paper from 'paper';
-import { imageLoaded } from '$lib/fsm.svelte.ts';
+import { imageLoaded, renderingFinished } from '$lib/fsm.svelte.ts';
 import { config } from '$lib/config.svelte.ts';
 
 export class Rstr {
@@ -97,28 +97,38 @@ export class Rstr {
 
 	render() {
 		if (this.gridColorsCalculated < this.pixelCount) {
-			const x = this.getXForIndex(this.gridColorsCalculated);
-			const y = this.getYForIndex(this.gridColorsCalculated);
-			const pixel = this.grid[x][y];
-			let avg = this.image.getAverageColor(pixel);
-			let avgPct = (avg.red + avg.green + avg.blue) / 3;
-			if (!this.gridAverageColorValues[x]) {
-				this.gridAverageColorValues[x] = [];
-			}
-			this.gridAverageColorValues[x][y] = avg;
-			const from = new paper.Point({
-				x: pixel.rect.bounds.topLeft.x,
-				y: pixel.rect.bounds.topLeft.y + ((1 - avgPct) * pixel.rect.bounds.height)
-			});
-			const clr = new paper.Path.Rectangle({
-				from: from,
-				to: pixel.rect.bounds.bottomRight,
-				fillColor: 'darkorange',
-				opacity: 0.7
-			});
-			this.gridAverageColorLayer.addChild(clr);
-			this.gridColorsCalculated++;
+			return this.calculateGridAverageColorValues();
 		}
+		renderingFinished.action();
+		return 'done';
+	}
+
+	calculateGridAverageColorValues() {
+		if (this.gridColorsCalculated >= this.pixelCount) {
+			return;
+		}
+		const x = this.getXForIndex(this.gridColorsCalculated);
+		const y = this.getYForIndex(this.gridColorsCalculated);
+		const pixel = this.grid[x][y];
+		const avg = this.image.getAverageColor(pixel);
+		console.log('avg', avg.hue, avg.saturation, avg.brightness, 'light', avg.lightness);
+		if (!this.gridAverageColorValues[x]) {
+			this.gridAverageColorValues[x] = [];
+		}
+		this.gridAverageColorValues[x][y] = avg;
+		const from = new paper.Point({
+			x: pixel.rect.bounds.topLeft.x,
+			y: pixel.rect.bounds.topLeft.y + ((1 - avg.lightness) * pixel.rect.bounds.height)
+		});
+		const clr = new paper.Path.Rectangle({
+			from: from,
+			to: pixel.rect.bounds.bottomRight,
+			fillColor: 'darkorange',
+			opacity: 0.7
+		});
+		this.gridAverageColorLayer.addChild(clr);
+		this.gridColorsCalculated++;
+		return '0. pre-calculating average color values';
 	}
 }
 
