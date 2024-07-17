@@ -99,6 +99,7 @@ export class Rstr {
 		if (this.gridColorsCalculated < this.pixelCount) {
 			return this.calculateGridAverageColorValues();
 		}
+		console.info('Rendering finished');
 		renderingFinished.action();
 		return 'done';
 	}
@@ -110,9 +111,11 @@ export class Rstr {
 		const x = this.getXForIndex(this.gridColorsCalculated);
 		const y = this.getYForIndex(this.gridColorsCalculated);
 		const pixel = this.grid[x][y];
-		const avg = this.image.getAverageColor(pixel);
+		const avg = this.image.getAverageColor(pixel.rect.bounds);
 		if (!avg) {
-			return `0. no color found for pixel ${x}, ${y}`;
+			console.error(`0. no color found for pixel ${x}, ${y}, ${pixel.rect.bounds}, ${this.image}`);
+			this.gridColorsCalculated++;
+			return `0. no color found for pixel ${x}, ${y} - ${pixel.rect.bounds}`;
 		}
 		if (!this.gridAverageColorValues[x]) {
 			this.gridAverageColorValues[x] = [];

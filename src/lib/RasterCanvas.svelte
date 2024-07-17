@@ -14,7 +14,8 @@
 	let canvasWidth = $state(1280);
 	let canvasHeight = $state(1280);
 	let rstr: Rstr | null = $state(null);
-	let renderInfo = $state('');
+	let renderInfo = $state('...');
+	let animationFrameRequest = 0;
 
 	// TODO ---> set back
 	// const pics = ['test-rstr.png'];
@@ -75,7 +76,9 @@
 
 	$effect(() => {
 		if (rstrState.status === 'render') {
-			requestAnimationFrame(frame);
+			animationFrameRequest = requestAnimationFrame(frame);
+		} else {
+			cancelAnimationFrame(animationFrameRequest);
 		}
 	});
 
@@ -86,11 +89,13 @@
 		}
 		const budget = 10; // ms
 		const start = performance.now();
-		while (performance.now() - start < budget) {
+		while (rstrState.status === 'render' && performance.now() - start < budget) {
 			renderInfo = rstr.render();
 		}
 		if (rstrState.status === 'render') {
-			requestAnimationFrame(frame);
+			animationFrameRequest = requestAnimationFrame(frame);
+		} else {
+			cancelAnimationFrame(animationFrameRequest);
 		}
 	}
 
@@ -117,7 +122,7 @@
 
 <div class="canvas-container">
 	<div class="canvas-wrapper">
-		<canvas id="raster-canvas" bind:this={canvas} data-paper-hidpi="off" width={canvasWidth} height={canvasHeight}></canvas>
+		<canvas id="raster-canvas" bind:this={canvas} data-paper-hidpi="on" width={canvasWidth} height={canvasHeight}></canvas>
 	</div>
 	<div class="render-info">{renderInfo}</div>
 	<RasterActions {canvas} {rstr} />
@@ -158,6 +163,9 @@
         width: 100%;
         height: 100%;
         object-fit: contain;
+        border-color: black;
+        border-style: solid;
+        border-width: 1px;
     }
 
     @media (max-width: 850px) {
@@ -168,12 +176,18 @@
     }
 
     .render-info {
-        height: 1.1rem;
+        height: 1.9rem;
         width: 100%;
         font-family: "Courier New", monospace;
         font-size: small;
-        overflow: hidden;
         margin-bottom: 1rem;
+        background-color: black;
+        color: darkorange;
+        padding: .7rem .3rem .3rem .3rem;
+        margin-top: -1rem; /* eliminate gap */
+        border-color: black;
+        border-style: solid;
+        border-width: 1px
     }
 
     @keyframes spin {

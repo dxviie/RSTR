@@ -14,14 +14,16 @@
 
 	$effect(() => {
 		if (rstrState.status) {
-			configEnabled = rstrState.status === 'config' || rstrState.status === 'done';
-			if (pane) {
-				pane.disabled = !configEnabled;
-			}
-			console.debug(
-				'updating config',
-				configEnabled
-			);
+			setTimeout(() => {
+				configEnabled = rstrState.status === 'config' || rstrState.status === 'done';
+				if (pane) {
+					pane.disabled = !configEnabled;
+				}
+				console.debug(
+					'updating config',
+					configEnabled
+				);
+			}, 10);
 		}
 	});
 

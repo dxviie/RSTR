@@ -35,7 +35,6 @@
 	$effect(() => {
 		if (rstrState.status) {
 			setTimeout(() => {
-
 				const actions = getActionsForStatus(rstrState.status);
 				selectImageButtonEnabled =
 					actions.find((action) => action.type === ('input' as RstrActionType)) !== undefined;
