@@ -14,7 +14,7 @@
 	let canvasWidth = $state(1280);
 	let canvasHeight = $state(1280);
 	let rstr: Rstr | null = $state(null);
-	let renderInfo = $state('...');
+	let renderInfo = $state('');
 	let animationFrameRequest = 0;
 
 	// TODO ---> set back
@@ -121,16 +121,18 @@
 </script>
 
 <div class="canvas-container">
+	<div class="render-info">{renderInfo}</div>
 	<div class="canvas-wrapper">
 		<canvas id="raster-canvas" bind:this={canvas} data-paper-hidpi="on" width={canvasWidth} height={canvasHeight}></canvas>
 	</div>
-	<div class="render-info">{renderInfo}</div>
+
 	<RasterActions {canvas} {rstr} />
 </div>
 
 <style>
 
     .canvas-container {
+        position: relative;
         display: flex;
         gap: .5rem;
         flex-direction: column;
@@ -157,14 +159,11 @@
     }
 
     #raster-canvas {
-        position: absolute;
-        top: 0;
-        left: 0;
         width: 100%;
         height: 100%;
         object-fit: contain;
         border-color: black;
-        border-style: solid;
+        border-style: dashed;
         border-width: 1px;
     }
 
@@ -176,18 +175,16 @@
     }
 
     .render-info {
-        height: 1.9rem;
-        width: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
+        opacity: 0.8;
         font-family: "Courier New", monospace;
         font-size: small;
-        margin-bottom: 1rem;
-        background-color: black;
-        color: darkorange;
-        padding: .7rem .3rem .3rem .3rem;
-        margin-top: -1rem; /* eliminate gap */
-        border-color: black;
-        border-style: solid;
-        border-width: 1px
+        font-weight: bold;
+        z-index: 10;
+        color: black;
+        padding: 1rem;
     }
 
     @keyframes spin {
