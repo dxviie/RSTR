@@ -13,7 +13,7 @@ const initialState = {
 	// image
 	file: '',
 	// grid building
-	resolution: 10,
+	resolution: 2,
 	iterations: 3,
 	tolerance: 0.5,
 	// hatching

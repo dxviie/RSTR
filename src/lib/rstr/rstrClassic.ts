@@ -73,10 +73,61 @@
 //
 
 
+import type { RstrGroup, RstrGroupingAlgo, RstrPixel } from '$lib/rstr/rstr.ts';
+import paper from 'paper';
+import type { RstrConfig } from '$lib/rstr/config.svelte.ts';
+
 /***************************************
  						GROUPING
  ***************************************/
 
+export class RstrClassicGrouping implements RstrGroupingAlgo {
+
+	doGroupingStep(groups: RstrGroup[], config: RstrConfig): RstrGroup[] {
+		for (let i = 0; i < groups.length; i++) {
+			let group = groups[i];
+			group.timesVisited++;
+		}
+		return groups;
+	}
+
+	initGroups(grid: RstrPixel[][], layer: paper.Layer, config: RstrConfig): RstrGroup[] {
+		const groups: RstrGroup[] = [];
+		for (let i = 0; i < grid.length; i++) {
+			for (let j = 0; j < grid[i].length; j++) {
+				const pixel = grid[i][j];
+				let group = new RstrClassicPixel(pixel, config);
+				group.shape.addTo(layer);
+				groups.push(group);
+			}
+		}
+		console.info('initGroups', groups.length, 'groups');
+		return groups;
+	}
+
+	iterationsFinished(groups: RstrGroup[]): number {
+		return Math.max(...groups.map(g => g.timesVisited));
+	}
+}
+
+class RstrClassicPixel implements RstrGroup {
+	pixels: RstrPixel[];
+	shape: paper.Path;
+	timesVisited: number;
+
+	constructor(pixel: RstrPixel, config: RstrConfig) {
+		this.pixels = [pixel];
+		this.shape = new paper.Path.Rectangle({
+			from: [pixel.x, pixel.y],
+			to: [pixel.x + pixel.rect.bounds.width, pixel.y + pixel.rect.bounds.height],
+			fillColor: 'white',
+			strokeColor: 'black',
+			strokeWidth: 2
+		});
+		this.timesVisited = 0;
+		console.debug('RstrClassicPixel', this.shape.bounds);
+	}
+}
 
 // 	// group blocks in iterations
 // 	for (let i = 0; i < config.iterations; i++) {

@@ -1,14 +1,38 @@
 import paper from 'paper';
 import { imageLoaded, renderingFinished } from '$lib/fsm.svelte.ts';
 import type { RstrConfig } from '$lib/rstr/config.svelte.ts';
+import { RstrClassicGrouping } from '$lib/rstr/rstrClassic.ts';
+import Layer = paper.Layer;
+
+export interface RstrPixel {
+	x: number;
+	y: number;
+	rect: paper.Path.Rectangle;
+}
+
+export interface RstrGroup {
+	pixels: RstrPixel[];
+	shape: paper.Path;
+	timesVisited: number;
+}
+
+export interface RstrGroupingAlgo {
+	initGroups: (grid: RstrPixel[][], layer: paper.Layer, config: RstrConfig) => RstrGroup[];
+	doGroupingStep: (groups: RstrGroup[], config: RstrConfig) => RstrGroup[];
+	iterationsFinished: (groups: RstrGroup[]) => number;
+}
 
 export class Rstr {
+
+	classicGrouping: RstrGroupingAlgo = new RstrClassicGrouping();
 
 	paper: paper.PaperScope;
 	project: paper.Project;
 	image: paper.Raster | null = null;
 	gridLayer: paper.Layer | null = null;
 	grid: RstrPixel[][] = [];
+	groupLayer: paper.Layer | null = null;
+	groups: RstrGroup[] | null = null;
 
 	xResolution: number = 0;
 	yResolution: number = 0;
@@ -17,8 +41,8 @@ export class Rstr {
 
 	pixelCount: number = 0;
 	gridColorsCalculated: number = 0;
-	gridAverageColorValues: number[][] = [];
-	gridAverageColorLayer: paper.Layer = new paper.Layer();
+	gridAverageColorValues: paper.Color[][] = [];
+	gridAverageColorLayer: paper.Layer | null = null;
 
 	constructor(paper: paper.PaperScope) {
 		this.paper = paper;
@@ -40,7 +64,7 @@ export class Rstr {
 	}
 
 	updateGrid(xResolution: number) {
-		this.cleanupGrid();
+		this.cleanup();
 		if (!this.image) return;
 		if (this.gridLayer) {
 			this.gridLayer.remove();
@@ -55,7 +79,7 @@ export class Rstr {
 		for (let x = 0; x < xResolution; x++) {
 			const row: RstrPixel[] = [];
 			for (let y = 0; y < this.yResolution; y++) {
-				const pixel = new RstrPixel(
+				const pixel = new RstrPixelImpl(
 					x * this.xStep + this.image.bounds.x,
 					y * this.yStep + this.image.bounds.y,
 					this.xStep,
@@ -71,13 +95,41 @@ export class Rstr {
 	cleanupGrid() {
 		if (this.gridLayer) {
 			this.gridLayer.remove();
-		} else {
+			this.gridLayer = null;
+		}
+		if (this.grid) {
 			this.grid.forEach(row => row.forEach(pixel => pixel.rect.remove()));
+		}
+	}
+
+	cleanupPreparation() {
+		if (this.gridAverageColorLayer) {
+			this.gridAverageColorLayer.remove();
+			this.gridAverageColorLayer = null;
+		}
+		this.gridAverageColorValues = [];
+		this.gridColorsCalculated = 0;
+	}
+
+	cleanupGroups() {
+		if (this.groupLayer) {
+			this.groupLayer.remove();
+			this.groupLayer = null;
+		}
+		if (this.groups) {
+			this.groups.forEach(group => group.shape.remove());
+			this.groups = null;
 		}
 	}
 
 	cleanup() {
 		this.cleanupGrid();
+		this.cleanupPreparation();
+		this.cleanupGroups();
+	}
+
+	reset() {
+		this.cleanup();
 		if (this.project) {
 			this.project.remove();
 		}
@@ -95,15 +147,40 @@ export class Rstr {
 		return x * this.yResolution + y;
 	}
 
+	/***************************************
+	 							RENDERING
+	 ***************************************/
 	render(config: RstrConfig) {
+		/*** preparation ***/
 		if (this.gridColorsCalculated < this.pixelCount) {
+			if (this.gridAverageColorLayer === null) {
+				this.gridAverageColorLayer = new paper.Layer();
+			}
 			return this.calculateGridAverageColorValues();
+		}
+		/*** grouping ***/
+		if (this.groups === null) {
+			if (this.groupLayer === null) {
+				this.groupLayer = new paper.Layer();
+			}
+			this.groups = this.classicGrouping.initGroups(this.grid, this.groupLayer, config);
+			console.info('initializing groups');
+			return 'initializing groups';
+		}
+		const iterations = this.classicGrouping.iterationsFinished(this.groups);
+		console.info(`grouping: ${iterations} / ${config.iterations} iterations`);
+		if (iterations < config.iterations) {
+			this.groups = this.classicGrouping.doGroupingStep(this.groups, config);
+			return `grouping: ${iterations} / ${config.iterations} iterations`;
 		}
 		console.info('Rendering finished');
 		renderingFinished.action();
 		return 'done';
 	}
 
+	/***************************************
+	 							PREPARATION
+	 ***************************************/
 	calculateGridAverageColorValues() {
 		if (this.gridColorsCalculated >= this.pixelCount) {
 			return;
@@ -137,13 +214,13 @@ export class Rstr {
 	}
 }
 
-export class RstrPixel {
+class RstrPixelImpl implements RstrPixel {
 
 	x: number;
 	y: number;
 	rect: paper.Path.Rectangle;
 
-	constructor(x: number, y: number, width: number = 1, height: number = 1, layer: paper.Layer | null = null) {
+	constructor(x: number, y: number, width: number = 1, height: number = 1, layer: Layer) {
 		this.x = x;
 		this.y = y;
 		this.rect = new paper.Path.Rectangle({
@@ -152,5 +229,8 @@ export class RstrPixel {
 			strokeColor: 'darkorange',
 			strokeWidth: 1
 		});
+		if (layer) {
+			this.rect.addTo(layer);
+		}
 	}
 }

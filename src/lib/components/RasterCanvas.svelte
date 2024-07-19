@@ -62,7 +62,7 @@
 			}
 			setTimeout(() => {
 				if (rstr) {
-					rstr.cleanup();
+					rstr.reset();
 				}
 				paper.setup(canvas);
 				console.log('project setup', canvasWidth, canvasHeight, canvas.width, canvas.height, paper.view.bounds);
