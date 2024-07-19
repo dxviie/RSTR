@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { Pane } from 'tweakpane';
-	import { config, configActions } from '$lib/config.svelte.ts';
+	import { config, configActions } from '$lib/rstr/config.svelte.ts';
 	import {
 		rstrState
-	} from '$lib/fsm.svelte';
+	} from '$lib/fsm.svelte.js';
 
 	let container: HTMLDivElement;
 

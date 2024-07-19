@@ -1,5 +1,5 @@
 <script lang="ts">
-	import Button from './components/ui/button/button.svelte';
+	import Button from './ui/button/button.svelte';
 	import {
 		exported,
 		exporting,
@@ -10,7 +10,7 @@
 		type RstrActionType,
 		rstrState
 	} from '$lib/fsm.svelte.js';
-	import { configActions } from '$lib/config.svelte.ts';
+	import { configActions } from '$lib/rstr/config.svelte.ts';
 
 	let { canvas, rstr } = $props();
 

@@ -1,4 +1,4 @@
-import type { Vector2D } from '$lib/rstr/sketchTypes';
+import type { Vector2D } from '$lib/ccp/sketchTypes';
 
 export const PAPERJS_MM_TO_PT = 3.775;
 

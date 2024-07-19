@@ -1,6 +1,6 @@
 import paper from 'paper';
-import { getTranslationVector } from '$lib/rstr/SketchTools';
-import type { Pen } from '$lib/rstr/sketchTypes';
+import { getTranslationVector } from '$lib/ccp/SketchTools.ts';
+import type { Pen } from '$lib/ccp/sketchTypes';
 
 export function hatchRectangle(
 	p: paper.PaperScope,

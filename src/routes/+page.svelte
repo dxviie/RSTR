@@ -1,7 +1,7 @@
 <script lang="ts">
 	import * as Card from '$lib/components/ui/card';
-	import RasterCanvas from '$lib/RasterCanvas.svelte';
-	import RasterConfig from '$lib/RasterConfig.svelte';
+	import RasterCanvas from '$lib/components/RasterCanvas.svelte';
+	import RasterConfig from '$lib/components/RasterConfig.svelte';
 	import { marked } from 'marked';
 
 	let spinner: HTMLDivElement | null = null;

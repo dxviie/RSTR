@@ -1,12 +1,12 @@
 <script lang="ts">
 	import paper from 'paper';
-	import { config } from '$lib/config.svelte.ts';
+	import { config } from '$lib/rstr/config.svelte.ts';
 	import {
 		exported,
 		exporting, rstrState
-	} from './fsm.svelte';
-	import { Rstr } from '$lib/rstr.svelte.ts';
-	import RasterActions from '$lib/RasterActions.svelte';
+	} from '../fsm.svelte.js';
+	import { Rstr } from '$lib/rstr/rstr.svelte.ts';
+	import RasterActions from '$lib/components/RasterActions.svelte';
 
 	let canvas: HTMLCanvasElement | null = $state(null);
 	let img: HTMLImageElement | null = $state(null);

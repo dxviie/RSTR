@@ -1,6 +1,6 @@
 import paper from 'paper';
 import { imageLoaded, renderingFinished } from '$lib/fsm.svelte.ts';
-import { config } from '$lib/config.svelte.ts';
+import { config } from '$lib/rstr/config.svelte.ts';
 
 export class Rstr {
 

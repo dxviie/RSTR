@@ -1,4 +1,4 @@
-import { PAPERJS_MM_TO_PT } from '$lib/rstr/SketchTools';
+import { PAPERJS_MM_TO_PT } from '$lib/ccp/SketchTools.ts';
 
 export const COPIC_YR16_MARKER = {
 	strokeColor: '#F7941D',

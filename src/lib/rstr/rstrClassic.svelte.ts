@@ -71,6 +71,13 @@
 // 	}
 // 	console.log('rendering');
 //
+
+
+/***************************************
+ 						GROUPING
+ ***************************************/
+
+
 // 	// group blocks in iterations
 // 	for (let i = 0; i < config.iterations; i++) {
 // 		console.log('grouping iteration', i);
@@ -132,7 +139,11 @@
 // 			blocks.push(toAdd[a]);
 // 		}
 // 	}
-//
+
+/***************************************
+ 						HATCHING
+ ***************************************/
+
 // 	// hatch fill remaining blocks
 // 	for (let i = 0; i < blocks.length; i++) {
 // 		let block = blocks[i];
