@@ -4,17 +4,25 @@ import type { RstrConfig } from '$lib/rstr/config.svelte.ts';
 import { RstrClassicGrouping } from '$lib/rstr/rstrClassic.ts';
 import Layer = paper.Layer;
 
+/*****    INTERFACES    *****/
 export interface RstrPixel {
 	x: number;
 	y: number;
+	gridX: number;
+	gridY: number;
 	rect: paper.Path.Rectangle;
 	color: paper.Color | null;
+	group: RstrGroup | null;
+
+	isNeighbor(other: RstrPixel, allowDiagonals: boolean): boolean;
 }
 
 export interface RstrGroup {
 	pixels: RstrPixel[];
 	shape: paper.Path;
 	timesVisited: number;
+
+	getAverageLightness(): number;
 }
 
 export interface RstrGroupingAlgo {
@@ -23,6 +31,7 @@ export interface RstrGroupingAlgo {
 	iterationsFinished: (groups: RstrGroup[]) => number;
 }
 
+/****** IMPLEMENTATION ******/
 export class Rstr {
 
 	classicGrouping: RstrGroupingAlgo = new RstrClassicGrouping();
@@ -49,6 +58,9 @@ export class Rstr {
 		this.project = paper.project;
 	}
 
+	/***************************************
+	 							IMAGE & GRID
+	 ***************************************/
 	loadImage(image: string | HTMLImageElement) {
 		if (this.image) {
 			this.image.remove();
@@ -84,67 +96,14 @@ export class Rstr {
 					y * this.yStep + this.image.bounds.y,
 					this.xStep,
 					this.yStep,
-					this.gridLayer
+					this.gridLayer,
+					x,
+					y
 				);
 				row.push(pixel);
 			}
 			this.grid.push(row);
 		}
-	}
-
-	cleanupGrid() {
-		if (this.gridLayer) {
-			this.gridLayer.remove();
-			this.gridLayer = null;
-		}
-		if (this.grid) {
-			this.grid.forEach(row => row.forEach(pixel => pixel.rect.remove()));
-		}
-	}
-
-	cleanupPreparation() {
-		if (this.gridAverageColorLayer) {
-			this.gridAverageColorLayer.remove();
-			this.gridAverageColorLayer = null;
-		}
-		this.gridAverageColorValues = [];
-		this.gridColorsCalculated = 0;
-	}
-
-	cleanupGroups() {
-		if (this.groupLayer) {
-			this.groupLayer.remove();
-			this.groupLayer = null;
-		}
-		if (this.groups) {
-			this.groups.forEach(group => group.shape.remove());
-			this.groups = null;
-		}
-	}
-
-	cleanup() {
-		this.cleanupGrid();
-		this.cleanupPreparation();
-		this.cleanupGroups();
-	}
-
-	reset() {
-		this.cleanup();
-		if (this.project) {
-			this.project.remove();
-		}
-	}
-
-	getXForIndex(index: number): number {
-		return Math.floor(index / this.yResolution);
-	}
-
-	getYForIndex(index: number): number {
-		return index % this.yResolution;
-	}
-
-	getIndexForXY(x: number, y: number): number {
-		return x * this.yResolution + y;
 	}
 
 	/***************************************
@@ -164,16 +123,13 @@ export class Rstr {
 				this.groupLayer = new paper.Layer();
 			}
 			this.groups = this.classicGrouping.initGroups(this.grid, this.groupLayer, config);
-			console.info('initializing groups');
 			return 'initializing groups';
 		}
 		const iterations = this.classicGrouping.iterationsFinished(this.groups);
-		console.info(`grouping: ${iterations} / ${config.iterations} iterations`);
 		if (iterations < config.iterations) {
 			this.groups = this.classicGrouping.doGroupingStep(this.groups, config);
-			return `grouping: ${iterations} / ${config.iterations} iterations`;
+			return `grouping: ${iterations + 1} / ${config.iterations} iterations`;
 		}
-		console.info('Rendering finished');
 		renderingFinished.action();
 		return 'done';
 	}
@@ -209,19 +165,85 @@ export class Rstr {
 		this.gridColorsCalculated++;
 		return '0. pre-calculating average color values';
 	}
+
+	/***************************************
+	 							CLEANUP
+	 ***************************************/
+	cleanup() {
+		this.cleanupGrid();
+		this.cleanupPreparation();
+		this.cleanupGroups();
+	}
+
+	reset() {
+		this.cleanup();
+		if (this.project) {
+			this.project.remove();
+		}
+	}
+
+	cleanupGrid() {
+		if (this.gridLayer) {
+			this.gridLayer.remove();
+			this.gridLayer = null;
+		}
+		if (this.grid) {
+			this.grid.forEach(row => row.forEach(pixel => pixel.rect.remove()));
+		}
+	}
+
+	cleanupPreparation() {
+		if (this.gridAverageColorLayer) {
+			this.gridAverageColorLayer.remove();
+			this.gridAverageColorLayer = null;
+		}
+		this.gridAverageColorValues = [];
+		this.gridColorsCalculated = 0;
+	}
+
+	cleanupGroups() {
+		if (this.groupLayer) {
+			this.groupLayer.remove();
+			this.groupLayer = null;
+		}
+		if (this.groups) {
+			this.groups.forEach(group => group.shape.remove());
+			this.groups = null;
+		}
+	}
+
+	/***************************************
+	 							UTILS
+	 ***************************************/
+	getXForIndex(index: number): number {
+		return Math.floor(index / this.yResolution);
+	}
+
+	getYForIndex(index: number): number {
+		return index % this.yResolution;
+	}
+
+	getIndexForXY(x: number, y: number): number {
+		return x * this.yResolution + y;
+	}
 }
 
 class RstrPixelImpl implements RstrPixel {
 
 	x: number;
 	y: number;
+	gridX: number;
+	gridY: number;
 	rect: paper.Path.Rectangle;
 	color: paper.Color | null;
+	group: RstrGroup | null;
 
-	constructor(x: number, y: number, width: number = 1, height: number = 1, layer: Layer) {
+	constructor(x: number, y: number, width: number, height: number, layer: Layer, gridX: number, gridY: number) {
 		this.color = null;
 		this.x = x;
 		this.y = y;
+		this.gridX = gridX;
+		this.gridY = gridY;
 		this.rect = new paper.Path.Rectangle({
 			from: [x, y],
 			to: [x + width, y + height],
@@ -231,5 +253,14 @@ class RstrPixelImpl implements RstrPixel {
 		if (layer) {
 			this.rect.addTo(layer);
 		}
+	}
+
+	isNeighbor(other: RstrPixel, allowDiagonals: boolean): boolean {
+		const xDiff = Math.abs(this.gridX - other.gridX);
+		const yDiff = Math.abs(this.gridY - other.gridY);
+		if (allowDiagonals) {
+			return xDiff <= 1 && yDiff <= 1;
+		}
+		return (xDiff === 1 && yDiff === 0) || (xDiff === 0 && yDiff === 1);
 	}
 }

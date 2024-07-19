@@ -81,12 +81,53 @@ import type { RstrConfig } from '$lib/rstr/config.svelte.ts';
  						GROUPING
  ***************************************/
 
+function findNeighboringGroups(group: RstrGroup, groups: RstrGroup[]): RstrGroup[] {
+	const neighbors = [];
+	for (let i = 0; i < groups.length; i++) {
+		const neighbor = groups[i];
+		if (neighbor === group) continue;
+		if ((neighbor.shape.strokeBounds.intersects(group.shape.strokeBounds) ||
+				neighbor.shape.strokeBounds.contains(group.shape.strokeBounds)) &&
+			!neighbors.includes(neighbor)) {
+			// check if any of the neighbor's pixels is right next to any of our pixels
+			// if so, add the neighbor to the neighbors list
+			if (neighbor.pixels.some(p => group.pixels.some(gp => gp.isNeighbor(p, false)))) {
+				neighbors.push(neighbor);
+			}
+		}
+	}
+	return neighbors;
+
+}
+
 export class RstrClassicGrouping implements RstrGroupingAlgo {
 
 	doGroupingStep(groups: RstrGroup[], config: RstrConfig): RstrGroup[] {
+		let iters = this.iterationsFinished(groups);
 		for (let i = 0; i < groups.length; i++) {
-			let group = groups[i];
-			group.timesVisited++;
+			const group = groups[i];
+			if (group.timesVisited <= iters) {
+				const neighbors = findNeighboringGroups(group, groups);
+				const neighborDiffs = neighbors.map((n) => {
+					return Math.abs(group.getAverageLightness() - n.getAverageLightness());
+				});
+				// find the index in neighborDiffs of the smallest element
+				const minIndex = neighborDiffs.indexOf(Math.min(...neighborDiffs));
+				if (minIndex >= 0) {
+					const neighbor = neighbors[minIndex];
+					const diff = neighborDiffs[minIndex];
+					if (diff < config.tolerance) {
+						neighbor.timesVisited++;
+						// merge the two groups
+						group.pixels = group.pixels.concat(neighbor.pixels);
+						group.shape = group.shape.unite(neighbor.shape);
+						// remove the neighbor from the groups list
+						groups.splice(groups.indexOf(neighbor), 1);
+					}
+				}
+				group.timesVisited++;
+				return groups;
+			}
 		}
 		return groups;
 	}
@@ -96,7 +137,8 @@ export class RstrClassicGrouping implements RstrGroupingAlgo {
 		for (let i = 0; i < grid.length; i++) {
 			for (let j = 0; j < grid[i].length; j++) {
 				const pixel = grid[i][j];
-				let group = new RstrClassicPixel(pixel, config);
+				let group = new RstrClassicGroup(pixel, config);
+				pixel.group = group;
 				group.shape.addTo(layer);
 				groups.push(group);
 			}
@@ -105,11 +147,11 @@ export class RstrClassicGrouping implements RstrGroupingAlgo {
 	}
 
 	iterationsFinished(groups: RstrGroup[]): number {
-		return Math.max(...groups.map(g => g.timesVisited));
+		return Math.min(...groups.map(g => g.timesVisited));
 	}
 }
 
-class RstrClassicPixel implements RstrGroup {
+class RstrClassicGroup implements RstrGroup {
 	pixels: RstrPixel[];
 	shape: paper.Path;
 	timesVisited: number;
@@ -123,8 +165,11 @@ class RstrClassicPixel implements RstrGroup {
 			strokeColor: 'black',
 			strokeWidth: 1
 		});
-		console.debug('color:: ', pixel.color);
 		this.timesVisited = 0;
+	}
+
+	getAverageLightness(): number {
+		return this.pixels.reduce((acc, p) => acc + p.color.lightness, 0) / this.pixels.length;
 	}
 }
 

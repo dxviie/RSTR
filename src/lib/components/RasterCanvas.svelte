@@ -76,6 +76,7 @@
 
 	$effect(() => {
 		if (rstrState.status === 'render') {
+			if (rstr) rstr.cleanup();
 			animationFrameRequest = requestAnimationFrame(frame);
 		} else {
 			cancelAnimationFrame(animationFrameRequest);
