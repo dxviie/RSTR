@@ -101,7 +101,6 @@ export class RstrClassicGrouping implements RstrGroupingAlgo {
 				groups.push(group);
 			}
 		}
-		console.info('initGroups', groups.length, 'groups');
 		return groups;
 	}
 
@@ -120,12 +119,12 @@ class RstrClassicPixel implements RstrGroup {
 		this.shape = new paper.Path.Rectangle({
 			from: [pixel.x, pixel.y],
 			to: [pixel.x + pixel.rect.bounds.width, pixel.y + pixel.rect.bounds.height],
-			fillColor: 'white',
+			fillColor: pixel.color.lightness ? new paper.Color(pixel.color.lightness) : 'white',
 			strokeColor: 'black',
-			strokeWidth: 2
+			strokeWidth: 1
 		});
+		console.debug('color:: ', pixel.color);
 		this.timesVisited = 0;
-		console.debug('RstrClassicPixel', this.shape.bounds);
 	}
 }
 

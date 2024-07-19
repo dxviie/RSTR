@@ -8,6 +8,7 @@ export interface RstrPixel {
 	x: number;
 	y: number;
 	rect: paper.Path.Rectangle;
+	color: paper.Color | null;
 }
 
 export interface RstrGroup {
@@ -41,7 +42,6 @@ export class Rstr {
 
 	pixelCount: number = 0;
 	gridColorsCalculated: number = 0;
-	gridAverageColorValues: paper.Color[][] = [];
 	gridAverageColorLayer: paper.Layer | null = null;
 
 	constructor(paper: paper.PaperScope) {
@@ -194,10 +194,7 @@ export class Rstr {
 			this.gridColorsCalculated++;
 			return `0. no color found for pixel ${x}, ${y} - ${pixel.rect.bounds}`;
 		}
-		if (!this.gridAverageColorValues[x]) {
-			this.gridAverageColorValues[x] = [];
-		}
-		this.gridAverageColorValues[x][y] = avg;
+		pixel.color = avg;
 		const from = new paper.Point({
 			x: pixel.rect.bounds.topLeft.x,
 			y: pixel.rect.bounds.topLeft.y + ((1 - (avg.lightness || 0)) * pixel.rect.bounds.height)
@@ -219,8 +216,10 @@ class RstrPixelImpl implements RstrPixel {
 	x: number;
 	y: number;
 	rect: paper.Path.Rectangle;
+	color: paper.Color | null;
 
 	constructor(x: number, y: number, width: number = 1, height: number = 1, layer: Layer) {
+		this.color = null;
 		this.x = x;
 		this.y = y;
 		this.rect = new paper.Path.Rectangle({
