@@ -21,6 +21,7 @@ export interface RstrGroup {
 	pixels: RstrPixel[];
 	shape: paper.Path;
 	timesVisited: number;
+	isFilled: boolean;
 
 	getAverageLightness(): number;
 }
@@ -29,6 +30,10 @@ export interface RstrGroupingAlgo {
 	initGroups: (grid: RstrPixel[][], layer: paper.Layer, config: RstrConfig) => RstrGroup[];
 	doGroupingStep: (groups: RstrGroup[], config: RstrConfig) => RstrGroup[];
 	iterationsFinished: (groups: RstrGroup[]) => number;
+}
+
+export interface RstrFillingAlgo {
+	fillGroup: (group: RstrGroup, config: RstrConfig) => void;
 }
 
 /****** IMPLEMENTATION ******/
@@ -129,6 +134,16 @@ export class Rstr {
 		if (iterations < config.iterations) {
 			this.groups = this.classicGrouping.doGroupingStep(this.groups, config);
 			return `grouping: ${iterations + 1} / ${config.iterations} iterations`;
+		}
+		/*** filling ***/
+		const hasUnfilledGroups = this.groups.some(group => !group.isFilled);
+		if (hasUnfilledGroups) {
+			for (const group of this.groups) {
+				if (!group.isFilled) {
+					this.classicGrouping.fillGroup(group, config);
+					return 'filling groups';
+				}
+			}
 		}
 		renderingFinished.action();
 		return 'done';

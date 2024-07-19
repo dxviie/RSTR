@@ -73,9 +73,10 @@
 //
 
 
-import type { RstrGroup, RstrGroupingAlgo, RstrPixel } from '$lib/rstr/rstr.ts';
+import type { RstrFillingAlgo, RstrGroup, RstrGroupingAlgo, RstrPixel } from '$lib/rstr/rstr.ts';
 import paper from 'paper';
 import type { RstrConfig } from '$lib/rstr/config.svelte.ts';
+import { hatchShape } from '$lib/ccp/PaperTools.ts';
 
 /***************************************
  						GROUPING
@@ -97,10 +98,9 @@ function findNeighboringGroups(group: RstrGroup, groups: RstrGroup[]): RstrGroup
 		}
 	}
 	return neighbors;
-
 }
 
-export class RstrClassicGrouping implements RstrGroupingAlgo {
+export class RstrClassicGrouping implements RstrGroupingAlgo, RstrFillingAlgo {
 
 	doGroupingStep(groups: RstrGroup[], config: RstrConfig): RstrGroup[] {
 		let iters = this.iterationsFinished(groups);
@@ -149,12 +149,19 @@ export class RstrClassicGrouping implements RstrGroupingAlgo {
 	iterationsFinished(groups: RstrGroup[]): number {
 		return Math.min(...groups.map(g => g.timesVisited));
 	}
+
+	fillGroup(group: RstrGroup, config: RstrConfig): void {
+		if (group.isFilled) return;
+		group.isFilled = true;
+		hatchShape(paper.project, group.shape, 45, 10);
+	}
 }
 
 class RstrClassicGroup implements RstrGroup {
 	pixels: RstrPixel[];
 	shape: paper.Path;
 	timesVisited: number;
+	isFilled: boolean;
 
 	constructor(pixel: RstrPixel, config: RstrConfig) {
 		this.pixels = [pixel];
@@ -166,6 +173,7 @@ class RstrClassicGroup implements RstrGroup {
 			strokeWidth: 1
 		});
 		this.timesVisited = 0;
+		this.isFilled = false;
 	}
 
 	getAverageLightness(): number {
