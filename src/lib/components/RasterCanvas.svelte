@@ -121,7 +121,9 @@
 </script>
 
 <div class="canvas-container">
-	<div class="render-info">{renderInfo}</div>
+	{#if rstrState.status === 'render'}
+		<div class="render-info">{renderInfo}</div>
+	{/if}
 	<div class="canvas-wrapper">
 		<canvas id="raster-canvas" bind:this={canvas} data-paper-hidpi="on" width={canvasWidth} height={canvasHeight}></canvas>
 	</div>
@@ -175,6 +177,7 @@
     }
 
     .render-info {
+        background-color: rgba(255, 255, 255, 0.8);
         position: absolute;
         top: 0;
         left: 0;
@@ -184,7 +187,8 @@
         font-weight: bold;
         z-index: 10;
         color: black;
-        padding: 1rem;
+        padding: 0 .5rem;
+        margin: .5rem;
     }
 
     @keyframes spin {
