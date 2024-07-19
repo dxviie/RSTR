@@ -1,3 +1,14 @@
+export type RstrConfig = {
+	// image
+	file: string;
+	// grid building
+	resolution: number;
+	iterations: number;
+	tolerance: number;
+	// hatching
+	blockLineCount: number;
+}
+
 const initialState = {
 	// image
 	file: '',
@@ -17,7 +28,7 @@ const updateConfig = (newValues: { [s: string]: unknown; } | ArrayLike<unknown>)
 	}
 };
 
-export const config: { [key: string]: any } = $state({ ...initialState });
+export const config: RstrConfig = $state({ ...initialState });
 
 export const configActions = {
 	update: updateConfig,

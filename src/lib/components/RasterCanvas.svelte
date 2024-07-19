@@ -5,7 +5,7 @@
 		exported,
 		exporting, rstrState
 	} from '../fsm.svelte.js';
-	import { Rstr } from '$lib/rstr/rstr.svelte.ts';
+	import { Rstr } from '$lib/rstr/rstr.ts';
 	import RasterActions from '$lib/components/RasterActions.svelte';
 
 	let canvas: HTMLCanvasElement | null = $state(null);
@@ -90,7 +90,7 @@
 		const budget = 10; // ms
 		const start = performance.now();
 		while (rstrState.status === 'render' && performance.now() - start < budget) {
-			renderInfo = rstr.render();
+			renderInfo = rstr.render(config);
 		}
 		if (rstrState.status === 'render') {
 			animationFrameRequest = requestAnimationFrame(frame);

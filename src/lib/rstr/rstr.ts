@@ -1,6 +1,6 @@
 import paper from 'paper';
 import { imageLoaded, renderingFinished } from '$lib/fsm.svelte.ts';
-import { config } from '$lib/rstr/config.svelte.ts';
+import type { RstrConfig } from '$lib/rstr/config.svelte.ts';
 
 export class Rstr {
 
@@ -10,7 +10,7 @@ export class Rstr {
 	gridLayer: paper.Layer | null = null;
 	grid: RstrPixel[][] = [];
 
-	xResolution: number = config.resolution;
+	xResolution: number = 0;
 	yResolution: number = 0;
 	xStep: number = 0;
 	yStep: number = 0;
@@ -95,7 +95,7 @@ export class Rstr {
 		return x * this.yResolution + y;
 	}
 
-	render() {
+	render(config: RstrConfig) {
 		if (this.gridColorsCalculated < this.pixelCount) {
 			return this.calculateGridAverageColorValues();
 		}
