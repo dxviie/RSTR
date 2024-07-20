@@ -119,8 +119,11 @@ export class RstrClassicGrouping implements RstrGroupingAlgo, RstrFillingAlgo {
 					if (diff < config.tolerance) {
 						neighbor.timesVisited++;
 						// merge the two groups
+						const temp = group.shape;
 						group.pixels = group.pixels.concat(neighbor.pixels);
 						group.shape = group.shape.unite(neighbor.shape);
+						temp.remove();
+						neighbor.shape.remove();
 						// remove the neighbor from the groups list
 						groups.splice(groups.indexOf(neighbor), 1);
 					}
@@ -150,11 +153,57 @@ export class RstrClassicGrouping implements RstrGroupingAlgo, RstrFillingAlgo {
 		return Math.min(...groups.map(g => g.timesVisited));
 	}
 
-	fillGroup(group: RstrGroup, config: RstrConfig): void {
+	fillGroup(group: RstrGroup, layer: paper.Layer, config: RstrConfig): void {
 		if (group.isFilled) return;
 		group.isFilled = true;
-		hatchShape(paper.project, group.shape, 45, 10);
+		// calculate the shape combining all group's pixels
+		// fill the shape with a hatch pattern
+		console.log('SHAPE TO HATCH', group.shape);
+		console.log('GROUP pixels', group.pixels);
+		const box = calculateBoundingBox(group.pixels.map(p => p.rect));
+
+		hatchShape(group.shape, box, 45, 10);
 	}
+}
+
+function calculateBoundingBox(rectangles): paper.Path.Rectangle {
+	if (rectangles.length === 0) {
+		return null; // Return null if the array is empty
+	}
+
+	let minX = Infinity;
+	let minY = Infinity;
+	let maxX = -Infinity;
+	let maxY = -Infinity;
+
+	rectangles.forEach(rect => {
+		minX = Math.min(minX, rect.bounds.left);
+		minY = Math.min(minY, rect.bounds.top);
+		maxX = Math.max(maxX, rect.bounds.right);
+		maxY = Math.max(maxY, rect.bounds.bottom);
+	});
+
+	// Create a new rectangle using the calculated bounds
+	return new paper.Path.Rectangle({
+		point: [minX, minY],
+		size: [maxX - minX, maxY - minY]
+	});
+}
+
+function combineRectangles(rectangles) {
+	if (rectangles.length === 0) {
+		return null; // Return null if the array is empty
+	}
+
+	// Start with the first rectangle
+	let combinedShape = rectangles[0].toPath();
+
+	// Unite with the remaining rectangles
+	for (let i = 1; i < rectangles.length; i++) {
+		combinedShape = combinedShape.unite(rectangles[i]);
+	}
+
+	return combinedShape;
 }
 
 class RstrClassicGroup implements RstrGroup {
@@ -165,10 +214,13 @@ class RstrClassicGroup implements RstrGroup {
 
 	constructor(pixel: RstrPixel, config: RstrConfig) {
 		this.pixels = [pixel];
+		const fillAlpha = pixel.color.lightness ? pixel.color.lightness : 0;
+		let fill = new paper.Color('white');
+		fill.alpha = fillAlpha;
 		this.shape = new paper.Path.Rectangle({
 			from: [pixel.x, pixel.y],
 			to: [pixel.x + pixel.rect.bounds.width, pixel.y + pixel.rect.bounds.height],
-			fillColor: pixel.color.lightness ? new paper.Color(pixel.color.lightness) : 'white',
+			fillColor: fill,
 			strokeColor: 'black',
 			strokeWidth: 1
 		});
@@ -314,3 +366,39 @@ class RstrClassicGroup implements RstrGroup {
 // project.view.pause();
 // 	};
 // });
+
+
+// Original hatching implementation from the genuary project :
+// function hatchFillRectangle(paper, debug, start, end, rectangle, lineCount, pattern) {
+// 	let direction = new paper.Path.Line(start, end);
+// 	if (pattern === 0) {
+// 		direction = new paper.Path.Line(start, direction.getPointAt(direction.length / 2));
+// 	} else if (pattern === 1) {
+// 		direction = new paper.Path.Line(direction.getPointAt(direction.length / 2), end);
+// 	}
+// 	if (debug) {
+// 		direction.strokeColor = 'red';
+// 	}
+// 	for (var i = 0; i < lineCount; i++) {
+// 		let linePoint = direction.getPointAt((i * direction.length) / (lineCount - 1));
+// 		if (!linePoint) {
+// 			continue;
+// 		}
+// 		if (debug) {
+// 			let circle = new paper.Path.Circle(linePoint, 2);
+// 			circle.fillColor = 'red';
+// 		}
+// 		// draw a line perpendicular to direction through linePoint
+// 		let perpendicular = direction.getNormalAt((i * direction.length) / (lineCount - 1));
+// 		let lineStart = linePoint.subtract(perpendicular.multiply(direction.length));
+// 		let lineEnd = linePoint.add(perpendicular.multiply(direction.length));
+//
+// 		let line = new paper.Path.Line(lineStart, lineEnd);
+// 		let hrs = rectangle.getIntersections(line);
+// 		if (hrs && hrs.length > 0) {
+// 			line.remove();
+// 			line = new paper.Path.Line(hrs[0].point, hrs[hrs.length - 1].point);
+// 		}
+// 		line.strokeColor = 'black';
+// 	}
+// }

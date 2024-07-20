@@ -34,8 +34,8 @@
 		baseFolder.addBinding(paneConfig, 'resolution', { min: 10, max: 100, step: 1 });
 
 		const groupingFolder = pane.addFolder({ title: 'GROUPING' });
-		groupingFolder.addBinding(paneConfig, 'iterations', { min: 1, max: 20, step: 1 });
-		groupingFolder.addBinding(paneConfig, 'tolerance', { min: 0, max: 1, step: 0.01 });
+		groupingFolder.addBinding(paneConfig, 'iterations', { min: 1, max: 10, step: 1 });
+		groupingFolder.addBinding(paneConfig, 'tolerance', { min: 0.05, max: 1, step: 0.05 });
 
 		const hatchingFolder = pane.addFolder({ title: 'FILL' });
 		hatchingFolder.addBinding(paneConfig, 'blockLineCount', { min: 1, max: 50, step: 1 });

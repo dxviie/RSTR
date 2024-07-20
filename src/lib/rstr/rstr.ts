@@ -33,7 +33,7 @@ export interface RstrGroupingAlgo {
 }
 
 export interface RstrFillingAlgo {
-	fillGroup: (group: RstrGroup, config: RstrConfig) => void;
+	fillGroup: (group: RstrGroup, layer: paper.Layer, config: RstrConfig) => void;
 }
 
 /****** IMPLEMENTATION ******/
@@ -48,6 +48,7 @@ export class Rstr {
 	grid: RstrPixel[][] = [];
 	groupLayer: paper.Layer | null = null;
 	groups: RstrGroup[] | null = null;
+	fillLayer: paper.Layer | null = null;
 
 	xResolution: number = 0;
 	yResolution: number = 0;
@@ -83,6 +84,7 @@ export class Rstr {
 	updateGrid(xResolution: number) {
 		this.cleanup();
 		if (!this.image) return;
+		this.image.opacity = 1;
 		if (this.gridLayer) {
 			this.gridLayer.remove();
 		}
@@ -115,6 +117,10 @@ export class Rstr {
 	 							RENDERING
 	 ***************************************/
 	render(config: RstrConfig) {
+		// if (!this.image || !this.gridLayer) {
+		// 	return 'no image or grid';
+		// }
+		// this.image.opacity = 1;
 		/*** preparation ***/
 		if (this.gridColorsCalculated < this.pixelCount) {
 			if (this.gridAverageColorLayer === null) {
@@ -138,13 +144,19 @@ export class Rstr {
 		/*** filling ***/
 		const hasUnfilledGroups = this.groups.some(group => !group.isFilled);
 		if (hasUnfilledGroups) {
+			if (this.fillLayer === null) {
+				this.fillLayer = new paper.Layer();
+			}
 			for (const group of this.groups) {
 				if (!group.isFilled) {
-					this.classicGrouping.fillGroup(group, config);
+					this.classicGrouping.fillGroup(group, this.fillLayer, config);
 					return 'filling groups';
 				}
 			}
 		}
+		if (this.groupLayer) this.groupLayer.opacity = 0;
+		if (this.gridAverageColorLayer) this.gridAverageColorLayer.opacity = 0;
+		if (this.image) this.image.opacity = 0;
 		renderingFinished.action();
 		return 'done';
 	}
@@ -188,6 +200,7 @@ export class Rstr {
 		this.cleanupGrid();
 		this.cleanupPreparation();
 		this.cleanupGroups();
+		this.cleanupFilling();
 	}
 
 	reset() {
@@ -224,6 +237,13 @@ export class Rstr {
 		if (this.groups) {
 			this.groups.forEach(group => group.shape.remove());
 			this.groups = null;
+		}
+	}
+
+	cleanupFilling() {
+		if (this.fillLayer) {
+			this.fillLayer.remove();
+			this.fillLayer = null;
 		}
 	}
 
