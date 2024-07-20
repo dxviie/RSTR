@@ -102,7 +102,7 @@ const transitions = {
 
 const actions = {
 	startRendering: {
-		label: 'RENDER',
+		label: 'START',
 		action: transitions.startRendering,
 		type: 'button' as RstrActionType
 	},
@@ -122,7 +122,7 @@ const actions = {
 		type: 'button' as RstrActionType
 	},
 	resetAndRender: {
-		label: 'RENDER',
+		label: 'START',
 		action: transitions.resetAndRender,
 		type: 'button' as RstrActionType
 	},
@@ -165,7 +165,7 @@ export const getActionsForStatus = (status: string): RstrAction[] => {
 		return [actions.imageLoaded];
 	}
 	return [];
-}
+};
 
 export const renderingFinished: RstrAction = actions.renderingFinished;
 export const loadingImage: RstrAction = actions.loadingImage;

@@ -189,23 +189,23 @@
 	>
 
 	<Button
-		class="font-bold"
+		class={`font-bold ${actionButtonLabel ? actionButtonLabel.toLowerCase() : ''}`}
 		on:click={() => handleActionButtonClick()}
 		disabled={!actionButtonEnabled}>{actionButtonLabel}</Button
 	>
 
 	{#if rstrState.status === 'done'}
-		{#if !isMobile}
-			<Button class="font-bold" on:click={handleExportSVG}>
-				<svg width="20" height="20" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-					<rect x="10" y="10" width="80" height="80" rx="10" ry="10" fill="none" stroke="white" stroke-width="10" />
-					<path d="M50 25 L50 60 M35 45 L50 60 L65 45" fill="none" stroke="white" stroke-width="7" stroke-linecap="round"
-								stroke-linejoin="round" />
-					<path d="M30 70 L70 70" stroke="white" stroke-width="7" stroke-linecap="round" />
-				</svg>
-				<p class="ml-1.5">SVG</p>
-			</Button>
-		{/if}
+		<!--{#if !isMobile}-->
+		<!--	<Button class="font-bold" on:click={handleExportSVG}>-->
+		<!--		<svg width="20" height="20" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">-->
+		<!--			<rect x="10" y="10" width="80" height="80" rx="10" ry="10" fill="none" stroke="white" stroke-width="10" />-->
+		<!--			<path d="M50 25 L50 60 M35 45 L50 60 L65 45" fill="none" stroke="white" stroke-width="7" stroke-linecap="round"-->
+		<!--						stroke-linejoin="round" />-->
+		<!--			<path d="M30 70 L70 70" stroke="white" stroke-width="7" stroke-linecap="round" />-->
+		<!--		</svg>-->
+		<!--		<p class="ml-1.5">SVG</p>-->
+		<!--	</Button>-->
+		<!--{/if}-->
 		<Button class="font-bold" on:click={handleSaveImage}>
 			<svg width="20" height="20" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
 				<rect x="10" y="10" width="80" height="80" rx="10" ry="10" fill="none" stroke="white" stroke-width="10" />
@@ -240,4 +240,10 @@
         flex-direction: row;
         gap: 1rem;
     }
+
+    :global(.start) {
+        background-color: darkorange;
+        color: black;
+    }
+
 </style>
