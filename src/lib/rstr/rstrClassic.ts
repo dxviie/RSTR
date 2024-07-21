@@ -207,11 +207,12 @@ export class RstrClassicGrouping implements RstrGroupingAlgo, RstrFillingAlgo {
 		let lineCount = ((1.5 - averageColor.lightness) * config.blockLineCount);
 
 		// function hatchFillRectangle(debug, start, end, rectangle, lineCount, pattern) {
-		hatchFillRectangle(false, start, end, box, lineCount, pattern);
+		hatchFillRectangle(false, start, end, box, group.shape, lineCount, pattern);
+		if (box) box.remove();
 	}
 }
 
-function hatchFillRectangle(debug, start, end, rectangle, lineCount, pattern) {
+function hatchFillRectangle(debug, start, end, rectangle, shape, lineCount, pattern) {
 	let direction = new paper.Path.Line(start, end);
 	if (pattern === 0) {
 		direction = new paper.Path.Line(start, direction.getPointAt(direction.length / 2));
@@ -232,16 +233,36 @@ function hatchFillRectangle(debug, start, end, rectangle, lineCount, pattern) {
 		}
 		// draw a line perpendicular to direction through linePoint
 		let perpendicular = direction.getNormalAt((i * direction.length) / (lineCount - 1));
-		let lineStart = linePoint.subtract(perpendicular.multiply(direction.length));
-		let lineEnd = linePoint.add(perpendicular.multiply(direction.length));
+		let lineStart = linePoint.subtract(perpendicular.multiply(direction.length * 2));
+		let lineEnd = linePoint.add(perpendicular.multiply(direction.length * 2));
 
 		let line = new paper.Path.Line(lineStart, lineEnd);
-		let hrs = rectangle.getIntersections(line);
-		if (hrs && hrs.length > 0) {
+		let hrs = shape.getIntersections(line);
+		if (hrs && hrs.length === 2) {
 			line.remove();
 			line = new paper.Path.Line(hrs[0].point, hrs[hrs.length - 1].point);
+			line.strokeColor = 'black';
+		} else if (hrs && hrs.length === 4) {
+			line.remove();
+			line = new paper.Path.Line(hrs[0].point, hrs[1].point);
+			line.strokeColor = 'black';
+			const lineB = new paper.Path.Line(hrs[2].point, hrs[3].point);
+			lineB.strokeColor = 'black';
+		} else if (hrs.length === 6) {
+			line.remove();
+			line = new paper.Path.Line(hrs[0].point, hrs[1].point);
+			line.strokeColor = 'black';
+			const lineB = new paper.Path.Line(hrs[2].point, hrs[3].point);
+			lineB.strokeColor = 'black';
+			const lineC = new paper.Path.Line(hrs[4].point, hrs[5].point);
+			lineC.strokeColor = 'black';
+		} else if (hrs.length === 0 || hrs.length === 1) {
+			line.remove();
+		} else {
+			console.warn('not sure what to do with', hrs.length, 'intersections', hrs);
+			line.remove();
 		}
-		line.strokeColor = 'black';
+
 	}
 }
 
@@ -272,7 +293,7 @@ class RstrClassicGroup implements RstrGroup {
 	}
 
 	getAverageLightness(): number {
-		return this.pixels.reduce((acc, p) => acc + p.color.lightness, 0) / this.pixels.length;
+		return this.pixels.reduce((acc, p) => acc + p.color.gray, 0) / this.pixels.length;
 	}
 
 	getBoundingBox(): paper.Rectangle | null {
