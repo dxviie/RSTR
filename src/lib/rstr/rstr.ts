@@ -24,6 +24,12 @@ export interface RstrGroup {
 	isFilled: boolean;
 
 	getAverageLightness(): number;
+
+	getBoundingBox(): paper.Rectangle | null;
+
+	getCornerPixels(): { topLeft: RstrPixel, topRight: RstrPixel, bottomLeft: RstrPixel, bottomRight: RstrPixel };
+
+	getAverageColor(): paper.Color;
 }
 
 export interface RstrGroupingAlgo {

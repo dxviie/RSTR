@@ -17,7 +17,7 @@
 	let renderInfo = $state('');
 	let animationFrameRequest = 0;
 
-	const pics = ['brasa.png', 'test-rstr.png', 'knest.png'];
+	const pics = ['brasa.png', 'kelb.png', 'knest.png'];
 	let selectedPic = $state('');
 
 	$effect(() => {

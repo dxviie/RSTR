@@ -84,10 +84,17 @@ import { hatchShape } from '$lib/ccp/PaperTools.ts';
 
 function findNeighboringGroups(group: RstrGroup, groups: RstrGroup[], maxPixelCount: number = Number.MAX_VALUE): RstrGroup[] {
 	const neighbors = [];
-	for (let i = 0; i < groups.length; i++) {
+
+	const verticalSliceCount = Math.ceil(Math.sqrt(groups.length));
+	const maxMisses = verticalSliceCount * (maxPixelCount * 2);
+	let misses = 0;
+
+	for (let i = groups.indexOf(group); i < groups.length; i++) {
 		const neighbor = groups[i];
 		if (neighbor === group) continue;
 		if (neighbor.pixels.length > maxPixelCount) continue;
+		if (neighbor.timesVisited > group.timesVisited) continue;
+		if (misses > maxMisses && neighbors.length > 1) return neighbors;
 		if ((neighbor.shape.strokeBounds.intersects(group.shape.strokeBounds) ||
 				neighbor.shape.strokeBounds.contains(group.shape.strokeBounds)) &&
 			!neighbors.includes(neighbor)) {
@@ -95,7 +102,12 @@ function findNeighboringGroups(group: RstrGroup, groups: RstrGroup[], maxPixelCo
 			// if so, add the neighbor to the neighbors list
 			if (neighbor.pixels.some(p => group.pixels.some(gp => gp.isNeighbor(p, false)))) {
 				neighbors.push(neighbor);
+				misses = 0;
+			} else {
+				misses++;
 			}
+		} else {
+			misses++;
 		}
 	}
 	return neighbors;
@@ -163,10 +175,10 @@ export class RstrClassicGrouping implements RstrGroupingAlgo, RstrFillingAlgo {
 	fillGroup(group: RstrGroup, layer: paper.Layer, config: RstrConfig): void {
 		if (group.isFilled) return;
 		group.isFilled = true;
-		const box = calculateBoundingBox(group.pixels.map(p => p.rect));
+		const box = group.getBoundingBox();
 
 		// get the average color for each quadrant of the block
-		let corners = findCornerPixels(group.pixels);
+		let corners = group.getCornerPixels();
 
 		let diffDesc = Math.abs(corners.topLeft.gray - corners.bottomRight.gray);
 		let diffAsc = Math.abs(corners.topRight.gray - corners.bottomLeft.gray);
@@ -233,58 +245,6 @@ function hatchFillRectangle(debug, start, end, rectangle, lineCount, pattern) {
 	}
 }
 
-function findCornerPixels(pixels: RstrPixel[]): { topLeft: RstrPixel, topRight: RstrPixel, bottomLeft: RstrPixel, bottomRight: RstrPixel } {
-	if (pixels.length === 0) {
-		throw new Error('Pixel group is empty');
-	}
-
-	let topLeft = pixels[0];
-	let topRight = pixels[0];
-	let bottomLeft = pixels[0];
-	let bottomRight = pixels[0];
-
-	pixels.forEach(pixel => {
-		if (pixel.x <= topLeft.x && pixel.y <= topLeft.y) {
-			topLeft = pixel;
-		}
-		if (pixel.x >= topRight.x && pixel.y <= topRight.y) {
-			topRight = pixel;
-		}
-		if (pixel.x <= bottomLeft.x && pixel.y >= bottomLeft.y) {
-			bottomLeft = pixel;
-		}
-		if (pixel.x >= bottomRight.x && pixel.y >= bottomRight.y) {
-			bottomRight = pixel;
-		}
-	});
-
-	return { topLeft, topRight, bottomLeft, bottomRight };
-}
-
-function calculateBoundingBox(rectangles): paper.Path.Rectangle {
-	if (rectangles.length === 0) {
-		return null; // Return null if the array is empty
-	}
-
-	let minX = Infinity;
-	let minY = Infinity;
-	let maxX = -Infinity;
-	let maxY = -Infinity;
-
-	rectangles.forEach(rect => {
-		minX = Math.min(minX, rect.bounds.left);
-		minY = Math.min(minY, rect.bounds.top);
-		maxX = Math.max(maxX, rect.bounds.right);
-		maxY = Math.max(maxY, rect.bounds.bottom);
-	});
-
-	// Create a new rectangle using the calculated bounds
-	return new paper.Path.Rectangle({
-		point: [minX, minY],
-		size: [maxX - minX, maxY - minY]
-	});
-}
-
 class RstrClassicGroup implements RstrGroup {
 	pixels: RstrPixel[];
 	shape: paper.Path;
@@ -314,7 +274,57 @@ class RstrClassicGroup implements RstrGroup {
 	getAverageLightness(): number {
 		return this.pixels.reduce((acc, p) => acc + p.color.lightness, 0) / this.pixels.length;
 	}
+
+	getBoundingBox(): paper.Rectangle | null {
+		const rectangles = this.pixels.map(p => p.rect);
+		if (rectangles.length === 0) {
+			return null; // Return null if the array is empty
+		}
+
+		let minX = Infinity;
+		let minY = Infinity;
+		let maxX = -Infinity;
+		let maxY = -Infinity;
+
+		rectangles.forEach(rect => {
+			minX = Math.min(minX, rect.bounds.left);
+			minY = Math.min(minY, rect.bounds.top);
+			maxX = Math.max(maxX, rect.bounds.right);
+			maxY = Math.max(maxY, rect.bounds.bottom);
+		});
+
+		// Create a new rectangle using the calculated bounds
+		return new paper.Path.Rectangle({
+			point: [minX, minY],
+			size: [maxX - minX, maxY - minY]
+		});
+	}
+
+	getCornerPixels(): { topLeft: RstrPixel; topRight: RstrPixel; bottomLeft: RstrPixel; bottomRight: RstrPixel } {
+		if (this.pixels.length === 0) {
+			throw new Error('Pixel group is empty');
+		}
+
+		let topLeft = this.pixels[0];
+		let topRight = this.pixels[0];
+		let bottomLeft = this.pixels[0];
+		let bottomRight = this.pixels[0];
+
+		this.pixels.forEach(pixel => {
+			if (pixel.x <= topLeft.x && pixel.y <= topLeft.y) {
+				topLeft = pixel;
+			}
+			if (pixel.x >= topRight.x && pixel.y <= topRight.y) {
+				topRight = pixel;
+			}
+			if (pixel.x <= bottomLeft.x && pixel.y >= bottomLeft.y) {
+				bottomLeft = pixel;
+			}
+			if (pixel.x >= bottomRight.x && pixel.y >= bottomRight.y) {
+				bottomRight = pixel;
+			}
+		});
+
+		return { topLeft, topRight, bottomLeft, bottomRight };
+	}
 }
-
-
-// Original hatching implementation from the genuary project :
