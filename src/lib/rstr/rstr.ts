@@ -140,12 +140,12 @@ export class Rstr {
 				this.groupLayer = new paper.Layer();
 			}
 			this.groups = this.classicGrouping.initGroups(this.grid, this.groupLayer, config);
-			return 'initializing groups';
+			return '1.a initializing groups';
 		}
 		const iterations = this.classicGrouping.iterationsFinished(this.groups);
 		if (iterations < config.iterations) {
 			this.groups = this.classicGrouping.doGroupingStep(this.groups, config);
-			return `grouping: ${iterations + 1} / ${config.iterations} iterations`;
+			return `1.b grouping: ${iterations + 1} / ${config.iterations} iterations`;
 		}
 		/*** filling ***/
 		const hasUnfilledGroups = this.groups.some(group => !group.isFilled);
@@ -156,7 +156,7 @@ export class Rstr {
 			for (const group of this.groups) {
 				if (!group.isFilled) {
 					this.classicGrouping.fillGroup(group, this.fillLayer, config);
-					return 'filling groups';
+					return '2. filling groups';
 				}
 			}
 		}
@@ -164,7 +164,7 @@ export class Rstr {
 		if (this.gridAverageColorLayer) this.gridAverageColorLayer.opacity = 0;
 		if (this.image) this.image.opacity = 0;
 		renderingFinished.action();
-		return 'done';
+		return '3. done';
 	}
 
 	/***************************************
