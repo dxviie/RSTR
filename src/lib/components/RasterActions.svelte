@@ -250,4 +250,8 @@
         color: black;
     }
 
+    :global(.start:hover) {
+        background-color: hsl(var(--primary) / 0.1);
+    }
+
 </style>
