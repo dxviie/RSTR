@@ -9,6 +9,7 @@
 	import RasterActions from '$lib/components/RasterActions.svelte';
 
 	let canvas: HTMLCanvasElement | null = $state(null);
+	let canvasWrapper: HTMLDivElement | null = $state(null);
 	let img: HTMLImageElement | null = $state(null);
 	let imageFile = config.file;
 	let canvasWidth = $state(1280);
@@ -26,7 +27,7 @@
 
 	$effect(() => {
 		if (config.file) {
-			console.debug('image selected', config.file);
+			console.debug('Image selected', config.file);
 			imageFile = config.file;
 			const reader = new FileReader();
 			reader.onload = (event) => {
@@ -35,8 +36,15 @@
 					const newImg = new Image();
 					newImg.src = event.target.result as string;
 					newImg.onload = () => {
-						canvasWidth = newImg.naturalWidth;
-						canvasHeight = newImg.naturalHeight;
+						const imgWidth = newImg.naturalWidth;
+						const imgHeight = newImg.naturalHeight;
+						if (canvas && canvasWrapper) {
+							const ratio = canvasWrapper.clientWidth / imgWidth;
+							canvasWidth = canvasWrapper.clientWidth;
+							canvasHeight = imgHeight * ratio;
+							canvas.width = canvasWidth;
+							canvas.height = canvasHeight;
+						}
 						img = newImg;
 					};
 				}
@@ -125,8 +133,8 @@
 	{#if rstrState.status === 'render'}
 		<div class="render-info">{renderInfo}</div>
 	{/if}
-	<div class="canvas-wrapper">
-		<canvas id="raster-canvas" bind:this={canvas} data-paper-hidpi="on" width={canvasWidth} height={canvasHeight}></canvas>
+	<div class="canvas-wrapper" bind:this={canvasWrapper}>
+		<canvas id="raster-canvas" bind:this={canvas} data-paper-hidpi="on" width="1080px" height="1080px"></canvas>
 	</div>
 
 	<RasterActions {canvas} {rstr} />
@@ -144,21 +152,17 @@
         justify-content: center;
         align-items: center;
         width: 60vw;
-        max-width: 1280px;
-        height: 80vh;
-        max-height: 1280px;
     }
 
     @media (max-width: 850px) {
         .canvas-container {
             width: 100%;
-            height: 50vh
+            max-width: 90vw;
         }
     }
 
     .canvas-wrapper {
-        width: 100%; /* or any desired width */
-        height: 100%; /* maintain aspect ratio */
+        width: 100%;
         position: relative;
         overflow: hidden;
     }
@@ -170,13 +174,6 @@
         border-color: black;
         border-style: dashed;
         border-width: 1px;
-    }
-
-    @media (max-width: 850px) {
-        #raster-canvas {
-            width: 100%;
-            height: 100%;
-        }
     }
 
     .render-info {

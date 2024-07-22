@@ -110,7 +110,6 @@
         flex-direction: column;
         align-items: center;
         padding: 1rem;
-        max-height: 100vh;
     }
 
     .config {
