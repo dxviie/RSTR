@@ -21,6 +21,10 @@
 	const pics = ['bbrasa-imp.png', 'knest-imp.png'];
 	let selectedPic = $state('');
 
+	function getPixelRatio() {
+		return typeof window !== 'undefined' ? Math.min(window.devicePixelRatio, 2) : 1;
+	}
+
 	$effect(() => {
 		selectedPic = pics[Math.floor(Math.random() * pics.length)];
 	});
@@ -40,8 +44,8 @@
 						const imgHeight = newImg.naturalHeight;
 						if (canvas && canvasWrapper) {
 							const ratio = canvasWrapper.clientWidth / imgWidth;
-							canvasWidth = canvasWrapper.clientWidth;
-							canvasHeight = imgHeight * ratio;
+							canvasWidth = canvasWrapper.clientWidth * getPixelRatio();
+							canvasHeight = imgHeight * ratio * getPixelRatio();
 							canvas.width = canvasWidth;
 							canvas.height = canvasHeight;
 						}
