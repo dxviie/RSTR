@@ -6,7 +6,7 @@ export type RstrConfig = {
 	iterations: number;
 	tolerance: number;
 	// hatching
-	blockLineCount: number;
+	density: number;
 }
 
 const initialState = {
@@ -14,10 +14,10 @@ const initialState = {
 	file: '',
 	// grid building
 	resolution: 33,
-	iterations: 1,
+	iterations: 3,
 	tolerance: 0.33,
 	// hatching
-	blockLineCount: 33
+	density: .66
 };
 
 const updateConfig = (newValues: { [s: string]: unknown; } | ArrayLike<unknown>) => {

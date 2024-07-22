@@ -22,10 +22,11 @@ export interface RstrGroup {
 	shape: paper.Path;
 	timesVisited: number;
 	isFilled: boolean;
+	fills: paper.Path[];
 
 	getAverageLightness(): number;
 
-	getBoundingBox(): paper.Rectangle | null;
+	getBoundingBox(): paper.Rectangle;
 
 	getCornerPixels(): { topLeft: RstrPixel, topRight: RstrPixel, bottomLeft: RstrPixel, bottomRight: RstrPixel };
 
@@ -80,7 +81,7 @@ export class Rstr {
 		this.image = new paper.Raster(image);
 		this.image.onLoad = () => {
 			if (!this.image) return;
-			console.debug('Image loaded', this.image.bounds);
+			console.debug('Image rasterized', this.image.bounds);
 			this.image.fitBounds(this.project.view.bounds);
 			console.debug('Image fitted', this.image.bounds);
 			imageLoaded.action();
@@ -163,6 +164,9 @@ export class Rstr {
 		if (this.groupLayer) this.groupLayer.opacity = 0;
 		if (this.gridAverageColorLayer) this.gridAverageColorLayer.opacity = 0;
 		if (this.image) this.image.opacity = 0;
+		this.cleanupGroups();
+		this.cleanupPreparation();
+		this.cleanupGrid();
 		renderingFinished.action();
 		return '3. done';
 	}

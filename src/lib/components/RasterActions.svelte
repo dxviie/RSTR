@@ -86,7 +86,7 @@
 		console.debug('exporting svg');
 		exporting.action();
 		setTimeout(() => {
-			const svg = rstr?.project.exportSVG({ asString: true }) as string;
+			const svg = rstr?.project.exportSVG({ asString: true, embedImages: false }) as string;
 			if (!svg) {
 				console.error('could not export svg');
 				return;
@@ -172,6 +172,8 @@
 	};
 </script>
 
+<!--=======================================================================================-->
+
 <div class="actions-container">
 
 	<Button
@@ -179,7 +181,8 @@
 		on:click={handleSelectFileClicked}
 		disabled={!selectImageButtonEnabled}
 		alt="Select image"
-		title="Select image">
+		title="Select image"
+		data-umami-event={"select-image"}>
 		<svg width="20" height="20" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
 			<rect x="10" y="10" width="80" height="80" rx="10" ry="10" fill="none" stroke="white" stroke-width="10" />
 			<circle cx="30" cy="30" r="10" fill="white" />
@@ -191,33 +194,32 @@
 	<Button
 		class={`font-bold ${actionButtonLabel ? actionButtonLabel.toLowerCase() : ''}`}
 		on:click={() => handleActionButtonClick()}
-		disabled={!actionButtonEnabled}>{actionButtonLabel}</Button
+		disabled={!actionButtonEnabled}
+		data-umami-event={`action-${actionButtonLabel.toLowerCase()}`}>{actionButtonLabel}</Button
 	>
 
-	{#if rstrState.status === 'done'}
+	<!--{#if !isMobile}-->
+	<!--	<Button class="font-bold" on:click={handleExportSVG}>-->
+	<!--		<svg width="20" height="20" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">-->
+	<!--			<rect x="10" y="10" width="80" height="80" rx="10" ry="10" fill="none" stroke="white" stroke-width="10" />-->
+	<!--			<path d="M50 25 L50 60 M35 45 L50 60 L65 45" fill="none" stroke="white" stroke-width="7" stroke-linecap="round"-->
+	<!--						stroke-linejoin="round" />-->
+	<!--			<path d="M30 70 L70 70" stroke="white" stroke-width="7" stroke-linecap="round" />-->
+	<!--		</svg>-->
+	<!--		<p class="ml-1.5">SVG</p>-->
+	<!--	</Button>-->
+	<!--{/if}-->
+	<Button class="font-bold" on:click={handleSaveImage} data-umami-event={"save-image"}>
+		<svg width="20" height="20" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+			<rect x="10" y="10" width="80" height="80" rx="10" ry="10" fill="none" stroke="white" stroke-width="10" />
+			<path d="M50 25 L50 60 M35 45 L50 60 L65 45" fill="none" stroke="white" stroke-width="7" stroke-linecap="round"
+						stroke-linejoin="round" />
+			<path d="M30 70 L70 70" stroke="white" stroke-width="7" stroke-linecap="round" />
+		</svg>
 		<!--{#if !isMobile}-->
-		<!--	<Button class="font-bold" on:click={handleExportSVG}>-->
-		<!--		<svg width="20" height="20" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">-->
-		<!--			<rect x="10" y="10" width="80" height="80" rx="10" ry="10" fill="none" stroke="white" stroke-width="10" />-->
-		<!--			<path d="M50 25 L50 60 M35 45 L50 60 L65 45" fill="none" stroke="white" stroke-width="7" stroke-linecap="round"-->
-		<!--						stroke-linejoin="round" />-->
-		<!--			<path d="M30 70 L70 70" stroke="white" stroke-width="7" stroke-linecap="round" />-->
-		<!--		</svg>-->
-		<!--		<p class="ml-1.5">SVG</p>-->
-		<!--	</Button>-->
+		<!--	<p class="ml-1.5">PNG</p>-->
 		<!--{/if}-->
-		<Button class="font-bold" on:click={handleSaveImage}>
-			<svg width="20" height="20" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-				<rect x="10" y="10" width="80" height="80" rx="10" ry="10" fill="none" stroke="white" stroke-width="10" />
-				<path d="M50 25 L50 60 M35 45 L50 60 L65 45" fill="none" stroke="white" stroke-width="7" stroke-linecap="round"
-							stroke-linejoin="round" />
-				<path d="M30 70 L70 70" stroke="white" stroke-width="7" stroke-linecap="round" />
-			</svg>
-			{#if !isMobile}
-				<p class="ml-1.5">PNG</p>
-			{/if}
-		</Button>
-	{/if}
+	</Button>
 
 
 	<input
@@ -231,6 +233,8 @@
 		oncancel={() => imageLoaded.action()}
 	/>
 </div>
+
+<!--=======================================================================================-->
 
 <style>
     .actions-container {

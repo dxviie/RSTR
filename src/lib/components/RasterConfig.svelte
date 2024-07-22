@@ -34,18 +34,15 @@
 		baseFolder.addBinding(paneConfig, 'resolution', { min: 10, max: 100, step: 1 });
 
 		const groupingFolder = pane.addFolder({ title: 'GROUPING' });
-		groupingFolder.addBinding(paneConfig, 'iterations', { min: 1, max: 5, step: 1 });
+		groupingFolder.addBinding(paneConfig, 'iterations', { min: 1, max: 10, step: 1 });
 		groupingFolder.addBinding(paneConfig, 'tolerance', { min: 0.05, max: 1, step: 0.05 });
 
 		const hatchingFolder = pane.addFolder({ title: 'FILL' });
-		hatchingFolder.addBinding(paneConfig, 'blockLineCount', { min: 1, max: 50, step: 1 });
+		hatchingFolder.addBinding(paneConfig, 'density', { min: 0, max: 1, step: 0.05 });
 
 		// Listen for changes and emit the updated config
 		pane.on('change', () => {
 			configActions.update({ ...paneConfig });
-			if (pane) {
-				console.info('pane preset:', pane);
-			}
 		});
 
 		return () => {
@@ -54,11 +51,13 @@
 	});
 </script>
 
+<!--=======================================================================================-->
+
 <div class="config-container">
-
 	<div id="tweakpane-container" class="tweakpane-container" bind:this={container}></div>
-
 </div>
+
+<!--=======================================================================================-->
 
 <style>
     .config-container {

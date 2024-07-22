@@ -1,82 +1,6 @@
-// onMount(() => {
-// 	paper.setup(canvas);
-// 	project = paper.project;
-//
-// 	project.view.onFrame = (event: { time: number; delta: number; count: number }) => {
-// 		console.log('rendering', 'time', event.time, 'delta', event.delta, 'count', event.count);
-// if (!paper || !paper.project || !paper.project.activeLayer) {
-// 	return;
-// }
-// paper.project.activeLayer.removeChildren();
-//
-// const bounds = paper.view.bounds.scale(0.9);
-// const offset = bounds.width * 0.05;
-// const width = bounds.width / config.resolution;
-// const height = bounds.height / config.resolution;
-// const size = new paper.Size(width, height);
-//
-// new paper.Path.Rectangle({
-// 	point: bounds.topLeft,
-// 	size: bounds.size,
-// 	fillColor: 'white'
-// });
-//
-// let info = new paper.PointText({
-// 	point: [20 / getPixelRatio(), paper.view.center.y - (fontSize / getPixelRatio()) * 3],
-// 	content: `initial resolution: ${config.resolution}x${config.resolution}\ngrouping iterations: ${config.iterations}\nsimilarity tolerance: ${config.tolerance}\nmax. lines per area: ${config.blockLineCount}\n\nDepending on the numbers above,\nand your device,\nthis might take a while.`,
-// 	fillColor: 'black',
-// 	fontSize: fontSize / getPixelRatio(),
-// 	fontFamily: 'courier new'
-// });
-//
-// let blocks = [];
-//
-// // build base raster
-// for (let i = 0; i < config.resolution; i++) {
-// 	let x = offset + width * i;
-// 	for (let j = 0; j < config.resolution; j++) {
-// 		let y = offset + height * j;
-// 		let block = new paper.Path.Rectangle({
-// 			point: [x, y],
-// 			size: size
-// 		});
-// 		block.gridX = i;
-// 		block.gridY = j;
-// 		block.xSpan = 1;
-// 		block.ySpan = 1;
-// 		block.used = false;
-// 		blocks.push(block);
-// 		if (debug) {
-// 			block.strokeColor = 'red';
-// 			block.strokeWidth = 1;
-// 		}
-// 	}
-// }
-//
-// let vera = new paper.Raster(img || selectedPic);
-// vera.opacity = 0;
-// vera.onLoad = () => {
-// 	console.log('loaded image');
-// 	if (debug) {
-// 		vera.opacity = 0.1;
-// 		vera.blendMode = 'multiply';
-// 	}
-// 	info.remove();
-// 	vera.fitBounds(bounds);
-//
-// 	if (rstrState.status !== 'render') {
-// 		console.log('not rendering');
-// 		vera.opacity = 1;
-// 		return;
-// 	}
-// 	console.log('rendering');
-//
-
-
 import type { RstrFillingAlgo, RstrGroup, RstrGroupingAlgo, RstrPixel } from '$lib/rstr/rstr.ts';
 import paper from 'paper';
 import type { RstrConfig } from '$lib/rstr/config.svelte.ts';
-import { hatchShape } from '$lib/ccp/PaperTools.ts';
 
 /***************************************
  						GROUPING
@@ -86,15 +10,15 @@ function findNeighboringGroups(group: RstrGroup, groups: RstrGroup[], maxPixelCo
 	const neighbors = [];
 
 	const verticalSliceCount = Math.ceil(Math.sqrt(groups.length));
-	const maxMisses = verticalSliceCount * (maxPixelCount * 2);
-	let misses = 0;
+	const startIndex = Math.max(0, groups.indexOf(group));
+	const endIndex = Math.min(groups.length, startIndex + (verticalSliceCount * (maxPixelCount * 2)));
 
-	for (let i = groups.indexOf(group); i < groups.length; i++) {
+
+	for (let i = startIndex; i < endIndex; i++) {
 		const neighbor = groups[i];
 		if (neighbor === group) continue;
 		if (neighbor.pixels.length > maxPixelCount) continue;
 		if (neighbor.timesVisited > group.timesVisited) continue;
-		if (misses > maxMisses && neighbors.length > 1) return neighbors;
 		if ((neighbor.shape.strokeBounds.intersects(group.shape.strokeBounds) ||
 				neighbor.shape.strokeBounds.contains(group.shape.strokeBounds)) &&
 			!neighbors.includes(neighbor)) {
@@ -102,16 +26,13 @@ function findNeighboringGroups(group: RstrGroup, groups: RstrGroup[], maxPixelCo
 			// if so, add the neighbor to the neighbors list
 			if (neighbor.pixels.some(p => group.pixels.some(gp => gp.isNeighbor(p, false)))) {
 				neighbors.push(neighbor);
-				misses = 0;
-			} else {
-				misses++;
 			}
-		} else {
-			misses++;
 		}
 	}
 	return neighbors;
 }
+
+const groupColors = ['darkorange', 'red', 'purple', 'blue', 'black'];
 
 export class RstrClassicGrouping implements RstrGroupingAlgo, RstrFillingAlgo {
 
@@ -120,7 +41,7 @@ export class RstrClassicGrouping implements RstrGroupingAlgo, RstrFillingAlgo {
 		for (let i = 0; i < groups.length; i++) {
 			const group = groups[i];
 			if (group.timesVisited <= iters) {
-				const neighbors = findNeighboringGroups(group, groups, iters + 1);
+				const neighbors = findNeighboringGroups(group, groups, Math.max(1, iters * iters));
 				const neighborDiffs = neighbors.map((n) => {
 					return Math.abs(group.getAverageLightness() - n.getAverageLightness());
 				});
@@ -142,6 +63,7 @@ export class RstrClassicGrouping implements RstrGroupingAlgo, RstrFillingAlgo {
 						groups.splice(groups.indexOf(neighbor), 1);
 					}
 				}
+				group.shape.strokeColor = new paper.Color(groupColors[group.timesVisited % groupColors.length]);
 				group.timesVisited++;
 				return groups;
 			}
@@ -202,17 +124,15 @@ export class RstrClassicGrouping implements RstrGroupingAlgo, RstrFillingAlgo {
 			start = new paper.Point(box.bounds.x, box.bounds.y + box.bounds.height);
 			end = new paper.Point(box.bounds.x + box.bounds.width, box.bounds.y);
 		}
-		let averageColor = group.getAverageColor();
 		// map average color to linecount
-		let lineCount = ((1.5 - averageColor.lightness) * config.blockLineCount);
-
+		const lineCount = (config.density * box.bounds.width) * (1 - group.getAverageLightness());
 		// function hatchFillRectangle(debug, start, end, rectangle, lineCount, pattern) {
-		hatchFillRectangle(false, start, end, box, group.shape, lineCount, pattern);
+		hatchFillRectangle(false, start, end, box, group.shape, lineCount, pattern, layer, group);
 		if (box) box.remove();
 	}
 }
 
-function hatchFillRectangle(debug, start, end, rectangle, shape, lineCount, pattern) {
+function hatchFillRectangle(debug, start, end, rectangle, shape, lineCount, pattern, layer, group) {
 	let direction = new paper.Path.Line(start, end);
 	if (pattern === 0) {
 		direction = new paper.Path.Line(start, direction.getPointAt(direction.length / 2));
@@ -222,47 +142,30 @@ function hatchFillRectangle(debug, start, end, rectangle, shape, lineCount, patt
 	if (debug) {
 		direction.strokeColor = 'red';
 	}
-	for (var i = 0; i < lineCount; i++) {
+	for (let i = 0; i < lineCount; i++) {
 		let linePoint = direction.getPointAt((i * direction.length) / (lineCount - 1));
 		if (!linePoint) {
 			continue;
 		}
-		if (debug) {
-			let circle = new paper.Path.Circle(linePoint, 2);
-			circle.fillColor = 'red';
-		}
 		// draw a line perpendicular to direction through linePoint
-		let perpendicular = direction.getNormalAt((i * direction.length) / (lineCount - 1));
-		let lineStart = linePoint.subtract(perpendicular.multiply(direction.length * 2));
-		let lineEnd = linePoint.add(perpendicular.multiply(direction.length * 2));
-
-		let line = new paper.Path.Line(lineStart, lineEnd);
-		let hrs = shape.getIntersections(line);
-		if (hrs && hrs.length === 2) {
-			line.remove();
-			line = new paper.Path.Line(hrs[0].point, hrs[hrs.length - 1].point);
-			line.strokeColor = 'black';
-		} else if (hrs && hrs.length === 4) {
-			line.remove();
-			line = new paper.Path.Line(hrs[0].point, hrs[1].point);
-			line.strokeColor = 'black';
-			const lineB = new paper.Path.Line(hrs[2].point, hrs[3].point);
-			lineB.strokeColor = 'black';
-		} else if (hrs.length === 6) {
-			line.remove();
-			line = new paper.Path.Line(hrs[0].point, hrs[1].point);
-			line.strokeColor = 'black';
-			const lineB = new paper.Path.Line(hrs[2].point, hrs[3].point);
-			lineB.strokeColor = 'black';
-			const lineC = new paper.Path.Line(hrs[4].point, hrs[5].point);
-			lineC.strokeColor = 'black';
+		const perpendicular = direction.getNormalAt((i * direction.length) / (lineCount - 1));
+		const lineStart = linePoint.subtract(perpendicular.multiply(direction.length * 2));
+		const lineEnd = linePoint.add(perpendicular.multiply(direction.length * 2));
+		const line = new paper.Path.Line(lineStart, lineEnd);
+		const hrs = line.getIntersections(shape);
+		if (hrs && hrs.length > 0 && hrs.length % 2 === 0) {
+			const lines = Math.ceil(hrs.length / 2);
+			for (let i = 0; i < lines; i++) {
+				const l = new paper.Path.Line(hrs[i * 2].point, hrs[(i * 2) + 1].point);
+				l.strokeColor = 'black';
+				group.fills.push(l);
+				l.addTo(layer);
+			}
 		} else if (hrs.length === 0 || hrs.length === 1) {
-			line.remove();
 		} else {
 			console.warn('not sure what to do with', hrs.length, 'intersections', hrs);
-			line.remove();
 		}
-
+		line.remove();
 	}
 }
 
@@ -271,6 +174,7 @@ class RstrClassicGroup implements RstrGroup {
 	shape: paper.Path;
 	timesVisited: number;
 	isFilled: boolean;
+	fills: paper.Path[] = [];
 
 	constructor(pixel: RstrPixel, config: RstrConfig) {
 		this.pixels = [pixel];
@@ -296,10 +200,11 @@ class RstrClassicGroup implements RstrGroup {
 		return this.pixels.reduce((acc, p) => acc + p.color.gray, 0) / this.pixels.length;
 	}
 
-	getBoundingBox(): paper.Rectangle | null {
+	getBoundingBox(): paper.Rectangle {
 		const rectangles = this.pixels.map(p => p.rect);
 		if (rectangles.length === 0) {
-			return null; // Return null if the array is empty
+			console.error('No rectangles found in group. Returning empty bounding box.');
+			return new paper.Path.Rectangle([0, 0], [0, 0]);
 		}
 
 		let minX = Infinity;

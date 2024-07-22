@@ -26,7 +26,3 @@ function findValidNeighbors(blocks, block) {
 	}
 	return neighbors;
 }
-
-function getPixelRatio() {
-	return typeof window !== 'undefined' ? Math.min(window.devicePixelRatio, 2) : 1;
-}

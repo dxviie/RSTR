@@ -53,7 +53,7 @@
 
 	$effect(() => {
 		if (img || selectedPic) {
-			console.info('image loaded >> render?!!', img, selectedPic);
+			console.info('Image loaded', img, selectedPic);
 			if (!canvas) {
 				console.warn('no canvas');
 				return;
@@ -119,6 +119,8 @@
 	}, 500);
 </script>
 
+<!--=======================================================================================-->
+
 <div class="canvas-container">
 	{#if rstrState.status === 'render'}
 		<div class="render-info">{renderInfo}</div>
@@ -129,6 +131,8 @@
 
 	<RasterActions {canvas} {rstr} />
 </div>
+
+<!--=======================================================================================-->
 
 <style>
 
