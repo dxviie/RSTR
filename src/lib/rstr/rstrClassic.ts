@@ -101,11 +101,11 @@ export class RstrClassicGrouping implements RstrGroupingAlgo, RstrFillingAlgo {
 
 		// get the average color for each quadrant of the block
 		let corners = group.getCornerPixels();
-
-		let diffDesc = Math.abs(corners.topLeft.gray - corners.bottomRight.gray);
-		let diffAsc = Math.abs(corners.topRight.gray - corners.bottomLeft.gray);
+		let diffDesc = Math.abs(corners.topLeft.color.gray - corners.bottomRight.color.gray);
+		let diffAsc = Math.abs(corners.topRight.color.gray - corners.bottomLeft.color.gray);
 		let start, end;
 		let pattern = 2;
+		console.info('diffs', corners, diffAsc, diffDesc);
 		if (diffAsc < diffDesc) {
 			// descending
 			if (diffDesc > config.tolerance / 2) {
@@ -134,21 +134,24 @@ export class RstrClassicGrouping implements RstrGroupingAlgo, RstrFillingAlgo {
 
 function hatchFillRectangle(debug, start, end, rectangle, shape, lineCount, pattern, layer, group) {
 	let direction = new paper.Path.Line(start, end);
+	let actualLineCount = lineCount;
 	if (pattern === 0) {
 		direction = new paper.Path.Line(start, direction.getPointAt(direction.length / 2));
+		actualLineCount = lineCount / 2;
 	} else if (pattern === 1) {
 		direction = new paper.Path.Line(direction.getPointAt(direction.length / 2), end);
+		actualLineCount = lineCount / 2;
 	}
 	if (debug) {
 		direction.strokeColor = 'red';
 	}
-	for (let i = 0; i < lineCount; i++) {
-		let linePoint = direction.getPointAt((i * direction.length) / (lineCount - 1));
+	for (let i = 0; i < actualLineCount; i++) {
+		let linePoint = direction.getPointAt((i * direction.length) / (actualLineCount - 1));
 		if (!linePoint) {
 			continue;
 		}
 		// draw a line perpendicular to direction through linePoint
-		const perpendicular = direction.getNormalAt((i * direction.length) / (lineCount - 1));
+		const perpendicular = direction.getNormalAt((i * direction.length) / (actualLineCount - 1));
 		const lineStart = linePoint.subtract(perpendicular.multiply(direction.length * 2));
 		const lineEnd = linePoint.add(perpendicular.multiply(direction.length * 2));
 		const line = new paper.Path.Line(lineStart, lineEnd);
