@@ -12,8 +12,6 @@
 	let canvasWrapper: HTMLDivElement | null = $state(null);
 	let img: HTMLImageElement | null = $state(null);
 	let imageFile = config.file;
-	let canvasWidth = $state(1280);
-	let canvasHeight = $state(1280);
 	let rstr: Rstr | null = $state(null);
 	let renderInfo = $state('');
 	let animationFrameRequest = 0;
@@ -22,7 +20,7 @@
 	let selectedPic = $state('');
 
 	function getPixelRatio() {
-		return typeof window !== 'undefined' ? Math.min(window.devicePixelRatio, 2) : 1;
+		return typeof window !== 'undefined' ? Math.min(2, window.devicePixelRatio) : 1;
 	}
 
 	$effect(() => {
@@ -40,15 +38,6 @@
 					const newImg = new Image();
 					newImg.src = event.target.result as string;
 					newImg.onload = () => {
-						const imgWidth = newImg.naturalWidth;
-						const imgHeight = newImg.naturalHeight;
-						if (canvas && canvasWrapper) {
-							const ratio = canvasWrapper.clientWidth / imgWidth;
-							canvasWidth = canvasWrapper.clientWidth * getPixelRatio();
-							canvasHeight = imgHeight * ratio * getPixelRatio();
-							canvas.width = canvasWidth;
-							canvas.height = canvasHeight;
-						}
 						img = newImg;
 					};
 				}
@@ -65,22 +54,35 @@
 
 	$effect(() => {
 		if (img || selectedPic) {
-			console.info('Image loaded', img, selectedPic);
-			if (!canvas) {
-				console.warn('no canvas');
-				return;
-			}
 			setTimeout(() => {
+				console.info('Image loaded', img, selectedPic);
+				if (!canvas) {
+					console.warn('no canvas');
+					return;
+				}
 				if (rstr) {
 					rstr.reset();
 				}
-				paper.setup(canvas);
-				console.log('project setup', canvasWidth, canvasHeight, canvas.width, canvas.height, paper.view.bounds);
-				rstr = new Rstr(paper);
-				rstr.loadImage(img || selectedPic);
-				debouncedGridUpdate();
+				if (img) {
+					const imgWidth = img.naturalWidth;
+					const imgHeight = img.naturalHeight;
+					if (canvas && canvasWrapper) {
+						const ratio = (canvasWrapper.clientWidth) / imgWidth;
+						const canvasWidth = canvasWrapper.clientWidth;
+						const canvasHeight = imgHeight * ratio;
+						canvas.style.width = `${canvasWidth}px`;
+						canvas.style.height = `${canvasHeight}px`;
+						canvas.width = canvasWidth * getPixelRatio();
+						canvas.height = canvasHeight * getPixelRatio();
+					}
+				}
+				setTimeout(() => {
+					paper.setup(canvas);
+					rstr = new Rstr(paper);
+					rstr.loadImage(img || selectedPic);
+					debouncedGridUpdate();
+				}, 10);
 			}, 10);
-
 		}
 	});
 
@@ -161,7 +163,7 @@
     @media (max-width: 850px) {
         .canvas-container {
             width: 100%;
-            max-width: 90vw;
+            /*    max-width: 90vw;*/
         }
     }
 
@@ -173,7 +175,7 @@
 
     #raster-canvas {
         width: 100%;
-        height: 100%;
+        /*height: 100%;*/
         object-fit: contain;
         border-color: black;
         border-style: dashed;
