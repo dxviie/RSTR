@@ -100,12 +100,11 @@ export class RstrClassicGrouping implements RstrGroupingAlgo, RstrFillingAlgo {
 		const box = group.getBoundingBox();
 
 		// get the average color for each quadrant of the block
-		let corners = group.getCornerPixels();
-		let diffDesc = Math.abs(corners.topLeft.color.gray - corners.bottomRight.color.gray);
-		let diffAsc = Math.abs(corners.topRight.color.gray - corners.bottomLeft.color.gray);
+		const corners = group.getCornerPixels();
+		const diffDesc = Math.abs(corners.topLeft.color.gray - corners.bottomRight.color.gray);
+		const diffAsc = Math.abs(corners.topRight.color.gray - corners.bottomLeft.color.gray);
 		let start, end;
 		let pattern = 2;
-		console.info('diffs', corners, diffAsc, diffDesc);
 		if (diffAsc < diffDesc) {
 			// descending
 			if (diffDesc > config.tolerance / 2) {

@@ -12,7 +12,7 @@
 	} from '$lib/fsm.svelte.js';
 	import { configActions } from '$lib/rstr/config.svelte.ts';
 
-	let { canvas, rstr } = $props();
+	const { canvas, rstr } = $props();
 
 	let fileInput: HTMLInputElement;
 	let actionButtonLabel = $state('--');
@@ -86,7 +86,11 @@
 		console.debug('exporting svg');
 		exporting.action();
 		setTimeout(() => {
-			const svg = rstr?.project.exportSVG({ asString: true, embedImages: false }) as string;
+			let svg = `<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${rstr.project.view.bounds.width}" height="${rstr.project.view.bounds.height}" viewBox="0,0,778,778">`;
+			rstr.groups.forEach((group) => {
+				group.fills.forEach((fill) => svg += fill.exportSVG({ asString: true }).replace(/\sxmlns="[^"]*"/, ''));
+			});
+			svg += '</svg>';
 			if (!svg) {
 				console.error('could not export svg');
 				return;
@@ -198,17 +202,17 @@
 		data-umami-event={`action-${actionButtonLabel.toLowerCase()}`}>{actionButtonLabel}</Button
 	>
 
-	<!--{#if !isMobile}-->
-	<!--	<Button class="font-bold" on:click={handleExportSVG}>-->
-	<!--		<svg width="20" height="20" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">-->
-	<!--			<rect x="10" y="10" width="80" height="80" rx="10" ry="10" fill="none" stroke="white" stroke-width="10" />-->
-	<!--			<path d="M50 25 L50 60 M35 45 L50 60 L65 45" fill="none" stroke="white" stroke-width="7" stroke-linecap="round"-->
-	<!--						stroke-linejoin="round" />-->
-	<!--			<path d="M30 70 L70 70" stroke="white" stroke-width="7" stroke-linecap="round" />-->
-	<!--		</svg>-->
-	<!--		<p class="ml-1.5">SVG</p>-->
-	<!--	</Button>-->
-	<!--{/if}-->
+	{#if !isMobile}
+		<Button class="font-bold" on:click={handleExportSVG}>
+			<svg width="20" height="20" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+				<rect x="10" y="10" width="80" height="80" rx="10" ry="10" fill="none" stroke="white" stroke-width="10" />
+				<path d="M50 25 L50 60 M35 45 L50 60 L65 45" fill="none" stroke="white" stroke-width="7" stroke-linecap="round"
+							stroke-linejoin="round" />
+				<path d="M30 70 L70 70" stroke="white" stroke-width="7" stroke-linecap="round" />
+			</svg>
+			<p class="ml-1.5">SVG</p>
+		</Button>
+	{/if}
 	<Button class="font-bold" on:click={handleSaveImage} data-umami-event={"save-image"}>
 		<svg width="20" height="20" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
 			<rect x="10" y="10" width="80" height="80" rx="10" ry="10" fill="none" stroke="white" stroke-width="10" />
@@ -216,9 +220,9 @@
 						stroke-linejoin="round" />
 			<path d="M30 70 L70 70" stroke="white" stroke-width="7" stroke-linecap="round" />
 		</svg>
-		<!--{#if !isMobile}-->
-		<!--	<p class="ml-1.5">PNG</p>-->
-		<!--{/if}-->
+		{#if !isMobile}
+			<p class="ml-1.5">PNG</p>
+		{/if}
 	</Button>
 
 

@@ -164,7 +164,7 @@ export class Rstr {
 		if (this.groupLayer) this.groupLayer.opacity = 0;
 		if (this.gridAverageColorLayer) this.gridAverageColorLayer.opacity = 0;
 		if (this.image) this.image.opacity = 0;
-		this.cleanupGroups();
+		// this.cleanupGroups(); we need these for SVG export
 		this.cleanupPreparation();
 		this.cleanupGrid();
 		renderingFinished.action();
@@ -246,6 +246,7 @@ export class Rstr {
 		}
 		if (this.groups) {
 			this.groups.forEach(group => group.shape.remove());
+			console.warn('Groups removed');
 			this.groups = null;
 		}
 	}

@@ -127,7 +127,7 @@
 			setTimeout(() => {
 				rstr.updateGrid(config.resolution);
 				exported.action();
-				console.debug('exported svg');
+				console.debug('grid updated');
 			}, 100);
 		}
 	}, 500);
