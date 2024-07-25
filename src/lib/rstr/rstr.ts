@@ -15,6 +15,8 @@ export interface RstrPixel {
 	group: RstrGroup | null;
 
 	isNeighbor(other: RstrPixel, allowDiagonals: boolean): boolean;
+
+	getAverageColorValue(): number;
 }
 
 export interface RstrGroup {
@@ -274,6 +276,28 @@ export class Rstr {
 	}
 }
 
+function rgbToCmyk(color) {
+	// Get RGB values from the Paper.js color object
+	let red = color.red;
+	let green = color.green;
+	let blue = color.blue;
+
+	// Calculate K (black)
+	let k = Math.min(1 - red, 1 - green, 1 - blue);
+
+	// Calculate CMY
+	let c = (1 - red - k) / (1 - k) || 0;
+	let m = (1 - green - k) / (1 - k) || 0;
+	let y = (1 - blue - k) / (1 - k) || 0;
+
+	return {
+		cyan: c,
+		magenta: m,
+		yellow: y,
+		black: k
+	};
+}
+
 class RstrPixelImpl implements RstrPixel {
 
 	x: number;
@@ -308,5 +332,14 @@ class RstrPixelImpl implements RstrPixel {
 			return xDiff <= 1 && yDiff <= 1;
 		}
 		return (xDiff === 1 && yDiff === 0) || (xDiff === 0 && yDiff === 1);
+	}
+
+	getAverageColorValue(): number {
+		if (!this.color) return 0;
+		let cmyk = rgbToCmyk(this.color);
+		const val = 1 - cmyk.black;
+		if (val === null) return 0;
+		if (val < 0 || val > 1) console.warn('Color value out of bounds', val);
+		return val;
 	}
 }

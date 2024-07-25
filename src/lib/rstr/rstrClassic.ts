@@ -101,14 +101,14 @@ export class RstrClassicGrouping implements RstrGroupingAlgo, RstrFillingAlgo {
 
 		// get the average color for each quadrant of the block
 		const corners = group.getCornerPixels();
-		const diffDesc = Math.abs(corners.topLeft.color.gray - corners.bottomRight.color.gray);
-		const diffAsc = Math.abs(corners.topRight.color.gray - corners.bottomLeft.color.gray);
+		const diffDesc = Math.abs(corners.topLeft.getAverageColorValue() - corners.bottomRight.getAverageColorValue());
+		const diffAsc = Math.abs(corners.topRight.getAverageColorValue() - corners.bottomLeft.getAverageColorValue());
 		let start, end;
 		let pattern = 2;
 		if (diffAsc < diffDesc) {
 			// descending
 			if (diffDesc > config.tolerance / 2) {
-				pattern = corners.topLeft.color.gray > corners.bottomRight.color.gray ? 1 : 0;
+				pattern = corners.topLeft.getAverageColorValue() > corners.bottomRight.getAverageColorValue() ? 1 : 0;
 			}
 			start = new paper.Point(box.bounds.x, box.bounds.y);
 			end = new paper.Point(
@@ -118,7 +118,7 @@ export class RstrClassicGrouping implements RstrGroupingAlgo, RstrFillingAlgo {
 		} else {
 			// ascending
 			if (diffAsc > config.tolerance / 2) {
-				pattern = corners.topRight.color.gray > corners.bottomLeft.color.gray ? 1 : 0;
+				pattern = corners.topRight.getAverageColorValue() > corners.bottomLeft.getAverageColorValue() ? 1 : 0;
 			}
 			start = new paper.Point(box.bounds.x, box.bounds.y + box.bounds.height);
 			end = new paper.Point(box.bounds.x + box.bounds.width, box.bounds.y);
@@ -130,6 +130,11 @@ export class RstrClassicGrouping implements RstrGroupingAlgo, RstrFillingAlgo {
 		if (box) box.remove();
 	}
 }
+
+const cyan = new paper.Color('cyan');
+const magenta = new paper.Color('magenta');
+const yellow = new paper.Color('yellow');
+const black = new paper.Color('black');
 
 function hatchFillRectangle(debug, start, end, rectangle, shape, lineCount, pattern, layer, group) {
 	let direction = new paper.Path.Line(start, end);
@@ -159,7 +164,8 @@ function hatchFillRectangle(debug, start, end, rectangle, shape, lineCount, patt
 			const lines = Math.ceil(hrs.length / 2);
 			for (let i = 0; i < lines; i++) {
 				const l = new paper.Path.Line(hrs[i * 2].point, hrs[(i * 2) + 1].point);
-				l.strokeColor = 'black';
+				l.strokeColor = black;
+				l.blendMode = 'multiply';
 				group.fills.push(l);
 				l.addTo(layer);
 			}
@@ -199,7 +205,7 @@ class RstrClassicGroup implements RstrGroup {
 	}
 
 	getAverageLightness(): number {
-		return this.pixels.reduce((acc, p) => acc + p.color.gray, 0) / this.pixels.length;
+		return this.pixels.reduce((acc, p) => acc + p.getAverageColorValue(), 0) / this.pixels.length;
 	}
 
 	getBoundingBox(): paper.Rectangle {
