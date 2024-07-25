@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8" />
+	<link rel="icon" href="%sveltekit.assets%/favicon.png" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<!-- OpenGraph tags -->
+	<meta property="og:title" content="RSTR" />
+	<meta property="og:type" content="website" />
+	<meta property="og:image" content="https://rstr.d17e.dev/rstr-og.png" />
+	<meta property="og:url" content="https://rstr.d17e.dev" />
+	<meta property="og:description" content="Creative Image Rasterization For Plotters" />
+	<!-- Twitter Card data -->
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:site" content="@david_d17e" />
+	<meta name="twitter:title" content="RSTR" />
+	<meta name="twitter:description" content="Creative Image Rasterization For Plotters" />
+	<meta name="twitter:image" content="https://rstr.d17e.dev/rstr-og.png" />
+	<!-- Canonical URL -->
+	<link rel="canonical" href="https://rstr.d17e.dev" />
+	<!-- Author and Publisher Information -->
+	<meta name="author" content="David Vandenbogaerde" />
+	<meta name="publisher" content="d17e.dev" />
+	<!-- Keywords -->
+	<meta name="keywords"
+				content="rasterization, plotters, creative imaging, digital art, creative coding, plotter art, axidraw" />
+	<!-- Robots -->
+	<meta name="robots" content="index, follow" />
+	<!-- Description -->
+	<meta name="description" content="Creative Image Rasterization For Plotters" />
+	<title>RSTR</title>
+	<!-- Umami -->
+	<script async src="https://umami.d17e.dev/script.js"
+					data-website-id="c542a7b5-3443-4563-a6a7-dabe42b2c227"></script>
+	%sveltekit.head%
+</head>
+
+<body data-sveltekit-preload-data="hover">
+<div style="display: contents">%sveltekit.body%</div>
+<script>
+	if ('serviceWorker' in navigator) {
+		navigator.serviceWorker.getRegistrations().then(function(registrations) {
+			for (let registration of registrations) {
+				registration.unregister();
+			}
+		});
+	}
+</script>
+</body>
+
+</html>
