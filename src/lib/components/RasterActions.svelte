@@ -87,11 +87,20 @@
 		exporting.action();
 		let groupCount = 0;
 		setTimeout(() => {
+			if (!rstr || !rstr.project || !rstr.project.view || !rstr.groups) {
+				console.error('no data available for export');
+				exported.action();
+				return;
+			}
 			const svgW = rstr.project.view.bounds.width;
 			const svgH = rstr.project.view.bounds.height;
 			let svg = `<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${svgW}" height="${svgH}" viewBox="0,0,${svgW},${svgH}">`;
 			rstr.groups.forEach((group) => {
 				svg += `<g id="group-${groupCount++}">`;
+				if (!group.fills) {
+					console.warn('skipping group without fills', group);
+					return;
+				}
 				group.fills.forEach((fill) => svg += fill.exportSVG({ asString: true }).replace(/\sxmlns="[^"]*"/, ''));
 				svg += '</g>';
 			});
@@ -207,28 +216,30 @@
 		data-umami-event={`action-${actionButtonLabel.toLowerCase()}`}>{actionButtonLabel}</Button
 	>
 
-	{#if !isMobile}
-		<Button class="font-bold" on:click={handleExportSVG}>
+	{#if rstrState && rstrState.status === 'done'}
+		{#if !isMobile}
+			<Button class="font-bold" on:click={handleExportSVG}>
+				<svg width="20" height="20" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+					<rect x="10" y="10" width="80" height="80" rx="10" ry="10" fill="none" stroke="white" stroke-width="10" />
+					<path d="M50 25 L50 60 M35 45 L50 60 L65 45" fill="none" stroke="white" stroke-width="7" stroke-linecap="round"
+								stroke-linejoin="round" />
+					<path d="M30 70 L70 70" stroke="white" stroke-width="7" stroke-linecap="round" />
+				</svg>
+				<p class="ml-1.5">SVG</p>
+			</Button>
+		{/if}
+		<Button class="font-bold" on:click={handleSaveImage} data-umami-event={"save-image"}>
 			<svg width="20" height="20" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
 				<rect x="10" y="10" width="80" height="80" rx="10" ry="10" fill="none" stroke="white" stroke-width="10" />
 				<path d="M50 25 L50 60 M35 45 L50 60 L65 45" fill="none" stroke="white" stroke-width="7" stroke-linecap="round"
 							stroke-linejoin="round" />
 				<path d="M30 70 L70 70" stroke="white" stroke-width="7" stroke-linecap="round" />
 			</svg>
-			<p class="ml-1.5">SVG</p>
+			{#if !isMobile}
+				<p class="ml-1.5">PNG</p>
+			{/if}
 		</Button>
 	{/if}
-	<Button class="font-bold" on:click={handleSaveImage} data-umami-event={"save-image"}>
-		<svg width="20" height="20" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-			<rect x="10" y="10" width="80" height="80" rx="10" ry="10" fill="none" stroke="white" stroke-width="10" />
-			<path d="M50 25 L50 60 M35 45 L50 60 L65 45" fill="none" stroke="white" stroke-width="7" stroke-linecap="round"
-						stroke-linejoin="round" />
-			<path d="M30 70 L70 70" stroke="white" stroke-width="7" stroke-linecap="round" />
-		</svg>
-		{#if !isMobile}
-			<p class="ml-1.5">PNG</p>
-		{/if}
-	</Button>
 
 
 	<input
