@@ -85,10 +85,15 @@
 	const handleExportSVG = () => {
 		console.debug('exporting svg');
 		exporting.action();
+		let groupCount = 0;
 		setTimeout(() => {
-			let svg = `<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${rstr.project.view.bounds.width}" height="${rstr.project.view.bounds.height}" viewBox="0,0,778,778">`;
+			const svgW = rstr.project.view.bounds.width;
+			const svgH = rstr.project.view.bounds.height;
+			let svg = `<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${svgW}" height="${svgH}" viewBox="0,0,${svgW},${svgH}">`;
 			rstr.groups.forEach((group) => {
+				svg += `<g id="group-${groupCount++}">`;
 				group.fills.forEach((fill) => svg += fill.exportSVG({ asString: true }).replace(/\sxmlns="[^"]*"/, ''));
+				svg += '</g>';
 			});
 			svg += '</svg>';
 			if (!svg) {
@@ -171,7 +176,7 @@
 
 	const getFrameFileName = (ext: string) => {
 		const now = new Date();
-		const timestamp = `${now.getFullYear()}${now.getMonth() + 1}${now.getDate()}-${now.getHours()}${now.getMinutes()}`;
+		const timestamp = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${(now.getDate()).toString().padStart(2, '0')}-${(now.getHours()).toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
 		return `rstr.d17e.dev-${timestamp}.${ext}`;
 	};
 </script>
