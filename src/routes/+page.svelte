@@ -7,6 +7,7 @@
 	let spinner: HTMLDivElement | null = null;
 
 	const phrases = [
+		'Turning Images Into Abstract Messes Since 2024',
 		'Creative Image Rasterization For Plotters',
 		'Innovative Rasterization Techniques for Plotting Images',
 		'Artistic Rasterization for Plotter Devices',
