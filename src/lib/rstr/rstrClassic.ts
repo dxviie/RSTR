@@ -35,8 +35,9 @@ export class RstrClassicGrouping implements RstrGroupingAlgo, RstrFillingAlgo {
 			const group = groups[i];
 			if (group.timesVisited <= iters) {
 				const neighbors = findNeighboringGroups(group, groups, Math.pow(2, iters + 1));
+				const avg = group.getAverageColor();
 				const neighborDiffs = neighbors.map((n) => {
-					return Math.abs(group.getAverageLightness() - n.getAverageLightness());
+					return calculateColorDifference(n.getAverageColor(), avg);
 				});
 				// find the index in neighborDiffs of the smallest element
 				const minIndex = neighborDiffs.indexOf(Math.min(...neighborDiffs));
@@ -87,6 +88,12 @@ export class RstrClassicGrouping implements RstrGroupingAlgo, RstrFillingAlgo {
  						HATCHING
 	 ***************************************/
 
+	green = '#0f711e';
+	blue = '#14f3e2';
+	black = '#000000';
+
+	colors = [new paper.Color(this.green), new paper.Color(this.blue), new paper.Color(this.black)];
+
 	fillGroup(group: RstrGroup, layer: paper.Layer, config: RstrConfig): void {
 		if (group.isFilled) return;
 		group.isFilled = true;
@@ -116,10 +123,23 @@ export class RstrClassicGrouping implements RstrGroupingAlgo, RstrFillingAlgo {
 			start = new paper.Point(box.bounds.x, box.bounds.y + box.bounds.height);
 			end = new paper.Point(box.bounds.x + box.bounds.width, box.bounds.y);
 		}
+		// selecting pen color based on group color
+		const avg = group.getAverageColor();
+		let dist = 1;
+		let color = this.colors[0];
+		for (let i in this.colors) {
+			const c = this.colors[i];
+			const d = calculateColorDifference(avg, c);
+			if (d < dist) {
+				color = c;
+				dist = d;
+			}
+		}
+
 		// map average color to linecount
 		const lineCount = (config.density * box.bounds.width) * (1 - group.getAverageLightness());
 		// function hatchFillRectangle(debug, start, end, rectangle, lineCount, pattern) {
-		hatchFillRectangle(false, start, end, box, group.shape, lineCount, pattern, layer, group);
+		hatchFillRectangle(false, start, end, box, group.shape, lineCount, pattern, layer, group, color);
 		if (box) box.remove();
 	}
 }
@@ -129,7 +149,7 @@ const magenta = new paper.Color('magenta');
 const yellow = new paper.Color('yellow');
 const black = new paper.Color('black');
 
-function hatchFillRectangle(debug, start, end, rectangle, shape, lineCount, pattern, layer, group) {
+function hatchFillRectangle(debug, start, end, rectangle, shape, lineCount, pattern, layer, group, color) {
 	let direction = new paper.Path.Line(start, end);
 	let actualLineCount = lineCount;
 	if (pattern === 0) {
@@ -138,9 +158,6 @@ function hatchFillRectangle(debug, start, end, rectangle, shape, lineCount, patt
 	} else if (pattern === 1) {
 		direction = new paper.Path.Line(direction.getPointAt(direction.length / 2), end);
 		actualLineCount = lineCount / 2;
-	}
-	if (debug) {
-		direction.strokeColor = 'red';
 	}
 	for (let i = 0; i < actualLineCount; i++) {
 		let linePoint = direction.getPointAt((i * direction.length) / (actualLineCount - 1));
@@ -157,7 +174,7 @@ function hatchFillRectangle(debug, start, end, rectangle, shape, lineCount, patt
 			const lines = Math.ceil(hrs.length / 2);
 			for (let i = 0; i < lines; i++) {
 				const l = new paper.Path.Line(hrs[i * 2].point, hrs[(i * 2) + 1].point);
-				l.strokeColor = black;
+				l.strokeColor = color;
 				l.blendMode = 'multiply';
 				group.fills.push(l);
 				l.addTo(layer);
@@ -176,6 +193,55 @@ function hatchFillRectangle(debug, start, end, rectangle, shape, lineCount, patt
 		line.remove();
 	}
 }
+
+function calculateColorDifference(color1, color2) {
+	// Convert Paper.js colors to CIELAB
+	if (!color1 || !color2) {
+		console.warn('no COLORS', color1, color2);
+		return 0;
+	}
+	const lab1 = rgbToLab(color1);
+	const lab2 = rgbToLab(color2);
+
+	// Calculate Euclidean distance in LAB space
+	const deltaL = lab1.l - lab2.l;
+	const deltaA = lab1.a - lab2.a;
+	const deltaB = lab1.b - lab2.b;
+
+	const distance = Math.sqrt(deltaL * deltaL + deltaA * deltaA + deltaB * deltaB);
+
+	// Normalize to 0-1 range (assuming maximum possible distance is 100)
+	return Math.min(distance / 100, 1);
+}
+
+// Helper function to convert Paper.js color to CIELAB
+function rgbToLab(color) {
+	// First, convert to XYZ
+	let r = color.red;
+	let g = color.green;
+	let b = color.blue;
+
+	r = (r > 0.04045) ? Math.pow((r + 0.055) / 1.055, 2.4) : r / 12.92;
+	g = (g > 0.04045) ? Math.pow((g + 0.055) / 1.055, 2.4) : g / 12.92;
+	b = (b > 0.04045) ? Math.pow((b + 0.055) / 1.055, 2.4) : b / 12.92;
+
+	const x = (r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047;
+	const y = (r * 0.2126 + g * 0.7152 + b * 0.0722) / 1.00000;
+	const z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883;
+
+	// Then, convert XYZ to Lab
+	const fx = (x > 0.008856) ? Math.pow(x, 1 / 3) : (7.787 * x) + 16 / 116;
+	const fy = (y > 0.008856) ? Math.pow(y, 1 / 3) : (7.787 * y) + 16 / 116;
+	const fz = (z > 0.008856) ? Math.pow(z, 1 / 3) : (7.787 * z) + 16 / 116;
+
+	const l = (116 * fy) - 16;
+	const a = 500 * (fx - fy);
+	const bb = 200 * (fy - fz);
+
+	return { l: l, a: a, b: bb };
+}
+
+/******************* GROUP IMPLEMENTATION **************************************/
 
 class RstrClassicGroup implements RstrGroup {
 	pixels: RstrPixel[];
