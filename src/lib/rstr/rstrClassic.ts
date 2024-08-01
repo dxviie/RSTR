@@ -269,4 +269,24 @@ class RstrClassicGroup implements RstrGroup {
 
 		return { topLeft, topRight, bottomLeft, bottomRight };
 	}
+
+	getBoundingPixelCoords(): [number, number, number, number] {
+		if (this.pixels.length === 0) {
+			throw new Error('Pixel group is empty');
+		}
+
+		let topLeft = this.pixels[0];
+		let bottomRight = this.pixels[0];
+
+		this.pixels.forEach(pixel => {
+			if (pixel.x <= topLeft.x && pixel.y <= topLeft.y) {
+				topLeft = pixel;
+			}
+			if (pixel.x >= bottomRight.x && pixel.y >= bottomRight.y) {
+				bottomRight = pixel;
+			}
+		});
+
+		return [topLeft.x, topLeft.y, bottomRight.x, bottomRight.y];
+	}
 }
