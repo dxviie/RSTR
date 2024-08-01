@@ -30,6 +30,8 @@ export interface RstrGroup {
 
 	getBoundingBox(): paper.Rectangle;
 
+	getBoundingPixelCoords(): [number, number, number, number]; // returns [topLeftX, topLeftY, bottomRightX, bottomRightY]
+
 	getCornerPixels(): { topLeft: RstrPixel, topRight: RstrPixel, bottomLeft: RstrPixel, bottomRight: RstrPixel };
 
 	getAverageColor(): paper.Color;
