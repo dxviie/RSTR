@@ -13,21 +13,13 @@ function findNeighboringGroups(group: RstrGroup, groups: RstrGroup[], maxPixelCo
 	const startIndex = Math.max(0, groups.indexOf(group)) + 1;
 	const endIndex = Math.min(groups.length, startIndex + (verticalSliceCount * maxPixelCount * 2));
 
-	// console.log(maxPixelCount, '--------------', verticalSliceCount, startIndex, endIndex, '---', groups.length, '--', groupIndices.length);
-	// console.log('=========', startIndex, '=', groupIndices);
 	for (let index = startIndex; index < endIndex; index++) {
 		const neighbor = groups[index];
 		if (neighbor === group) continue;
 		if (neighbor.pixels.length > maxPixelCount) continue;
 		if (neighbor.timesVisited > group.timesVisited) continue;
-		if ((neighbor.shape.strokeBounds.intersects(group.shape.strokeBounds) ||
-				neighbor.shape.strokeBounds.contains(group.shape.strokeBounds)) &&
-			!neighbors.includes(neighbor)) {
-			// check if any of the neighbor's pixels is right next to any of our pixels
-			// if so, add the neighbor to the neighbors list
-			if (neighbor.pixels.some(p => group.pixels.some(gp => gp.isNeighbor(p, false)))) {
-				neighbors.push(neighbor);
-			}
+		if (!neighbors.includes(neighbor) && neighbor.pixels.some(p => group.pixels.some(gp => gp.isNeighbor(p, false)))) {
+			neighbors.push(neighbor);
 		}
 	}
 	return neighbors;
@@ -268,25 +260,5 @@ class RstrClassicGroup implements RstrGroup {
 		});
 
 		return { topLeft, topRight, bottomLeft, bottomRight };
-	}
-
-	getBoundingPixelCoords(): [number, number, number, number] {
-		if (this.pixels.length === 0) {
-			throw new Error('Pixel group is empty');
-		}
-
-		let topLeft = this.pixels[0];
-		let bottomRight = this.pixels[0];
-
-		this.pixels.forEach(pixel => {
-			if (pixel.x <= topLeft.x && pixel.y <= topLeft.y) {
-				topLeft = pixel;
-			}
-			if (pixel.x >= bottomRight.x && pixel.y >= bottomRight.y) {
-				bottomRight = pixel;
-			}
-		});
-
-		return [topLeft.x, topLeft.y, bottomRight.x, bottomRight.y];
 	}
 }
