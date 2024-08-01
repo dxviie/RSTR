@@ -6,9 +6,10 @@
 	} from '$lib/fsm.svelte.js';
 
 	let container: HTMLDivElement;
-
 	let pane: Pane | null = null;
-	let paneConfig = { ...config };
+	let paneConfig = {
+		...config
+	};
 
 	let configEnabled = $state(true);
 
@@ -40,6 +41,9 @@
 		const hatchingFolder = pane.addFolder({ title: 'FILL' });
 		hatchingFolder.addBinding(paneConfig, 'halves');
 		hatchingFolder.addBinding(paneConfig, 'density', { min: 0, max: 1, step: 0.05 });
+		hatchingFolder.addBinding(paneConfig, 'color_a');
+		hatchingFolder.addBinding(paneConfig, 'color_b');
+		hatchingFolder.addBinding(paneConfig, 'color_c');
 
 		// Listen for changes and emit the updated config
 		pane.on('change', () => {

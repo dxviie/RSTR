@@ -9,6 +9,16 @@ export type RstrConfig = {
 	// hatching
 	halves: boolean;
 	density: number;
+	// colors
+	color_a: RstrColor;
+	color_b: RstrColor;
+	color_c: RstrColor;
+}
+
+export type RstrColor = {
+	r: number;
+	g: number;
+	b: number;
 }
 
 const initialState = {
@@ -21,7 +31,11 @@ const initialState = {
 	tolerance: 0.33,
 	// hatching
 	halves: false,
-	density: .66
+	density: .66,
+	// colors
+	color_a: { r: 255, g: 0, b: 255 },
+	color_b: { r: 255, g: 255, b: 0 },
+	color_c: { r: 0, g: 255, b: 255 }
 };
 
 const updateConfig = (newValues: { [s: string]: unknown; } | ArrayLike<unknown>) => {
