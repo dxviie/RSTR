@@ -38,6 +38,7 @@
 		groupingFolder.addBinding(paneConfig, 'tolerance', { min: 0.05, max: 1, step: 0.05 });
 
 		const hatchingFolder = pane.addFolder({ title: 'FILL' });
+		hatchingFolder.addBinding(paneConfig, 'halves');
 		hatchingFolder.addBinding(paneConfig, 'density', { min: 0, max: 1, step: 0.05 });
 
 		// Listen for changes and emit the updated config

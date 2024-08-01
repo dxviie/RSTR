@@ -336,8 +336,9 @@ class RstrPixelImpl implements RstrPixel {
 
 	getAverageColorValue(): number {
 		if (!this.color) return 0;
-		let cmyk = rgbToCmyk(this.color);
-		const val = 1 - cmyk.black;
+		// let cmyk = rgbToCmyk(this.color);
+		// const val = 1 - cmyk.black;
+		const val = this.color.gray;
 		if (val === null) return 0;
 		if (val < 0 || val > 1) console.warn('Color value out of bounds', val);
 		return val;
