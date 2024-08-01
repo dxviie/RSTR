@@ -1,22 +1,26 @@
 export type RstrConfig = {
 	// image
 	file: string;
-	// grid building
+	// grid
 	resolution: number;
+	// grouping
 	iterations: number;
 	tolerance: number;
 	// hatching
+	halves: boolean;
 	density: number;
 }
 
 const initialState = {
 	// image
 	file: '',
-	// grid building
+	// grid
 	resolution: 33,
+	// grouping
 	iterations: 3,
 	tolerance: 0.33,
 	// hatching
+	halves: false,
 	density: .66
 };
 

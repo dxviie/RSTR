@@ -10,12 +10,13 @@ function findNeighboringGroups(group: RstrGroup, groups: RstrGroup[], maxPixelCo
 	const neighbors = [];
 
 	const verticalSliceCount = Math.ceil(Math.sqrt(groups.length));
-	const startIndex = Math.max(0, groups.indexOf(group));
-	const endIndex = Math.min(groups.length, startIndex + (verticalSliceCount * (maxPixelCount * 2)));
+	const startIndex = Math.max(0, groups.indexOf(group)) + 1;
+	const endIndex = Math.min(groups.length, startIndex + (verticalSliceCount * maxPixelCount * 2));
 
-
-	for (let i = startIndex; i < endIndex; i++) {
-		const neighbor = groups[i];
+	// console.log(maxPixelCount, '--------------', verticalSliceCount, startIndex, endIndex, '---', groups.length, '--', groupIndices.length);
+	// console.log('=========', startIndex, '=', groupIndices);
+	for (let index = startIndex; index < endIndex; index++) {
+		const neighbor = groups[index];
 		if (neighbor === group) continue;
 		if (neighbor.pixels.length > maxPixelCount) continue;
 		if (neighbor.timesVisited > group.timesVisited) continue;
@@ -41,7 +42,7 @@ export class RstrClassicGrouping implements RstrGroupingAlgo, RstrFillingAlgo {
 		for (let i = 0; i < groups.length; i++) {
 			const group = groups[i];
 			if (group.timesVisited <= iters) {
-				const neighbors = findNeighboringGroups(group, groups, Math.max(1, iters * iters));
+				const neighbors = findNeighboringGroups(group, groups, Math.pow(2, iters + 1));
 				const neighborDiffs = neighbors.map((n) => {
 					return Math.abs(group.getAverageLightness() - n.getAverageLightness());
 				});
@@ -107,7 +108,7 @@ export class RstrClassicGrouping implements RstrGroupingAlgo, RstrFillingAlgo {
 		let pattern = 2;
 		if (diffAsc < diffDesc) {
 			// descending
-			if (diffDesc > config.tolerance / 2) {
+			if (config.halves && diffDesc > config.tolerance / 2) {
 				pattern = corners.topLeft.getAverageColorValue() > corners.bottomRight.getAverageColorValue() ? 1 : 0;
 			}
 			start = new paper.Point(box.bounds.x, box.bounds.y);
@@ -117,7 +118,7 @@ export class RstrClassicGrouping implements RstrGroupingAlgo, RstrFillingAlgo {
 			);
 		} else {
 			// ascending
-			if (diffAsc > config.tolerance / 2) {
+			if (config.halves && diffAsc > config.tolerance / 2) {
 				pattern = corners.topRight.getAverageColorValue() > corners.bottomLeft.getAverageColorValue() ? 1 : 0;
 			}
 			start = new paper.Point(box.bounds.x, box.bounds.y + box.bounds.height);
@@ -169,7 +170,14 @@ function hatchFillRectangle(debug, start, end, rectangle, shape, lineCount, patt
 				group.fills.push(l);
 				l.addTo(layer);
 			}
+		} else if (hrs.length === 3) {
+			const l = new paper.Path.Line(hrs[0].point, hrs[2].point);
+			l.strokeColor = black;
+			l.blendMode = 'multiply';
+			group.fills.push(l);
+			l.addTo(layer);
 		} else if (hrs.length === 0 || hrs.length === 1) {
+			console.debug('ignoring 0/1 intersections.');
 		} else {
 			console.warn('not sure what to do with', hrs.length, 'intersections', hrs);
 		}
