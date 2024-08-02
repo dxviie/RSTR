@@ -11,7 +11,7 @@ function findNeighboringGroups(group: RstrGroup, groups: RstrGroup[], maxPixelCo
 
 	const verticalSliceCount = Math.ceil(Math.sqrt(groups.length));
 	const startIndex = Math.max(0, groups.indexOf(group)) + 1;
-	const endIndex = Math.min(groups.length, startIndex + (verticalSliceCount * maxPixelCount * 2));
+	const endIndex = Math.min(groups.length, startIndex + (verticalSliceCount * 2));
 
 	for (let index = startIndex; index < endIndex; index++) {
 		const neighbor = groups[index];
@@ -88,11 +88,18 @@ export class RstrClassicGrouping implements RstrGroupingAlgo, RstrFillingAlgo {
  						HATCHING
 	 ***************************************/
 
-	green = '#0f711e';
+	yellow = '#f7f773';
+	pink = '#fba9fb';
+	green = '#22834c';
 	blue = '#14f3e2';
 	black = '#000000';
-
-	colors = [new paper.Color(this.green), new paper.Color(this.blue), new paper.Color(this.black)];
+	purple = '#ad73bf';
+	grape = '#c8628d';
+	orange = '#fc8851';
+	brown = '#5b4e54';
+	kelbColors = [new paper.Color(this.orange), new paper.Color(this.yellow), new paper.paper.Color(this.purple), new paper.Color(this.grape), new paper.Color(this.brown)];
+	kHoodColors = [new paper.Color(this.green), new paper.Color(this.pink), new paper.paper.Color(this.blue), new paper.Color(this.black), new paper.Color(this.yellow)];
+	colors = this.kelbColors;
 
 	fillGroup(group: RstrGroup, layer: paper.Layer, config: RstrConfig): void {
 		if (group.isFilled) return;
@@ -135,6 +142,7 @@ export class RstrClassicGrouping implements RstrGroupingAlgo, RstrFillingAlgo {
 				dist = d;
 			}
 		}
+		group.fillColor = color;
 
 		// map average color to linecount
 		const lineCount = (config.density * box.bounds.width) * (1 - group.getAverageLightness());
@@ -249,6 +257,7 @@ class RstrClassicGroup implements RstrGroup {
 	timesVisited: number;
 	isFilled: boolean;
 	fills: paper.Path[] = [];
+	fillColor = new paper.Color('black');
 
 	constructor(pixel: RstrPixel, config: RstrConfig) {
 		this.pixels = [pixel];

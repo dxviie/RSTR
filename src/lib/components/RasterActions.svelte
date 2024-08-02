@@ -95,13 +95,26 @@
 			const svgW = rstr.project.view.bounds.width;
 			const svgH = rstr.project.view.bounds.height;
 			let svg = `<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${svgW}" height="${svgH}" viewBox="0,0,${svgW},${svgH}">`;
-			rstr.groups.forEach((group) => {
-				svg += `<g id="group-${groupCount++}">`;
-				if (!group.fills) {
-					console.warn('skipping group without fills', group);
-					return;
+			let colorGroupedGroups = rstr.groups.reduce((acc, group) => {
+				let colorGroup = acc.get(group.fillColor);
+				if (!colorGroup) {
+					colorGroup = [];
+					acc.set(group.fillColor, colorGroup);
 				}
-				group.fills.forEach((fill) => svg += fill.exportSVG({ asString: true }).replace(/\sxmlns="[^"]*"/, ''));
+				colorGroup.push(group);
+				return acc;
+			}, new Map());
+			colorGroupedGroups.forEach((groups, color) => {
+				svg += `<g id="color-${color}">`;
+				groups.forEach((group) => {
+					svg += `<g id="group-${groupCount++}">`;
+					if (!group.fills) {
+						console.warn('skipping group without fills', group);
+						return;
+					}
+					group.fills.forEach((fill) => svg += fill.exportSVG({ asString: true }).replace(/\sxmlns="[^"]*"/, ''));
+					svg += '</g>';
+				});
 				svg += '</g>';
 			});
 			svg += '</svg>';
