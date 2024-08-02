@@ -32,7 +32,7 @@
 		pane = new Pane({ container: container });
 
 		const baseFolder = pane.addFolder({ title: 'IMAGE' });
-		baseFolder.addBinding(paneConfig, 'resolution', { min: 10, max: 100, step: 1 });
+		baseFolder.addBinding(paneConfig, 'resolution', { min: 10, max: 512, step: 1 });
 
 		const groupingFolder = pane.addFolder({ title: 'GROUPING' });
 		groupingFolder.addBinding(paneConfig, 'iterations', { min: 1, max: 10, step: 1 });
