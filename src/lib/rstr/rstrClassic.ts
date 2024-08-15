@@ -1,253 +1,6 @@
-import type { RstrFillingAlgo, RstrGroup, RstrGroupingAlgo, RstrPixel } from '$lib/rstr/rstr.ts';
+import type { RstrColor, RstrFillingAlgo, RstrGroup, RstrGroupingAlgo, RstrPixel } from '$lib/rstr/rstr.ts';
 import paper from 'paper';
 import type { RstrConfig } from '$lib/rstr/config.svelte.ts';
-
-/***************************************
- 						GROUPING
- ***************************************/
-
-function findNeighboringGroups(group: RstrGroup, groups: RstrGroup[], maxPixelCount: number = Number.MAX_VALUE): RstrGroup[] {
-	const neighbors = [];
-
-	const verticalSliceCount = Math.ceil(Math.sqrt(groups.length));
-	const startIndex = Math.max(0, groups.indexOf(group)) + 1;
-	const endIndex = Math.min(groups.length, startIndex + (verticalSliceCount * 2));
-
-	for (let index = startIndex; index < endIndex; index++) {
-		const neighbor = groups[index];
-		if (neighbor === group) continue;
-		if (neighbor.pixels.length > maxPixelCount) continue;
-		if (neighbor.timesVisited > group.timesVisited) continue;
-		if (!neighbors.includes(neighbor) && neighbor.pixels.some(p => group.pixels.some(gp => gp.isNeighbor(p, false)))) {
-			neighbors.push(neighbor);
-		}
-	}
-	return neighbors;
-}
-
-const groupColors = ['darkorange', 'red', 'purple', 'blue', 'black'];
-
-export class RstrClassicGrouping implements RstrGroupingAlgo, RstrFillingAlgo {
-
-	doGroupingStep(groups: RstrGroup[], config: RstrConfig): RstrGroup[] {
-		let iters = this.iterationsFinished(groups);
-		for (let i = 0; i < groups.length; i++) {
-			const group = groups[i];
-			if (group.timesVisited <= iters) {
-				const neighbors = findNeighboringGroups(group, groups, Math.pow(2, iters + 1));
-				const avg = group.getAverageColor();
-				const neighborDiffs = neighbors.map((n) => {
-					return calculateColorDifference(n.getAverageColor(), avg);
-				});
-				// find the index in neighborDiffs of the smallest element
-				const minIndex = neighborDiffs.indexOf(Math.min(...neighborDiffs));
-				if (minIndex >= 0) {
-					const neighbor = neighbors[minIndex];
-					const diff = neighborDiffs[minIndex];
-					if (diff < config.tolerance) {
-						neighbor.timesVisited++;
-						// merge the two groups
-						const temp = group.shape;
-						group.pixels = group.pixels.concat(neighbor.pixels);
-						group.shape = group.shape.unite(neighbor.shape);
-						temp.remove();
-						group.shape.opacity = 1;
-						neighbor.shape.remove();
-						// remove the neighbor from the groups list
-						groups.splice(groups.indexOf(neighbor), 1);
-					}
-				}
-				group.shape.strokeColor = new paper.Color(groupColors[group.timesVisited % groupColors.length]);
-				group.timesVisited++;
-				return groups;
-			}
-		}
-		return groups;
-	}
-
-	initGroups(grid: RstrPixel[][], layer: paper.Layer, config: RstrConfig): RstrGroup[] {
-		const groups: RstrGroup[] = [];
-		for (let i = 0; i < grid.length; i++) {
-			for (let j = 0; j < grid[i].length; j++) {
-				const pixel = grid[i][j];
-				let group = new RstrClassicGroup(pixel, config);
-				pixel.group = group;
-				group.shape.opacity = 0;
-				group.shape.addTo(layer);
-				groups.push(group);
-			}
-		}
-		return groups;
-	}
-
-	iterationsFinished(groups: RstrGroup[]): number {
-		return Math.min(...groups.map(g => g.timesVisited));
-	}
-
-	/***************************************
- 						HATCHING
-	 ***************************************/
-
-	yellow = '#f7f773';
-	pink = '#fba9fb';
-	green = '#22834c';
-	blue = '#14f3e2';
-	black = '#000000';
-	purple = '#ad73bf';
-	grape = '#c8628d';
-	orange = '#fc8851';
-	brown = '#5b4e54';
-	kelbColors = [new paper.Color(this.orange), new paper.Color(this.yellow), new paper.paper.Color(this.purple), new paper.Color(this.grape), new paper.Color(this.brown)];
-	kHoodColors = [new paper.Color(this.green), new paper.Color(this.pink), new paper.paper.Color(this.blue), new paper.Color(this.black), new paper.Color(this.yellow)];
-	colors = this.kelbColors;
-
-	fillGroup(group: RstrGroup, layer: paper.Layer, config: RstrConfig): void {
-		if (group.isFilled) return;
-		group.isFilled = true;
-		const box = group.getBoundingBox();
-
-		// get the average color for each quadrant of the block
-		const corners = group.getCornerPixels();
-		const diffDesc = Math.abs(corners.topLeft.getAverageColorValue() - corners.bottomRight.getAverageColorValue());
-		const diffAsc = Math.abs(corners.topRight.getAverageColorValue() - corners.bottomLeft.getAverageColorValue());
-		let start, end;
-		let pattern = 2;
-		if (diffAsc < diffDesc) {
-			// descending
-			if (config.halves && diffDesc > config.tolerance / 2) {
-				pattern = corners.topLeft.getAverageColorValue() > corners.bottomRight.getAverageColorValue() ? 1 : 0;
-			}
-			start = new paper.Point(box.bounds.x, box.bounds.y);
-			end = new paper.Point(
-				box.bounds.x + box.bounds.width,
-				box.bounds.y + box.bounds.height
-			);
-		} else {
-			// ascending
-			if (config.halves && diffAsc > config.tolerance / 2) {
-				pattern = corners.topRight.getAverageColorValue() > corners.bottomLeft.getAverageColorValue() ? 1 : 0;
-			}
-			start = new paper.Point(box.bounds.x, box.bounds.y + box.bounds.height);
-			end = new paper.Point(box.bounds.x + box.bounds.width, box.bounds.y);
-		}
-		// selecting pen color based on group color
-		const avg = group.getAverageColor();
-		let dist = 1;
-		let color = this.colors[0];
-		for (let i in this.colors) {
-			const c = this.colors[i];
-			const d = calculateColorDifference(avg, c);
-			if (d < dist) {
-				color = c;
-				dist = d;
-			}
-		}
-		group.fillColor = color;
-
-		// map average color to linecount
-		const lineCount = (config.density * box.bounds.width) * (1 - group.getAverageLightness());
-		// function hatchFillRectangle(debug, start, end, rectangle, lineCount, pattern) {
-		hatchFillRectangle(false, start, end, box, group.shape, lineCount, pattern, layer, group, color);
-		if (box) box.remove();
-	}
-}
-
-const cyan = new paper.Color('cyan');
-const magenta = new paper.Color('magenta');
-const yellow = new paper.Color('yellow');
-const black = new paper.Color('black');
-
-function hatchFillRectangle(debug, start, end, rectangle, shape, lineCount, pattern, layer, group, color) {
-	let direction = new paper.Path.Line(start, end);
-	let actualLineCount = lineCount;
-	if (pattern === 0) {
-		direction = new paper.Path.Line(start, direction.getPointAt(direction.length / 2));
-		actualLineCount = lineCount / 2;
-	} else if (pattern === 1) {
-		direction = new paper.Path.Line(direction.getPointAt(direction.length / 2), end);
-		actualLineCount = lineCount / 2;
-	}
-	for (let i = 0; i < actualLineCount; i++) {
-		let linePoint = direction.getPointAt((i * direction.length) / (actualLineCount - 1));
-		if (!linePoint) {
-			continue;
-		}
-		// draw a line perpendicular to direction through linePoint
-		const perpendicular = direction.getNormalAt((i * direction.length) / (actualLineCount - 1));
-		const lineStart = linePoint.subtract(perpendicular.multiply(direction.length * 2));
-		const lineEnd = linePoint.add(perpendicular.multiply(direction.length * 2));
-		const line = new paper.Path.Line(lineStart, lineEnd);
-		const hrs = line.getIntersections(shape);
-		if (hrs && hrs.length > 0 && hrs.length % 2 === 0) {
-			const lines = Math.ceil(hrs.length / 2);
-			for (let i = 0; i < lines; i++) {
-				const l = new paper.Path.Line(hrs[i * 2].point, hrs[(i * 2) + 1].point);
-				l.strokeColor = color;
-				l.blendMode = 'multiply';
-				group.fills.push(l);
-				l.addTo(layer);
-			}
-		} else if (hrs.length === 3) {
-			const l = new paper.Path.Line(hrs[0].point, hrs[2].point);
-			l.strokeColor = black;
-			l.blendMode = 'multiply';
-			group.fills.push(l);
-			l.addTo(layer);
-		} else if (hrs.length === 0 || hrs.length === 1) {
-			console.debug('ignoring 0/1 intersections.');
-		} else {
-			console.warn('not sure what to do with', hrs.length, 'intersections', hrs);
-		}
-		line.remove();
-	}
-}
-
-function calculateColorDifference(color1, color2) {
-	// Convert Paper.js colors to CIELAB
-	if (!color1 || !color2) {
-		console.warn('no COLORS', color1, color2);
-		return 0;
-	}
-	const lab1 = rgbToLab(color1);
-	const lab2 = rgbToLab(color2);
-
-	// Calculate Euclidean distance in LAB space
-	const deltaL = lab1.l - lab2.l;
-	const deltaA = lab1.a - lab2.a;
-	const deltaB = lab1.b - lab2.b;
-
-	const distance = Math.sqrt(deltaL * deltaL + deltaA * deltaA + deltaB * deltaB);
-
-	// Normalize to 0-1 range (assuming maximum possible distance is 100)
-	return Math.min(distance / 100, 1);
-}
-
-// Helper function to convert Paper.js color to CIELAB
-function rgbToLab(color) {
-	// First, convert to XYZ
-	let r = color.red;
-	let g = color.green;
-	let b = color.blue;
-
-	r = (r > 0.04045) ? Math.pow((r + 0.055) / 1.055, 2.4) : r / 12.92;
-	g = (g > 0.04045) ? Math.pow((g + 0.055) / 1.055, 2.4) : g / 12.92;
-	b = (b > 0.04045) ? Math.pow((b + 0.055) / 1.055, 2.4) : b / 12.92;
-
-	const x = (r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047;
-	const y = (r * 0.2126 + g * 0.7152 + b * 0.0722) / 1.00000;
-	const z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883;
-
-	// Then, convert XYZ to Lab
-	const fx = (x > 0.008856) ? Math.pow(x, 1 / 3) : (7.787 * x) + 16 / 116;
-	const fy = (y > 0.008856) ? Math.pow(y, 1 / 3) : (7.787 * y) + 16 / 116;
-	const fz = (z > 0.008856) ? Math.pow(z, 1 / 3) : (7.787 * z) + 16 / 116;
-
-	const l = (116 * fy) - 16;
-	const a = 500 * (fx - fy);
-	const bb = 200 * (fy - fz);
-
-	return { l: l, a: a, b: bb };
-}
 
 /******************* GROUP IMPLEMENTATION **************************************/
 
@@ -273,6 +26,7 @@ class RstrClassicGroup implements RstrGroup {
 		});
 		this.timesVisited = 0;
 		this.isFilled = false;
+		setupGroupInteractivity(this.shape);
 	}
 
 	getAverageColor(): paper.Color {
@@ -336,4 +90,269 @@ class RstrClassicGroup implements RstrGroup {
 
 		return { topLeft, topRight, bottomLeft, bottomRight };
 	}
+}
+
+/***************************************
+ 						GROUPING
+ ***************************************/
+
+function findNeighboringGroups(group: RstrGroup, groups: RstrGroup[], maxPixelCount: number = Number.MAX_VALUE): RstrGroup[] {
+	const neighbors = [];
+
+	const verticalSliceCount = Math.ceil(Math.sqrt(groups.length));
+	const startIndex = Math.max(0, groups.indexOf(group)) + 1;
+	const endIndex = Math.min(groups.length, startIndex + (verticalSliceCount * 2));
+
+	for (let index = startIndex; index < endIndex; index++) {
+		const neighbor = groups[index];
+		if (neighbor === group) continue;
+		if (neighbor.pixels.length > maxPixelCount) continue;
+		if (neighbor.timesVisited > group.timesVisited) continue;
+		if (!neighbors.includes(neighbor) && neighbor.pixels.some(p => group.pixels.some(gp => gp.isNeighbor(p, false)))) {
+			neighbors.push(neighbor);
+		}
+	}
+	return neighbors;
+}
+
+const groupColors = ['darkorange', 'red', 'purple', 'blue', 'black'];
+
+export class RstrClassicGrouping implements RstrGroupingAlgo, RstrFillingAlgo {
+
+	doGroupingStep(groups: RstrGroup[], config: RstrConfig): RstrGroup[] {
+		let iters = this.iterationsFinished(groups);
+		for (let i = 0; i < groups.length; i++) {
+			const group = groups[i];
+			if (group.timesVisited <= iters) {
+				const neighbors = findNeighboringGroups(group, groups, Math.pow(2, iters + 1));
+				const avg = group.getAverageColor();
+				const neighborDiffs = neighbors.map((n) => {
+					return calculateColorDifference(n.getAverageColor(), avg);
+				});
+				// find the index in neighborDiffs of the smallest element
+				const minIndex = neighborDiffs.indexOf(Math.min(...neighborDiffs));
+				if (minIndex >= 0) {
+					const neighbor = neighbors[minIndex];
+					const diff = neighborDiffs[minIndex];
+					if (diff < config.tolerance) {
+						neighbor.timesVisited++;
+						// merge the two groups
+						const temp = group.shape;
+						group.pixels = group.pixels.concat(neighbor.pixels);
+						group.shape = group.shape.unite(neighbor.shape);
+						setupGroupInteractivity(group.shape);
+						temp.remove();
+						group.shape.opacity = 1;
+						neighbor.shape.remove();
+						// remove the neighbor from the groups list
+						groups.splice(groups.indexOf(neighbor), 1);
+					}
+				}
+				group.shape.strokeColor = new paper.Color(groupColors[group.timesVisited % groupColors.length]);
+				group.timesVisited++;
+				return groups;
+			}
+		}
+		return groups;
+	}
+
+	initGroups(grid: RstrPixel[][], layer: paper.Layer, config: RstrConfig): RstrGroup[] {
+		const groups: RstrGroup[] = [];
+		for (let i = 0; i < grid.length; i++) {
+			for (let j = 0; j < grid[i].length; j++) {
+				const pixel = grid[i][j];
+				let group = new RstrClassicGroup(pixel, config);
+				pixel.group = group;
+				group.shape.opacity = 0;
+				group.shape.addTo(layer);
+				groups.push(group);
+			}
+		}
+		return groups;
+	}
+
+	iterationsFinished(groups: RstrGroup[]): number {
+		return Math.min(...groups.map(g => g.timesVisited));
+	}
+
+	/***************************************
+ 						HATCHING
+	 ***************************************/
+
+	yellow = '#f7f773';
+	pink = '#fba9fb';
+	green = '#22834c';
+	blue = '#14f3e2';
+	black = '#000000';
+	purple = '#ad73bf';
+	grape = '#c8628d';
+	orange = '#fc8851';
+	brown = '#5b4e54';
+	copicOrange = '#F7941D';
+	kelbColors = [new paper.Color(this.orange), new paper.Color(this.yellow), new paper.paper.Color(this.purple), new paper.Color(this.grape), new paper.Color(this.brown)];
+	kHoodColors = [new paper.Color(this.green), new paper.Color(this.pink), new paper.paper.Color(this.blue), new paper.Color(this.black), new paper.Color(this.yellow)];
+
+	fillGroup(group: RstrGroup, layer: paper.Layer, config: RstrConfig): void {
+		if (group.isFilled) return;
+		group.isFilled = true;
+		const box = group.getBoundingBox();
+
+		const colors = [];
+		colors.push(new paper.Color(config.colorA));
+		colors.push(new paper.Color(config.colorB));
+		colors.push(new paper.Color(config.colorC));
+
+		// get the average color for each quadrant of the block
+		const corners = group.getCornerPixels();
+		const diffDesc = Math.abs(corners.topLeft.getAverageColorValue() - corners.bottomRight.getAverageColorValue());
+		const diffAsc = Math.abs(corners.topRight.getAverageColorValue() - corners.bottomLeft.getAverageColorValue());
+		let start, end;
+		let pattern = 2;
+		if (diffAsc < diffDesc) {
+			// descending
+			if (config.halves && diffDesc > config.tolerance / 2) {
+				pattern = corners.topLeft.getAverageColorValue() > corners.bottomRight.getAverageColorValue() ? 1 : 0;
+			}
+			start = new paper.Point(box.bounds.x, box.bounds.y);
+			end = new paper.Point(
+				box.bounds.x + box.bounds.width,
+				box.bounds.y + box.bounds.height
+			);
+		} else {
+			// ascending
+			if (config.halves && diffAsc > config.tolerance / 2) {
+				pattern = corners.topRight.getAverageColorValue() > corners.bottomLeft.getAverageColorValue() ? 1 : 0;
+			}
+			start = new paper.Point(box.bounds.x, box.bounds.y + box.bounds.height);
+			end = new paper.Point(box.bounds.x + box.bounds.width, box.bounds.y);
+		}
+		// selecting pen color based on group color
+		const avg = group.getAverageColor();
+		let dist = Number.MAX_VALUE;
+		let color = colors[0];
+		for (let i in colors) {
+			const c = colors[i];
+			const d = calculateColorDifference(avg, c);
+			if (d < dist) {
+				color = c;
+				dist = d;
+			}
+		}
+		group.fillColor = color;
+
+		// map average color to linecount
+		const lineCount = (config.density * box.bounds.width) * (1 - group.getAverageLightness());
+		hatchFillRectangle(false, start, end, box, group.shape, lineCount, pattern, layer, group, color);
+		if (box) box.remove();
+	}
+}
+
+const cyan = new paper.Color('cyan');
+const magenta = new paper.Color('magenta');
+const yellow = new paper.Color('yellow');
+const black = new paper.Color('black');
+
+function hatchFillRectangle(debug, start, end, rectangle, shape, lineCount, pattern, layer, group, color) {
+	let direction = new paper.Path.Line(start, end);
+	let actualLineCount = lineCount;
+	if (pattern === 0) {
+		direction = new paper.Path.Line(start, direction.getPointAt(direction.length / 2));
+		actualLineCount = lineCount / 2;
+	} else if (pattern === 1) {
+		direction = new paper.Path.Line(direction.getPointAt(direction.length / 2), end);
+		actualLineCount = lineCount / 2;
+	}
+	for (let i = 0; i < actualLineCount; i++) {
+		let linePoint = direction.getPointAt((i * direction.length) / (actualLineCount - 1));
+		if (!linePoint) {
+			continue;
+		}
+		// draw a line perpendicular to direction through linePoint
+		const perpendicular = direction.getNormalAt((i * direction.length) / (actualLineCount - 1));
+		const lineStart = linePoint.subtract(perpendicular.multiply(direction.length * 2));
+		const lineEnd = linePoint.add(perpendicular.multiply(direction.length * 2));
+		const line = new paper.Path.Line(lineStart, lineEnd);
+		const hrs = line.getIntersections(shape);
+		if (hrs && hrs.length > 0 && hrs.length % 2 === 0) {
+			const lines = Math.ceil(hrs.length / 2);
+			for (let i = 0; i < lines; i++) {
+				const l = new paper.Path.Line(hrs[i * 2].point, hrs[(i * 2) + 1].point);
+				l.strokeColor = color;
+				l.blendMode = 'multiply';
+				group.fills.push(l);
+				l.addTo(layer);
+			}
+		} else if (hrs.length === 3) {
+			const l = new paper.Path.Line(hrs[0].point, hrs[2].point);
+			l.strokeColor = black;
+			l.blendMode = 'multiply';
+			group.fills.push(l);
+			l.addTo(layer);
+		} else if (hrs.length === 0 || hrs.length === 1) {
+			console.debug('ignoring 0/1 intersections.');
+		} else {
+			console.warn('not sure what to do with', hrs.length, 'intersections', hrs);
+		}
+		line.remove();
+	}
+}
+
+/*****************************************************************
+ 							Helpers
+ *****************************************************************/
+function setupGroupInteractivity(groupShape: paper.Path) {
+	groupShape.onMouseEnter = () => {
+		groupShape.opacity = 0.5;
+	};
+	groupShape.onMouseLeave = () => {
+		groupShape.opacity = 0;
+	};
+	groupShape.bringToFront();
+}
+
+function calculateColorDifference(color1, color2) {
+	// Convert Paper.js colors to CIELAB
+	if (!color1 || !color2) {
+		console.warn('no COLORS', color1, color2);
+		return 0;
+	}
+	const lab1 = rgbToLab(color1);
+	const lab2 = rgbToLab(color2);
+
+	// Calculate Euclidean distance in LAB space
+	const deltaL = lab1.l - lab2.l;
+	const deltaA = lab1.a - lab2.a;
+	const deltaB = lab1.b - lab2.b;
+
+	const distance = Math.sqrt(deltaL * deltaL + deltaA * deltaA + deltaB * deltaB);
+
+	// Normalize to 0-1 range (assuming maximum possible distance is 100)
+	return Math.min(distance / 100, 1);
+}
+
+// Helper function to convert Paper.js color to CIELAB
+function rgbToLab(color) {
+	// First, convert to XYZ
+	let r = color.red;
+	let g = color.green;
+	let b = color.blue;
+
+	r = (r > 0.04045) ? Math.pow((r + 0.055) / 1.055, 2.4) : r / 12.92;
+	g = (g > 0.04045) ? Math.pow((g + 0.055) / 1.055, 2.4) : g / 12.92;
+	b = (b > 0.04045) ? Math.pow((b + 0.055) / 1.055, 2.4) : b / 12.92;
+
+	const x = (r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047;
+	const y = (r * 0.2126 + g * 0.7152 + b * 0.0722) / 1.00000;
+	const z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883;
+
+	// Then, convert XYZ to Lab
+	const fx = (x > 0.008856) ? Math.pow(x, 1 / 3) : (7.787 * x) + 16 / 116;
+	const fy = (y > 0.008856) ? Math.pow(y, 1 / 3) : (7.787 * y) + 16 / 116;
+	const fz = (z > 0.008856) ? Math.pow(z, 1 / 3) : (7.787 * z) + 16 / 116;
+
+	const l = (116 * fy) - 16;
+	const a = 500 * (fx - fy);
+	const bb = 200 * (fy - fz);
+
+	return { l: l, a: a, b: bb };
 }
