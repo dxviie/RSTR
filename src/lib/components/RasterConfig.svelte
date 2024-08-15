@@ -4,14 +4,19 @@
 	import {
 		rstrState
 	} from '$lib/fsm.svelte.js';
+	import type { RstrColor } from '$lib/rstr/rstr.ts';
 
 	let container: HTMLDivElement;
 	let pane: Pane | null = null;
-	let paneConfig = {
+	const colorBindings = [];
+	const paneConfig = {
 		...config
 	};
-
 	let configEnabled = $state(true);
+
+	/****************************
+	 * Config enabling
+	 ****************************/
 
 	$effect(() => {
 		if (rstrState.status) {
@@ -28,8 +33,76 @@
 		}
 	});
 
+	/****************************
+	 * Color generation code
+	 ****************************/
+
+	function getRandomInt(min, max) {
+		return Math.floor(Math.random() * (max - min + 1)) + min;
+	}
+
+	function generateHarmonicColors(baseHue, numberOfColors, hueShift, lightness, chroma): RstrColor[] {
+		let colors = [];
+		const l = lightness || 50 + getRandomInt(0, 50);
+		const c = chroma || 100 + getRandomInt(0, 130);
+		for (let i = 0; i < numberOfColors; i++) {
+			let hue = (baseHue + i * hueShift) % 360;
+			colors.push(lchToHex(l, c, hue));
+		}
+		return colors;
+	}
+
+	function lchToHex(l, c, h) {
+		// LCH to Lab
+		const a = c * Math.cos(h * Math.PI / 180);
+		const b = c * Math.sin(h * Math.PI / 180);
+
+		// Lab to XYZ
+		let y = (l + 16) / 116;
+		let x = a / 500 + y;
+		let z = y - b / 200;
+
+		x = 0.95047 * ((x * x * x > 0.008856) ? x * x * x : (x - 16 / 116) / 7.787);
+		y = 1.00000 * ((y * y * y > 0.008856) ? y * y * y : (y - 16 / 116) / 7.787);
+		z = 1.08883 * ((z * z * z > 0.008856) ? z * z * z : (z - 16 / 116) / 7.787);
+
+		// XYZ to sRGB
+		let red = x * 3.2406 + y * -1.5372 + z * -0.4986;
+		let green = x * -0.9689 + y * 1.8758 + z * 0.0415;
+		let blue = x * 0.0557 + y * -0.2040 + z * 1.0570;
+
+		red = (red > 0.0031308) ? (1.055 * Math.pow(red, 1 / 2.4) - 0.055) : 12.92 * red;
+		green = (green > 0.0031308) ? (1.055 * Math.pow(green, 1 / 2.4) - 0.055) : 12.92 * green;
+		blue = (blue > 0.0031308) ? (1.055 * Math.pow(blue, 1 / 2.4) - 0.055) : 12.92 * blue;
+
+		// Clip values
+		red = Math.max(0, Math.min(1, red));
+		green = Math.max(0, Math.min(1, green));
+		blue = Math.max(0, Math.min(1, blue));
+
+		// sRGB to Hex
+		const toHex = (x) => {
+			const hex = Math.round(x * 255).toString(16);
+			return hex.length === 1 ? '0' + hex : hex;
+		};
+
+		return `#${toHex(red)}${toHex(green)}${toHex(blue)}`;
+	}
+
+	function getRandomColors(count: number) {
+		let hue = getRandomInt(0, 360);
+		let shift = getRandomInt(30, 90);
+		return generateHarmonicColors(hue, count, shift);
+	}
+
+	/*************************************
+	 * Pane setup & interactivity
+	 ************************************/
+
 	$effect(() => {
 		pane = new Pane({ container: container });
+		paneConfig.colors = getRandomColors(getRandomInt(2, 5));
+		setTimeout(() => configActions.update(paneConfig), 10);
 
 		const baseFolder = pane.addFolder({ title: 'IMAGE' });
 		baseFolder.addBinding(paneConfig, 'resolution', { min: 10, max: 512, step: 1 });
@@ -41,13 +114,44 @@
 		const hatchingFolder = pane.addFolder({ title: 'FILL' });
 		hatchingFolder.addBinding(paneConfig, 'halves');
 		hatchingFolder.addBinding(paneConfig, 'density', { min: 0, max: 1, step: 0.05 });
-		hatchingFolder.addBinding(paneConfig, 'colorA', { label: `Color a` });
-		hatchingFolder.addBinding(paneConfig, 'colorB', { label: `Color b` });
-		hatchingFolder.addBinding(paneConfig, 'colorC', { label: `Color c` });
+		const wrapperArray = paneConfig.colors.map((color) => {
+			return { color: color };
+		});
+		wrapperArray.forEach((color, index) => {
+			const binding = hatchingFolder.addBinding(color, 'color', { label: `Color ${index + 1}` });
+			colorBindings.push(binding);
+		});
+
+		const addColorBtn = pane.addButton({
+			title: '+'
+		});
+		addColorBtn.on('click', () => {
+			const cfg = { ...paneConfig };
+			const newColor = { color: getRandomColors(1)[0] };
+			wrapperArray.push(newColor);
+			const binding = hatchingFolder.addBinding(newColor, 'color', { label: `Color ${wrapperArray.length}` });
+			colorBindings.push(binding);
+			cfg.colors = wrapperArray.map((wrapper) => wrapper.color);
+			configActions.update(cfg);
+		});
+		pane.addButton({
+			title: '-'
+		}).on('click', () => {
+			const cfg = { ...paneConfig };
+			wrapperArray.pop();
+			const binding = colorBindings.pop();
+			if (binding) {
+				hatchingFolder.remove(binding);
+				binding.dispose();
+			}
+			cfg.colors = wrapperArray.map((wrapper) => wrapper.color);
+			configActions.update(cfg);
+		});
 
 		// Listen for changes and emit the updated config
 		pane.on('change', () => {
 			const cfg = { ...paneConfig };
+			cfg.colors = wrapperArray.map((wrapper) => wrapper.color);
 			configActions.update(cfg);
 		});
 
