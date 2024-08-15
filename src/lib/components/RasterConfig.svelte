@@ -41,15 +41,40 @@
 		return Math.floor(Math.random() * (max - min + 1)) + min;
 	}
 
-	function generateHarmonicColors(baseHue, numberOfColors, hueShift, lightness, chroma): RstrColor[] {
-		let colors = [];
-		const l = lightness || 50 + getRandomInt(0, 50);
-		const c = chroma || 100 + getRandomInt(0, 130);
+	function generateHarmonicColors(baseHue, numberOfColors, hueShift): RstrColor[] {
+		const colors = [];
+		const palette = generateLCHPalette(numberOfColors, baseHue, hueShift);
 		for (let i = 0; i < numberOfColors; i++) {
-			let hue = (baseHue + i * hueShift) % 360;
-			colors.push(lchToHex(l, c, hue));
+			const c = palette[i];
+			colors.push(lchToHex(c.l, c.c, c.h));
 		}
 		return colors;
+	}
+
+	function generateLCHPalette(count, hue, shift = 0) {
+		// Ensure count is at least 1
+		count = Math.max(1, count);
+
+		// Normalize hue to 0-360 range
+		hue = ((hue % 360) + 360) % 360;
+
+		const palette = [];
+
+		for (let i = 0; i < count; i++) {
+			// Calculate lightness: distribute evenly from 20 to 80
+			const l = 20 + (60 * i / (count - 1));
+
+			// Calculate chroma: higher for midtones, lower for extremes
+			const cMax = 100 - Math.abs(l - 50) * 1.5;
+			const c = Math.min(80, cMax);
+
+			// Calculate hue: apply shift
+			const h = (hue + (shift * i)) % 360;
+
+			palette.push({ l, c, h });
+		}
+
+		return palette;
 	}
 
 	function lchToHex(l, c, h) {
@@ -105,15 +130,15 @@
 		setTimeout(() => configActions.update(paneConfig), 10);
 
 		const baseFolder = pane.addFolder({ title: 'IMAGE' });
-		baseFolder.addBinding(paneConfig, 'resolution', { min: 10, max: 512, step: 1 });
+		baseFolder.addBinding(paneConfig, 'resolution', { min: 10, max: 144, step: 1 });
 
 		const groupingFolder = pane.addFolder({ title: 'GROUPING' });
 		groupingFolder.addBinding(paneConfig, 'iterations', { min: 1, max: 10, step: 1 });
-		groupingFolder.addBinding(paneConfig, 'tolerance', { min: 0.05, max: 1, step: 0.05 });
+		groupingFolder.addBinding(paneConfig, 'tolerance', { min: 0.01, max: 1, step: 0.01 });
 
 		const hatchingFolder = pane.addFolder({ title: 'FILL' });
 		hatchingFolder.addBinding(paneConfig, 'halves');
-		hatchingFolder.addBinding(paneConfig, 'density', { min: 0, max: 1, step: 0.05 });
+		hatchingFolder.addBinding(paneConfig, 'density', { min: 0, max: 1, step: 0.01 });
 		const wrapperArray = paneConfig.colors.map((color) => {
 			return { color: color };
 		});
@@ -127,7 +152,8 @@
 		});
 		addColorBtn.on('click', () => {
 			const cfg = { ...paneConfig };
-			const newColor = { color: getRandomColors(1)[0] };
+			const newPalette = getRandomColors(10);
+			const newColor = { color: newPalette[getRandomInt(0, 9)] };
 			wrapperArray.push(newColor);
 			const binding = hatchingFolder.addBinding(newColor, 'color', { label: `Color ${wrapperArray.length}` });
 			colorBindings.push(binding);
