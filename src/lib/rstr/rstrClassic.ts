@@ -198,9 +198,8 @@ export class RstrClassicGrouping implements RstrGroupingAlgo, RstrFillingAlgo {
 		const box = group.getBoundingBox();
 
 		const colors = [];
-		colors.push(new paper.Color(config.colorA));
-		colors.push(new paper.Color(config.colorB));
-		colors.push(new paper.Color(config.colorC));
+		config.colors.forEach(c => colors.push(new paper.Color(c)));
+		if (colors.length === 0) colors.push(new paper.Color('black'));
 
 		// get the average color for each quadrant of the block
 		const corners = group.getCornerPixels();
@@ -230,12 +229,14 @@ export class RstrClassicGrouping implements RstrGroupingAlgo, RstrFillingAlgo {
 		const avg = group.getAverageColor();
 		let dist = Number.MAX_VALUE;
 		let color = colors[0];
-		for (let i in colors) {
-			const c = colors[i];
-			const d = calculateColorDifference(avg, c);
-			if (d < dist) {
-				color = c;
-				dist = d;
+		if (colors.length > 1) {
+			for (let i in colors) {
+				const c = colors[i];
+				const d = calculateColorDifference(avg, c);
+				if (d < dist) {
+					color = c;
+					dist = d;
+				}
 			}
 		}
 		group.fillColor = color;
