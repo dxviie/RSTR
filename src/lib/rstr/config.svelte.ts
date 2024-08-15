@@ -10,15 +10,9 @@ export type RstrConfig = {
 	halves: boolean;
 	density: number;
 	// colors
-	color_a: RstrColor;
-	color_b: RstrColor;
-	color_c: RstrColor;
-}
-
-export type RstrColor = {
-	r: number;
-	g: number;
-	b: number;
+	colorA: RstrColor;
+	colorB: RstrColor;
+	colorC: RstrColor;
 }
 
 const initialState = {
@@ -33,9 +27,9 @@ const initialState = {
 	halves: false,
 	density: .66,
 	// colors
-	color_a: { r: 255, g: 0, b: 255 },
-	color_b: { r: 255, g: 255, b: 0 },
-	color_c: { r: 0, g: 255, b: 255 }
+	colorA: '#FF00FF',
+	colorB: '#FFFF00',
+	colorC: '#00FFFF'
 };
 
 const updateConfig = (newValues: { [s: string]: unknown; } | ArrayLike<unknown>) => {

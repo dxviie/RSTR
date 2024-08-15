@@ -41,13 +41,14 @@
 		const hatchingFolder = pane.addFolder({ title: 'FILL' });
 		hatchingFolder.addBinding(paneConfig, 'halves');
 		hatchingFolder.addBinding(paneConfig, 'density', { min: 0, max: 1, step: 0.05 });
-		hatchingFolder.addBinding(paneConfig, 'color_a');
-		hatchingFolder.addBinding(paneConfig, 'color_b');
-		hatchingFolder.addBinding(paneConfig, 'color_c');
+		hatchingFolder.addBinding(paneConfig, 'colorA', { label: `Color a` });
+		hatchingFolder.addBinding(paneConfig, 'colorB', { label: `Color b` });
+		hatchingFolder.addBinding(paneConfig, 'colorC', { label: `Color c` });
 
 		// Listen for changes and emit the updated config
 		pane.on('change', () => {
-			configActions.update({ ...paneConfig });
+			const cfg = { ...paneConfig };
+			configActions.update(cfg);
 		});
 
 		return () => {
