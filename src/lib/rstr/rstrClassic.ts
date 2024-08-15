@@ -302,13 +302,13 @@ function hatchFillRectangle(debug, start, end, rectangle, shape, lineCount, patt
  							Helpers
  *****************************************************************/
 function setupGroupInteractivity(groupShape: paper.Path) {
-	groupShape.onMouseEnter = () => {
-		groupShape.opacity = 0.5;
-	};
-	groupShape.onMouseLeave = () => {
-		groupShape.opacity = 0;
-	};
-	groupShape.bringToFront();
+	// groupShape.onMouseEnter = () => {
+	// 	groupShape.opacity = 0.5;
+	// };
+	// groupShape.onMouseLeave = () => {
+	// 	groupShape.opacity = 0;
+	// };
+	// groupShape.bringToFront();
 }
 
 function calculateColorDifference(color1, color2) {
