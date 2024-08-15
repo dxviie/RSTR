@@ -168,8 +168,8 @@ export class Rstr {
 				}
 			}
 		}
-		// if (this.groupLayer) this.groupLayer.opacity = 0;
-		if (this.groups) this.groups.forEach(group => group.shape.opacity = 0);
+		if (this.groupLayer) this.groupLayer.opacity = 0;
+		// if (this.groups) this.groups.forEach(group => group.shape.opacity = 0);
 		if (this.gridAverageColorLayer) this.gridAverageColorLayer.opacity = 0;
 		if (this.image) this.image.opacity = 0;
 		// this.cleanupGroups(); we need these for SVG export
