@@ -116,7 +116,7 @@
 
 	function getRandomColors(count: number) {
 		let hue = getRandomInt(0, 360);
-		let shift = getRandomInt(30, 90);
+		let shift = getRandomInt(1, 180);
 		return generateHarmonicColors(hue, count, shift);
 	}
 
@@ -169,6 +169,30 @@
 			if (binding) {
 				hatchingFolder.remove(binding);
 				binding.dispose();
+			}
+			cfg.colors = wrapperArray.map((wrapper) => wrapper.color);
+			configActions.update(cfg);
+		});
+		pane.addButton({
+			title: 'Randomize'
+		}).on('click', () => {
+			const cfg = { ...paneConfig };
+			let popped = wrapperArray.pop();
+			while (popped) {
+				popped = wrapperArray.pop();
+			}
+			let poppedBinding = colorBindings.pop();
+			while (poppedBinding) {
+				hatchingFolder.remove(poppedBinding);
+				poppedBinding.dispose();
+				poppedBinding = colorBindings.pop();
+			}
+			const newPalette = getRandomColors(getRandomInt(2, 5));
+			for (let i = 0; i < newPalette.length; i++) {
+				const newColor = { color: newPalette[i] };
+				wrapperArray.push(newColor);
+				const binding = hatchingFolder.addBinding(newColor, 'color', { label: `Color ${i + 1}` });
+				colorBindings.push(binding);
 			}
 			cfg.colors = wrapperArray.map((wrapper) => wrapper.color);
 			configActions.update(cfg);
