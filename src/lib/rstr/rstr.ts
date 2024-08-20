@@ -152,7 +152,11 @@ export class Rstr {
 		}
 		const iterations = this.classicGrouping.iterationsFinished(this.groups);
 		if (iterations < config.iterations) {
-			this.groups = this.classicGrouping.doGroupingStep(this.groups, config);
+			this.project.view.pause();
+			this.doForTimeBudget(() => {
+				this.groups = this.classicGrouping.doGroupingStep(this.groups, config);
+			}, 50);
+			this.project.view.play();
 			return `1.b grouping: ${iterations + 1} / ${config.iterations} iterations`;
 		}
 		/*** filling ***/
@@ -161,12 +165,17 @@ export class Rstr {
 			if (this.fillLayer === null) {
 				this.fillLayer = new paper.Layer();
 			}
-			for (const group of this.groups) {
-				if (!group.isFilled) {
-					this.classicGrouping.fillGroup(group, this.fillLayer, config);
-					return '2. filling groups';
+			this.project.view.pause();
+			this.doForTimeBudget(() => {
+				for (const group of this.groups) {
+					if (!group.isFilled) {
+						this.classicGrouping.fillGroup(group, this.fillLayer, config);
+						return;
+					}
 				}
-			}
+			}, 50);
+			this.project.view.play();
+			return '2. filling groups';
 		}
 		if (this.groupLayer) this.groupLayer.opacity = 0;
 		// if (this.groups) this.groups.forEach(group => group.shape.opacity = 0);
@@ -177,6 +186,13 @@ export class Rstr {
 		this.cleanupGrid();
 		renderingFinished.action();
 		return '3. done';
+	}
+
+	doForTimeBudget(action, budget) {
+		const start = performance.now();
+		while (performance.now() - start < budget) {
+			action();
+		}
 	}
 
 	/***************************************
