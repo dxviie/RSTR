@@ -95,11 +95,11 @@
 			const svgW = rstr.project.view.bounds.width;
 			const svgH = rstr.project.view.bounds.height;
 			let svg = `<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${svgW}" height="${svgH}" viewBox="0,0,${svgW},${svgH}">`;
-			let colorGroupedGroups = rstr.groups.reduce((acc, group) => {
-				let colorGroup = acc.get(group.fillColor);
+			const colorGroupedGroups = rstr.groups.reduce((acc, group) => {
+				let colorGroup = acc.get(group.fillColor.toCSS(true));
 				if (!colorGroup) {
 					colorGroup = [];
-					acc.set(group.fillColor, colorGroup);
+					acc.set(group.fillColor.toCSS(true), colorGroup);
 				}
 				colorGroup.push(group);
 				return acc;
