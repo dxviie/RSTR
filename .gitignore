@@ -22,3 +22,7 @@ vite.config.ts.timestamp-*
 
 .idea/
 test-results/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
