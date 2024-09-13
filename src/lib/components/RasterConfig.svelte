@@ -127,6 +127,35 @@
 	$effect(() => {
 		pane = new Pane({ container: container });
 		paneConfig.colors = getRandomColors(getRandomInt(2, 5));
+
+		const metroGifColors = [
+			'#34431C', '#517800', '#8ADD52', '#46CBFF',
+			'#594550', '#F40043', '#000000'
+		];
+		const microns = [
+			{ color: '#4ED94D', name: 'Bright Green' },
+			{ color: '#33A381', name: 'Teal' },
+			{ color: '#2B4440', name: 'Dark Green' },
+			{ color: '#242B46', name: 'Navy Blue' },
+			{ color: '#F30015', name: 'Red' }
+		];
+
+		//--- BLUES ---
+		// paneConfig.colors = [
+		// 	'#005959',
+		// 	'#6D9BBC',
+		// 	'#A5CEE5',
+		// 	'#0095C7',
+		// 	'#7DCDC6'
+		// ];
+		// 	[
+		// 	{ color: '#005959', name: 'BG09 (Blue Green)' },
+		// 	{ color: '#6D9BBC', name: 'B45 (Smoky Blue)' },
+		// 	{ color: '#A5CEE5', name: 'B41 (Powder Blue)' },
+		// 	{ color: '#0095C7', name: 'B16 (Cyanine Blue)' },
+		// 	{ color: '#7DCDC6', name: 'BG05 (Holiday Blue)' }
+		// ];
+
 		setTimeout(() => configActions.update(paneConfig), 10);
 
 		const baseFolder = pane.addFolder({ title: 'IMAGE' });
