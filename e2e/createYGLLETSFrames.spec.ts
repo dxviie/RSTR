@@ -83,7 +83,7 @@ test.describe('Create YGLLETS Frames', () => {
 			start: 1,
 			end: 10,
 			easing: 'easeInOutQuad'
-		}, { start: 1, end: 0, easing: 'easeInOutQuad' }, 1);
+		}, { start: 1, end: 0, easing: 'easeInOutQuad' }, 15);
 		console.log('calculated frames:', frames.length);
 		for (let i = 0; i < frames.length; i++) {
 			const prefix = `${i.toString().padStart(4, '0')}`;
