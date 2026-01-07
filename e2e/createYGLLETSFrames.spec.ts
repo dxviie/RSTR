@@ -1,9 +1,5 @@
 import { test, expect } from '@playwright/test';
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-expect-error
 import path from 'path';
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-expect-error
 import fs from 'fs';
 
 test.setTimeout(3600000); // 1 hour
@@ -16,6 +12,7 @@ test.use({
 const files = [
 	'ygllets-arial-black.png',
 	'ygllets-nudica-bold.png',
+	'happy-2026.png',
 	'ygllets-nudica-bold-tulips.png'
 ];
 
