@@ -2,7 +2,7 @@
   "name": "rstr",
   "version": "0.0.1",
   "engines": {
-    "node": "^18.18.0"
+    "node": "^18.18.0 || ^20.0.0 || ^22.0.0"
   },
   "private": true,
   "scripts": {
