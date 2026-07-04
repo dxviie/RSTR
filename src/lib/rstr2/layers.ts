@@ -60,11 +60,12 @@ const inheritedHatchSettings = () => ({
 });
 
 export const defaultCmyLayers = (): LayerConfig[] => [
+	// Default pen colors are the d17e.dev brand accents.
 	{
 		id: 'cyan',
 		name: 'Cyan',
 		channel: 'c',
-		color: '#00A0C4',
+		color: '#00BFE8',
 		angleMin: 15,
 		angleMax: 105,
 		...inheritedHatchSettings(),
@@ -74,7 +75,7 @@ export const defaultCmyLayers = (): LayerConfig[] => [
 		id: 'magenta',
 		name: 'Magenta',
 		channel: 'm',
-		color: '#E6007E',
+		color: '#FF2AA6',
 		angleMin: 75,
 		angleMax: 165,
 		...inheritedHatchSettings(),
@@ -84,7 +85,7 @@ export const defaultCmyLayers = (): LayerConfig[] => [
 		id: 'yellow',
 		name: 'Yellow',
 		channel: 'y',
-		color: '#FFD900',
+		color: '#FFB000',
 		angleMin: 135,
 		angleMax: 225,
 		...inheritedHatchSettings(),
