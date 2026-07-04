@@ -1,4 +1,6 @@
 <script lang="ts">
+	import DualRangeInput from '@stanko/dual-range-input';
+	import '@stanko/dual-range-input/dist/index.css';
 	import { computeCellGrid, type CellGrid } from '$lib/rstr2/grid';
 	import { adjustColors, isNeutralAdjustment } from '$lib/rstr2/imageAdjust';
 	import {
@@ -17,12 +19,7 @@
 	} from '$lib/rstr2/params';
 	import { segmentGrid } from '$lib/rstr2/segmentation';
 	import { buildRegionGeometries } from '$lib/rstr2/regionTools';
-	import {
-		hatchPolygon,
-		spacingForInk,
-		type HatchSegments,
-		type SpacingCurve
-	} from '$lib/rstr2/hatchTools';
+	import { hatchPolygon, spacingForInk, type HatchSegments } from '$lib/rstr2/hatchTools';
 	import { buildSvgDocument } from '$lib/rstr2/svgExport';
 
 	//***************************************************************
@@ -348,7 +345,6 @@
 		void params.spacingMinMm;
 		void params.spacingMaxMm;
 		void params.hatchThreshold;
-		void params.spacingCurve;
 		void params.hatchGamma;
 		void params.inkBoost;
 		const results = layerResults;
@@ -381,7 +377,6 @@
 		ctx.globalAlpha = 0.85; // translucent-ink simulation
 
 		const pxPerMm = imgWidth / params.outputWidthMm;
-		const curve = params.spacingCurve as SpacingCurve;
 		let totalLines = 0;
 
 		for (const layer of layers) {
@@ -390,7 +385,13 @@
 			if (!result) continue;
 
 			const hatch = effectiveHatch(layer);
-			const spacingOptions = { curve, gamma: hatch.gamma, inkBoost: hatch.inkBoost };
+			// 'coverage' recreates the true tone: inked fraction matches the
+			// perceptually weighted channel value
+			const spacingOptions = {
+				curve: 'coverage' as const,
+				gamma: hatch.gamma,
+				inkBoost: hatch.inkBoost
+			};
 			const penWidthPx = hatch.penWidthMm * pxPerMm;
 			// Nominal spacing bounds: a minimum below the pen width is allowed
 			// and produces overlapping lines on purpose.
@@ -527,31 +528,146 @@
 		min: number;
 		max: number;
 		step: number;
+		/** tooltip explaining what the control does */
+		tip: string;
 	}
 
 	const ADJUST_SLIDERS: SliderDef[] = [
-		{ id: 'brightness', label: 'brightness', min: -0.5, max: 0.5, step: 0.01 },
-		{ id: 'contrast', label: 'contrast', min: -1, max: 1, step: 0.02 },
-		{ id: 'imageGamma', label: 'gamma / key', min: 0.25, max: 3, step: 0.05 },
-		{ id: 'saturation', label: 'saturation', min: 0, max: 2, step: 0.05 },
-		{ id: 'vibrance', label: 'vibrance', min: -1, max: 1, step: 0.02 }
+		{
+			id: 'brightness',
+			label: 'brightness',
+			min: -0.5,
+			max: 0.5,
+			step: 0.01,
+			tip: 'brighten (+) or darken (-) before segmentation'
+		},
+		{
+			id: 'contrast',
+			label: 'contrast',
+			min: -1,
+			max: 1,
+			step: 0.02,
+			tip: 'contrast around mid grey'
+		},
+		{
+			id: 'imageGamma',
+			label: 'gamma / key',
+			min: 0.25,
+			max: 3,
+			step: 0.05,
+			tip: 'midtone curve — above 1 lifts, below 1 keys down'
+		},
+		{
+			id: 'saturation',
+			label: 'saturation',
+			min: 0,
+			max: 2,
+			step: 0.05,
+			tip: 'uniform color saturation, 0 = greyscale'
+		},
+		{
+			id: 'vibrance',
+			label: 'vibrance',
+			min: -1,
+			max: 1,
+			step: 0.02,
+			tip: 'saturation boost weighted towards muted colors'
+		}
 	];
 
 	const SEGMENTATION_SLIDERS: SliderDef[] = [
-		{ id: 'resolution', label: 'resolution', min: 8, max: 512, step: 1 },
-		{ id: 'smoothing', label: 'smoothing', min: 0, max: 4, step: 1 },
-		{ id: 'tolerance', label: 'tolerance', min: 0, max: 0.5, step: 0.01 },
-		{ id: 'minRegionSize', label: 'min region size', min: 1, max: 128, step: 1 }
+		{
+			id: 'resolution',
+			label: 'resolution',
+			min: 8,
+			max: 512,
+			step: 1,
+			tip: 'grid resolution (cells across) — more cells, more detail, slower'
+		},
+		{
+			id: 'smoothing',
+			label: 'smoothing',
+			min: 0,
+			max: 4,
+			step: 1,
+			tip: 'blur passes before segmentation — higher = fewer, larger regions'
+		},
+		{
+			id: 'tolerance',
+			label: 'tolerance',
+			min: 0,
+			max: 0.5,
+			step: 0.01,
+			tip: 'max intensity difference for merging adjacent regions'
+		},
+		{
+			id: 'minRegionSize',
+			label: 'min region size',
+			min: 1,
+			max: 128,
+			step: 1,
+			tip: 'regions with fewer cells get absorbed into a neighbour'
+		}
 	];
 
 	const LINE_SLIDERS: SliderDef[] = [
-		{ id: 'penWidthMm', label: 'pen width (mm)', min: 0.05, max: 5, step: 0.05 },
-		{ id: 'spacingMinMm', label: 'spacing min (mm)', min: 0.05, max: 10, step: 0.05 },
-		{ id: 'spacingMaxMm', label: 'spacing max (mm)', min: 0.05, max: 10, step: 0.05 },
-		{ id: 'hatchThreshold', label: 'ink threshold', min: 0, max: 1, step: 0.05 },
-		{ id: 'hatchGamma', label: 'ink gamma', min: 0.5, max: 4, step: 0.05 },
-		{ id: 'inkBoost', label: 'ink boost', min: 0.25, max: 4, step: 0.05 }
+		{
+			id: 'penWidthMm',
+			label: 'pen width (mm)',
+			min: 0.05,
+			max: 5,
+			step: 0.05,
+			tip: 'physical line width — layers can override'
+		},
+		{
+			id: 'hatchThreshold',
+			label: 'ink threshold',
+			min: 0,
+			max: 1,
+			step: 0.05,
+			tip: 'regions with less ink are left empty — layers can override'
+		},
+		{
+			id: 'hatchGamma',
+			label: 'ink gamma',
+			min: 0.5,
+			max: 4,
+			step: 0.05,
+			tip: 'perceptual weight on ink intensity before spacing'
+		},
+		{
+			id: 'inkBoost',
+			label: 'ink boost',
+			min: 0.25,
+			max: 4,
+			step: 0.05,
+			tip: 'coverage multiplier — above 1 pushes dark regions into overlapping lines'
+		}
 	];
+
+	const SPACING_TIP =
+		'nominal min/max line spacing — each region lands in this range based on its ink; layers can override';
+
+	// Dual-range slider for the spacing bounds
+	let spacingMinEl: HTMLInputElement | undefined = $state();
+	let spacingMaxEl: HTMLInputElement | undefined = $state();
+	let spacingDri: DualRangeInput | undefined;
+
+	$effect(() => {
+		if (!spacingMinEl || !spacingMaxEl) return;
+		spacingDri = new DualRangeInput(spacingMinEl, spacingMaxEl);
+		return () => {
+			spacingDri?.destroy();
+			spacingDri = undefined;
+		};
+	});
+
+	// keep the track fill in sync when the values change from the number inputs
+	$effect(() => {
+		void params.spacingMinMm;
+		void params.spacingMaxMm;
+		spacingDri?.update();
+	});
 </script>
 
 <svelte:head>
@@ -582,7 +698,7 @@
 		<span class="wordmark">RSTR</span>
 		<span class="tagline">raster images to plottable svg</span>
 		<div class="spacer"></div>
-		<a class="top-link" href="/about" title="about">?</a>
+		<a class="top-link" href="/about" title="about RSTR">?</a>
 	</header>
 
 	<div class="workspace">
@@ -596,7 +712,7 @@
 					<button
 						class="thumb current"
 						onclick={() => fileInput?.click()}
-						title="Browse for an image"
+						title="browse for an image"
 					>
 						{#if inputImage}
 							<img src={inputImage} alt="current input" />
@@ -604,20 +720,16 @@
 							+
 						{/if}
 					</button>
-					{#each SAMPLE_IMAGES as sample (sample)}
-						<button
-							class="thumb"
-							class:active={inputImage === sample}
-							onclick={() => (inputImage = sample)}
-							title="Use sample image"
-						>
-							<img src={sample} alt="sample input" />
-						</button>
-					{/each}
+					<button
+						class="browse-btn"
+						onclick={() => fileInput?.click()}
+						title="pick an image from your device — it never leaves the browser"
+					>
+						browse an image<span class="browse-sub">or drop one on the render</span>
+					</button>
 				</div>
-				<p class="hint">click the preview to browse, or drop an image on the canvas</p>
 				{#each ADJUST_SLIDERS as slider (slider.id)}
-					<label class="slider-row">
+					<label class="slider-row" title={slider.tip}>
 						<span>{slider.label}</span>
 						<input
 							type="range"
@@ -642,7 +754,10 @@
 
 			<section class="panel-group">
 				<div class="group-title">segmentation</div>
-				<label class="select-row">
+				<label
+					class="select-row"
+					title="segmentation strategy — watershed follows tonal basins, posterize bands intensities, k-means clusters them"
+				>
 					<span>algorithm</span>
 					<select bind:value={params.algorithm}>
 						<option value="watershed">Watershed</option>
@@ -651,7 +766,7 @@
 					</select>
 				</label>
 				{#each SEGMENTATION_SLIDERS as slider (slider.id)}
-					<label class="slider-row">
+					<label class="slider-row" title={slider.tip}>
 						<span>{slider.label}</span>
 						<input
 							type="range"
@@ -674,7 +789,7 @@
 			<section class="panel-group">
 				<div class="group-title">lines</div>
 				{#each LINE_SLIDERS as slider (slider.id)}
-					<label class="slider-row">
+					<label class="slider-row" title={slider.tip}>
 						<span>{slider.label}</span>
 						<input
 							type="range"
@@ -692,15 +807,46 @@
 						/>
 					</label>
 				{/each}
-				<label class="select-row">
-					<span>spacing curve</span>
-					<select bind:value={params.spacingCurve}>
-						<option value="coverage">Coverage (true tone)</option>
-						<option value="gamma">Gamma</option>
-						<option value="log">Log</option>
-						<option value="linear">Linear</option>
-					</select>
-				</label>
+				<div class="spacing-control" title={SPACING_TIP}>
+					<div class="spacing-head">
+						<span>spacing (mm)</span>
+						<input
+							type="number"
+							min="0.05"
+							max="10"
+							step="0.05"
+							bind:value={params.spacingMinMm}
+							title="densest allowed line spacing (mm)"
+						/>
+						<span class="spacing-dash">–</span>
+						<input
+							type="number"
+							min="0.05"
+							max="10"
+							step="0.05"
+							bind:value={params.spacingMaxMm}
+							title="sparsest line spacing before a region stays empty-ish (mm)"
+						/>
+					</div>
+					<div class="dual-range-input">
+						<input
+							bind:this={spacingMinEl}
+							type="range"
+							min="0.05"
+							max="10"
+							step="0.05"
+							bind:value={params.spacingMinMm}
+						/>
+						<input
+							bind:this={spacingMaxEl}
+							type="range"
+							min="0.05"
+							max="10"
+							step="0.05"
+							bind:value={params.spacingMaxMm}
+						/>
+					</div>
+				</div>
 			</section>
 		</aside>
 
@@ -752,35 +898,44 @@
 				{#each layers as layer, index (layer.id)}
 					<div class="layer-card" class:disabled={!layer.enabled}>
 						<div class="layer-row">
-							<input type="checkbox" bind:checked={layer.enabled} title="Enable layer" />
+							<input
+								type="checkbox"
+								bind:checked={layer.enabled}
+								title="include this layer in the render and export"
+							/>
 							<input
 								class="layer-color"
 								type="color"
 								bind:value={layer.color}
-								title="Layer color"
+								title="pen color, used in the render and the exported SVG"
 							/>
-							<input class="layer-name" type="text" bind:value={layer.name} />
+							<input
+								class="layer-name"
+								type="text"
+								bind:value={layer.name}
+								title="layer name — becomes the layer label in the exported SVG"
+							/>
 							<button
 								class="icon-btn"
 								onclick={() => moveLayer(layer.id, -1)}
 								disabled={index === 0}
-								title="Move up">▲</button
+								title="move up — layers draw top to bottom">▲</button
 							>
 							<button
 								class="icon-btn"
 								onclick={() => moveLayer(layer.id, 1)}
 								disabled={index === layers.length - 1}
-								title="Move down">▼</button
+								title="move down — layers draw top to bottom">▼</button
 							>
 							<button
 								class="icon-btn remove"
 								onclick={() => removeLayer(layer.id)}
 								disabled={layers.length <= 1}
-								title="Remove layer">✕</button
+								title="remove layer">✕</button
 							>
 						</div>
 						<details class="layer-settings">
-							<summary>
+							<summary title="channel, hatch angles and per-layer overrides">
 								settings
 								{#if overrideCount(layer) > 0}
 									<span class="override-count"
@@ -789,7 +944,7 @@
 								{/if}
 							</summary>
 							<div class="layer-row">
-								<label>
+								<label title="which image channel drives this layer's ink amount">
 									channel
 									<select bind:value={layer.channel}>
 										{#each Object.entries(CHANNEL_LABELS) as [value, label]}
@@ -798,7 +953,10 @@
 									</select>
 								</label>
 							</div>
-							<div class="layer-row">
+							<div
+								class="layer-row"
+								title="hatch direction range — each region picks an angle in this range based on its own shape"
+							>
 								<label>
 									angle min°
 									<input type="number" bind:value={layer.angleMin} min="-360" max="360" step="5" />
@@ -812,7 +970,7 @@
 								below: empty = inherits the global lines value (<em>grey italic</em>)
 							</div>
 							<div class="layer-row">
-								<label>
+								<label title="physical line width for this pen — empty inherits the global value">
 									pen (mm)
 									<input
 										type="number"
@@ -824,7 +982,9 @@
 										step="0.05"
 									/>
 								</label>
-								<label>
+								<label
+									title="regions with less ink are left empty — empty inherits the global value"
+								>
 									threshold
 									<input
 										type="number"
@@ -838,7 +998,7 @@
 								</label>
 							</div>
 							<div class="layer-row">
-								<label>
+								<label title="densest allowed line spacing — empty inherits the global value">
 									spacing min
 									<input
 										type="number"
@@ -850,7 +1010,7 @@
 										step="0.05"
 									/>
 								</label>
-								<label>
+								<label title="sparsest line spacing — empty inherits the global value">
 									spacing max
 									<input
 										type="number"
@@ -864,7 +1024,9 @@
 								</label>
 							</div>
 							<div class="layer-row">
-								<label>
+								<label
+									title="perceptual weight on ink intensity before spacing — empty inherits the global value"
+								>
 									ink gamma
 									<input
 										type="number"
@@ -876,7 +1038,9 @@
 										step="0.05"
 									/>
 								</label>
-								<label>
+								<label
+									title="coverage multiplier — above 1 pushes dark regions into overlapping lines; empty inherits the global value"
+								>
 									ink boost
 									<input
 										type="number"
@@ -890,7 +1054,11 @@
 								</label>
 							</div>
 							{#if overrideCount(layer) > 0}
-								<button class="clear-overrides" onclick={() => clearOverrides(layer)}>
+								<button
+									class="clear-overrides"
+									onclick={() => clearOverrides(layer)}
+									title="clear all overrides — every value inherits the global lines settings again"
+								>
 									↺ clear overrides
 								</button>
 							{/if}
@@ -898,27 +1066,44 @@
 					</div>
 				{/each}
 				<div class="layers-actions">
-					<button onclick={addLayer}>+ add layer</button>
-					<button onclick={resetLayers}>reset to CMY</button>
+					<button onclick={addLayer} title="add a new pen layer">+ add layer</button>
+					<button
+						onclick={resetLayers}
+						title="replace the stack with the default cyan, magenta and yellow pens"
+						>reset to CMY</button
+					>
 				</div>
 			</section>
 
 			<section class="panel-group">
 				<div class="group-title">export</div>
-				<label class="slider-row">
+				<label
+					class="slider-row"
+					title="target output width in millimeters — the height follows the image aspect"
+				>
 					<span>width (mm)</span>
 					<input type="range" min="10" max="1000" step="1" bind:value={params.outputWidthMm} />
 					<input type="number" min="10" max="1000" step="1" bind:value={params.outputWidthMm} />
 				</label>
 				<div class="export-actions">
-					<button class="primary-btn" onclick={downloadSvg} disabled={!hatchReady || status.busy}>
+					<button
+						class="primary-btn"
+						onclick={downloadSvg}
+						disabled={!hatchReady || status.busy}
+						title="download a plottable SVG — one layer group per pen"
+					>
 						↓ SVG
 					</button>
-					<button class="primary-btn" onclick={downloadPng} disabled={!hatchReady || status.busy}>
+					<button
+						class="primary-btn"
+						onclick={downloadPng}
+						disabled={!hatchReady || status.busy}
+						title="download the current render as a PNG"
+					>
 						↓ PNG
 					</button>
 				</div>
-				<div class="blip">
+				<div class="blip" title="grid size · regions found · hatch lines drawn · compute time">
 					{#if status.busy}
 						<span class="busy-dot"></span> computing…
 					{:else if cellGrid}
@@ -972,16 +1157,13 @@
 	}
 
 	/* Full-viewport app shell in the d17e.dev brand — deliberately covers the
-	   site chrome of the root layout without touching any other page. */
+	   site chrome of the root layout without touching any other page. The UI
+	   itself stays neutral (inks and greys) so the art can shine; the brand
+	   CMY lives in the artwork and the default pens. */
 	.app {
 		/* d17e.dev palette */
-		--accent-cyan: #23d0ff;
-		--accent-cyan-color: #00bfe8;
-		--accent-magenta: #ff3db4;
-		--accent-magenta-color: #ff2aa6;
-		--accent-yellow: #ffcc33;
-		--accent-yellow-color: #ffb000;
 		--ink: #1a202c;
+		--ink-soft: #2d3748;
 		--bg: #fdfaff;
 		--border: #e1e4e8;
 		--muted: #60739f;
@@ -1019,7 +1201,13 @@
 	}
 
 	.app :focus-visible {
-		outline: var(--accent-magenta-color) dashed 1px;
+		outline: var(--muted) dashed 1px;
+	}
+
+	/* neutral thumbs for all single-value sliders and checkboxes */
+	.app input[type='range'],
+	.app input[type='checkbox'] {
+		accent-color: var(--ink);
 	}
 
 	/* ------------------------------------------------- top bar */
@@ -1045,7 +1233,7 @@
 	}
 
 	.logo-link:hover .logo {
-		color: var(--accent-magenta-color);
+		opacity: 0.7;
 	}
 
 	.wordmark {
@@ -1072,8 +1260,7 @@
 	}
 
 	.top-link:hover {
-		color: var(--accent-magenta-color);
-		border-color: var(--accent-magenta-color) !important;
+		border-color: var(--ink) !important;
 	}
 
 	/* ------------------------------------------------- workspace */
@@ -1129,7 +1316,7 @@
 	}
 
 	.credit:hover {
-		color: var(--accent-magenta-color);
+		color: var(--ink);
 	}
 
 	/* ------------------------------------------------- stage */
@@ -1146,7 +1333,7 @@
 	}
 
 	.stage.drag-active {
-		outline: 2px dashed var(--accent-magenta-color);
+		outline: 2px dashed var(--muted);
 		outline-offset: -6px;
 	}
 
@@ -1194,8 +1381,8 @@
 
 	.image-picker {
 		display: flex;
-		gap: 0.4rem;
-		align-items: flex-end;
+		gap: 0.5rem;
+		align-items: stretch;
 	}
 
 	.thumb {
@@ -1205,23 +1392,14 @@
 		background: #fff;
 		cursor: pointer;
 		overflow: hidden;
-		width: 44px;
-		height: 44px;
+		width: 64px;
+		height: 64px;
+		flex-shrink: 0;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		font-size: 1.2rem !important;
 		color: var(--muted);
-	}
-
-	.thumb.current {
-		width: 64px;
-		height: 64px;
-	}
-
-	.thumb.active {
-		border-color: var(--accent-magenta-color);
-		box-shadow: 0 0 0 1px var(--accent-magenta-color);
 	}
 
 	.thumb img {
@@ -1231,12 +1409,31 @@
 		border-radius: 0;
 	}
 
-	.hint {
+	.browse-btn {
+		flex: 1;
+		min-width: 0;
+		border: 1px dashed var(--border);
+		border-radius: 8px;
+		background: #fff;
+		cursor: pointer;
+		color: var(--ink);
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 0.2rem;
+		padding: 0.4rem;
+	}
+
+	.browse-btn:hover {
+		border-color: var(--muted);
+	}
+
+	.browse-sub {
 		font-family: 'argesta_regular', serif;
+		font-size: 0.66rem;
 		color: var(--muted);
-		font-size: 0.7rem;
-		margin: 0;
-		line-height: 1.4;
+		font-weight: normal;
 	}
 
 	/* ------------------------------------------------- controls */
@@ -1256,7 +1453,6 @@
 	.slider-row input[type='range'] {
 		width: 100%;
 		min-width: 0;
-		accent-color: var(--accent-magenta-color);
 	}
 
 	.slider-row input[type='number'] {
@@ -1294,6 +1490,57 @@
 		color: var(--ink);
 		font-family: inherit;
 		font-size: 0.72rem;
+	}
+
+	/* ------------------------------------------------- spacing dual range */
+
+	.spacing-control {
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+		color: var(--muted);
+	}
+
+	.spacing-head {
+		display: grid;
+		grid-template-columns: 1fr 3.2rem auto 3.2rem;
+		align-items: center;
+		gap: 0.25rem;
+	}
+
+	.spacing-head > span:first-child {
+		font-size: 0.68rem;
+	}
+
+	.spacing-dash {
+		text-align: center;
+	}
+
+	.spacing-head input[type='number'] {
+		width: 100%;
+		box-sizing: border-box;
+		padding: 0.1rem 0.2rem;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		background: #fff;
+		color: var(--ink);
+		font-family: 'nudica_monolight', monospace;
+		font-size: 0.68rem;
+	}
+
+	/* neutral theme for @stanko/dual-range-input */
+	.app :global(.dual-range-input) {
+		--dri-height: 1.3rem;
+		--dri-thumb-width: 0.85rem;
+		--dri-thumb-height: 0.85rem;
+		--dri-thumb-color: var(--ink);
+		--dri-thumb-hover-color: var(--ink-soft);
+		--dri-thumb-active-color: var(--ink-soft);
+		--dri-thumb-border-color: transparent;
+		--dri-thumb-border-radius: 999px;
+		--dri-track-height: 0.2rem;
+		--dri-track-color: #ccc;
+		--dri-track-filled-color: var(--ink);
 	}
 
 	/* ------------------------------------------------- layer cards */
@@ -1355,7 +1602,7 @@
 	}
 
 	.override-count {
-		background: var(--accent-yellow);
+		background: var(--muted-light);
 		color: var(--ink);
 		border-radius: 999px;
 		padding: 0 0.4rem;
@@ -1378,8 +1625,8 @@
 
 	/* an active override stands out from inherited fields */
 	details.layer-settings input.overridden {
-		border-color: var(--accent-magenta-color);
-		background: #fff5fb;
+		border-color: var(--ink);
+		background: var(--muted-light);
 	}
 
 	.clear-overrides {
@@ -1445,8 +1692,7 @@
 	}
 
 	.icon-btn.remove:hover:not(:disabled) {
-		background: #ffe3f2 !important;
-		border-color: var(--accent-magenta-color);
+		border-color: var(--muted);
 	}
 
 	.layers-actions {
@@ -1482,8 +1728,8 @@
 	}
 
 	.primary-btn:hover:not(:disabled) {
-		background: var(--accent-magenta-color) !important;
-		border-color: var(--accent-magenta-color);
+		background: var(--ink-soft) !important;
+		border-color: var(--ink-soft);
 		color: #fff;
 	}
 
@@ -1511,7 +1757,7 @@
 		height: 0.5rem;
 		flex-shrink: 0;
 		border-radius: 50%;
-		background: var(--accent-cyan-color);
+		background: var(--muted);
 		animation: pulse 1s ease-in-out infinite;
 	}
 
