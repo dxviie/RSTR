@@ -3,7 +3,6 @@
 // per-layer overrides fall back to these globals.
 
 export type SegmentationAlgorithm = 'watershed' | 'posterize' | 'kmeans';
-export type SpacingCurveName = 'coverage' | 'gamma' | 'log' | 'linear';
 
 export interface Rstr2Params {
 	// adjust (pre-segmentation color pipeline)
@@ -23,7 +22,6 @@ export interface Rstr2Params {
 	spacingMinMm: number;
 	spacingMaxMm: number;
 	hatchThreshold: number;
-	spacingCurve: SpacingCurveName;
 	hatchGamma: number;
 	inkBoost: number;
 	// export
@@ -45,7 +43,6 @@ export const defaultParams = (): Rstr2Params => ({
 	spacingMinMm: 0.5,
 	spacingMaxMm: 4,
 	hatchThreshold: 0.1,
-	spacingCurve: 'coverage',
 	hatchGamma: 1.8,
 	inkBoost: 1,
 	outputWidthMm: 200
