@@ -30,9 +30,11 @@
 	//***************************************************************
 
 	const LAYER_STORAGE_KEY = 'rstr:v2:layers';
+	const SAMPLE_IMAGES = ['/bbrasa-imp.png', '/knest-imp.png'];
+	/** cap on the adjust-preview resolution — display only, keeps sliders fluid */
+	const PREVIEW_MAX_PX = 1024;
 
 	interface RenderRegion {
-		d: string;
 		loops: Float64Array[];
 		/** mean channel intensity, 0..1 */
 		ink: number;
@@ -45,6 +47,14 @@
 	interface LayerResult {
 		layerId: string;
 		regions: RenderRegion[];
+	}
+
+	interface PreviewBase {
+		w: number;
+		h: number;
+		r: Float32Array;
+		g: Float32Array;
+		b: Float32Array;
 	}
 
 	const loadParams = (): Rstr2Params => {
@@ -69,12 +79,25 @@
 	let cellGrid: CellGrid | null = $state(null);
 	let adjustedGrid: CellGrid | null = $state(null);
 	let layerResults: LayerResult[] = $state([]);
+	let previewBase: PreviewBase | null = $state(null);
 
 	let hatchCanvas: HTMLCanvasElement | undefined = $state();
-	let hatchDataURL = $state('');
+	let adjustCanvas: HTMLCanvasElement | undefined = $state();
+	let hatchReady = $state(false);
 
 	let fileInput: HTMLInputElement | undefined = $state();
 	let dragActive = $state(false);
+
+	// While the user works the adjust sliders we show the (adjusted) input
+	// image instead of the hatch render, so the effect of the sliders on the
+	// source is visible; shortly after the last interaction we flip back.
+	let adjustActive = $state(false);
+	let adjustTimer: ReturnType<typeof setTimeout> | undefined;
+	const noteAdjust = () => {
+		adjustActive = true;
+		clearTimeout(adjustTimer);
+		adjustTimer = setTimeout(() => (adjustActive = false), 900);
+	};
 
 	const status = $state({ busy: false, segMs: 0, hatchMs: 0, regions: 0, lines: 0 });
 
@@ -93,6 +116,13 @@
 	//***************************************************************
 	// 														IMAGE INPUT
 	//***************************************************************
+
+	// start with a random sample so there is something to play with right away
+	$effect(() => {
+		if (!inputImage) {
+			inputImage = SAMPLE_IMAGES[Math.floor(Math.random() * SAMPLE_IMAGES.length)];
+		}
+	});
 
 	const openFile = (files: FileList | null | undefined) => {
 		const file = files?.[0];
@@ -114,10 +144,11 @@
 	// 														PIPELINE
 	//***************************************************************
 
-	// 1. image -> pixels
+	// 1. image -> pixels (+ downscaled float copy for the adjust preview)
 	$effect(() => {
 		const src = inputImage;
 		if (!src || typeof window === 'undefined') return;
+		hatchReady = false;
 		const img = new Image();
 		img.onload = () => {
 			const canvas = document.createElement('canvas');
@@ -129,8 +160,60 @@
 			imgWidth = img.width;
 			imgHeight = img.height;
 			pixels = ctx.getImageData(0, 0, img.width, img.height).data;
+			previewBase = buildPreviewBase(img);
 		};
 		img.src = src;
+	});
+
+	const buildPreviewBase = (img: HTMLImageElement): PreviewBase | null => {
+		const scale = Math.min(1, PREVIEW_MAX_PX / Math.max(img.width, img.height));
+		const w = Math.max(1, Math.round(img.width * scale));
+		const h = Math.max(1, Math.round(img.height * scale));
+		const canvas = document.createElement('canvas');
+		canvas.width = w;
+		canvas.height = h;
+		const ctx = canvas.getContext('2d');
+		if (!ctx) return null;
+		ctx.drawImage(img, 0, 0, w, h);
+		const data = ctx.getImageData(0, 0, w, h).data;
+		const n = w * h;
+		const r = new Float32Array(n);
+		const g = new Float32Array(n);
+		const b = new Float32Array(n);
+		for (let i = 0, p = 0; i < n; i++, p += 4) {
+			r[i] = data[p] / 255;
+			g[i] = data[p + 1] / 255;
+			b[i] = data[p + 2] / 255;
+		}
+		return { w, h, r, g, b };
+	};
+
+	// 1b. adjust preview: draw the adjusted source while sliders are active
+	$effect(() => {
+		const adjustments = {
+			brightness: params.brightness,
+			contrast: params.contrast,
+			gamma: params.imageGamma,
+			saturation: params.saturation,
+			vibrance: params.vibrance
+		};
+		const base = previewBase;
+		const canvas = adjustCanvas;
+		if (!adjustActive || !base || !canvas) return;
+		const { r, g, b } = isNeutralAdjustment(adjustments)
+			? base
+			: adjustColors(base.r, base.g, base.b, adjustments);
+		const ctx = canvas.getContext('2d');
+		if (!ctx) return;
+		const imageData = ctx.createImageData(base.w, base.h);
+		const data = imageData.data;
+		for (let i = 0, p = 0; i < base.w * base.h; i++, p += 4) {
+			data[p] = r[i] * 255;
+			data[p + 1] = g[i] * 255;
+			data[p + 2] = b[i] * 255;
+			data[p + 3] = 255;
+		}
+		ctx.putImageData(imageData, 0, 0);
 	});
 
 	// 2. pixels + resolution -> cell grid (single pass over the pixel buffer)
@@ -238,7 +321,6 @@
 			results.push({
 				layerId: layer.id,
 				regions: geometries.map((geometry) => ({
-					d: geometry.d,
 					loops: geometry.loops,
 					ink: seg.regionMean[geometry.id],
 					boundsW: geometry.maxX - geometry.minX,
@@ -257,11 +339,10 @@
 		status.busy = false;
 	};
 
-	// 4. segmentation + mapping config -> hatch lines (canvas preview)
+	// 4. segmentation + mapping config -> hatch lines on the visible canvas
 	let hatchGeneration = 0;
 	$effect(() => {
 		void hatchLayersKey;
-		void params.showHatching;
 		void params.outputWidthMm;
 		void params.penWidthMm;
 		void params.spacingMinMm;
@@ -271,10 +352,7 @@
 		void params.hatchGamma;
 		void params.inkBoost;
 		const results = layerResults;
-		if (!params.showHatching || results.length === 0 || !imgWidth || !hatchCanvas) {
-			hatchDataURL = '';
-			return;
-		}
+		if (results.length === 0 || !imgWidth || !hatchCanvas) return;
 		recomputeHatching(results);
 	});
 
@@ -293,12 +371,14 @@
 		if (!canvas || !ctx) return;
 		const t0 = performance.now();
 
+		ctx.globalCompositeOperation = 'source-over';
+		ctx.globalAlpha = 1;
 		ctx.clearRect(0, 0, canvas.width, canvas.height);
 		ctx.fillStyle = '#FFFEF7'; // warm paper white
 		ctx.fillRect(0, 0, canvas.width, canvas.height);
 		ctx.lineCap = 'round';
 		ctx.globalCompositeOperation = 'multiply';
-		ctx.globalAlpha = 0.85;
+		ctx.globalAlpha = 0.85; // translucent-ink simulation
 
 		const pxPerMm = imgWidth / params.outputWidthMm;
 		const curve = params.spacingCurve as SpacingCurve;
@@ -348,7 +428,7 @@
 			if (generation !== hatchGeneration) return;
 		}
 
-		hatchDataURL = canvas.toDataURL('image/png');
+		hatchReady = true;
 		status.hatchMs = performance.now() - t0;
 		status.lines = totalLines;
 	};
@@ -376,9 +456,6 @@
 	const resetLayers = () => {
 		layers = defaultCmyLayers();
 	};
-
-	const layerById = (id: string): LayerConfig | undefined =>
-		layers.find((layer) => layer.id === id);
 
 	const OVERRIDE_FIELDS = [
 		'penWidthMm',
@@ -478,110 +555,388 @@
 </script>
 
 <svelte:head>
-	<title>RSTR v2 — raster to plottable SVG</title>
+	<title>RSTR — raster images to plottable SVG</title>
 </svelte:head>
 
-<div class="tool">
+<div class="app">
 	<!-------------------------------------------------------------
-		CANVAS AREA
+		TOP BAR
 	-------------------------------------------------------------->
-	<div
-		class="canvas-area"
-		class:drag-active={dragActive}
-		role="button"
-		tabindex="0"
-		ondragover={(event) => {
-			event.preventDefault();
-			dragActive = true;
-		}}
-		ondragleave={() => (dragActive = false)}
-		ondrop={onDrop}
-		onclick={() => {
-			if (!inputImage) fileInput?.click();
-		}}
-		onkeydown={(event) => {
-			if (!inputImage && (event.key === 'Enter' || event.key === ' ')) fileInput?.click();
-		}}
-	>
-		{#if inputImage}
+	<header class="topbar">
+		<a class="logo-link" href="https://d17e.dev" title="d17e.dev">
 			<svg
+				class="logo"
+				role="img"
+				aria-label="D17E logo"
+				viewBox="0 0 1046 447"
+				xmlns="http://www.w3.org/2000/svg"
+			>
+				<g transform="matrix(1.2778,0,0,0.628916,-169.768,-154.959)">
+					<path
+						d="M930.998,957.001L930.998,957.183L132.86,957.183L132.86,246.391L930.998,246.391L930.998,246.802L951.958,246.802L951.958,957.001L930.998,957.001ZM399.748,807.315L517.675,807.315L517.675,734.622L477.603,734.622L477.603,400.234L441.538,400.234L441.538,417.68C441.538,444.431 436.099,452.573 422.647,452.573L401.18,452.573L401.18,522.358L441.252,522.358L441.252,734.622L399.748,734.622L399.748,807.315ZM586.656,807.315L627.3,807.315L706.3,475.253L706.3,400.234L566.047,400.234L566.047,472.345L665.655,472.345L586.656,801.499L586.656,807.315ZM208.261,807.315L268.083,807.315C326.76,807.315 354.238,728.806 354.238,627.036L354.238,580.513C354.238,478.742 326.76,400.234 268.083,400.234L208.261,400.234L208.261,807.315ZM245.471,734.622L245.471,472.927L268.083,472.927C306.438,472.927 317.028,516.543 317.028,580.513L317.028,627.036C317.028,691.006 306.438,734.622 268.083,734.622L245.471,734.622ZM750.665,807.315L876.606,807.315L876.606,735.785L787.875,735.785L787.875,632.852L867.733,632.852L867.733,561.903L787.875,561.903L787.875,471.764L876.606,471.764L876.606,400.234L750.665,400.234L750.665,807.315Z"
+						fill="currentColor"
+					/>
+				</g>
+			</svg>
+		</a>
+		<span class="wordmark">RSTR</span>
+		<span class="tagline">raster images to plottable svg</span>
+		<div class="spacer"></div>
+		<a class="top-link" href="/about" title="about">?</a>
+	</header>
+
+	<div class="workspace">
+		<!-------------------------------------------------------------
+			LEFT PANE — image + adjust, segmentation, lines
+		-------------------------------------------------------------->
+		<aside class="pane left">
+			<section class="panel-group">
+				<div class="group-title">image</div>
+				<div class="image-picker">
+					<button
+						class="thumb current"
+						onclick={() => fileInput?.click()}
+						title="Browse for an image"
+					>
+						{#if inputImage}
+							<img src={inputImage} alt="current input" />
+						{:else}
+							+
+						{/if}
+					</button>
+					{#each SAMPLE_IMAGES as sample (sample)}
+						<button
+							class="thumb"
+							class:active={inputImage === sample}
+							onclick={() => (inputImage = sample)}
+							title="Use sample image"
+						>
+							<img src={sample} alt="sample input" />
+						</button>
+					{/each}
+				</div>
+				<p class="hint">click the preview to browse, or drop an image on the canvas</p>
+				{#each ADJUST_SLIDERS as slider (slider.id)}
+					<label class="slider-row">
+						<span>{slider.label}</span>
+						<input
+							type="range"
+							min={slider.min}
+							max={slider.max}
+							step={slider.step}
+							bind:value={params[slider.id]}
+							onpointerdown={noteAdjust}
+							oninput={noteAdjust}
+						/>
+						<input
+							type="number"
+							min={slider.min}
+							max={slider.max}
+							step={slider.step}
+							bind:value={params[slider.id]}
+							oninput={noteAdjust}
+						/>
+					</label>
+				{/each}
+			</section>
+
+			<section class="panel-group">
+				<div class="group-title">segmentation</div>
+				<label class="select-row">
+					<span>algorithm</span>
+					<select bind:value={params.algorithm}>
+						<option value="watershed">Watershed</option>
+						<option value="posterize">Posterize</option>
+						<option value="kmeans">K-means</option>
+					</select>
+				</label>
+				{#each SEGMENTATION_SLIDERS as slider (slider.id)}
+					<label class="slider-row">
+						<span>{slider.label}</span>
+						<input
+							type="range"
+							min={slider.min}
+							max={slider.max}
+							step={slider.step}
+							bind:value={params[slider.id]}
+						/>
+						<input
+							type="number"
+							min={slider.min}
+							max={slider.max}
+							step={slider.step}
+							bind:value={params[slider.id]}
+						/>
+					</label>
+				{/each}
+			</section>
+
+			<section class="panel-group">
+				<div class="group-title">lines</div>
+				{#each LINE_SLIDERS as slider (slider.id)}
+					<label class="slider-row">
+						<span>{slider.label}</span>
+						<input
+							type="range"
+							min={slider.min}
+							max={slider.max}
+							step={slider.step}
+							bind:value={params[slider.id]}
+						/>
+						<input
+							type="number"
+							min={slider.min}
+							max={slider.max}
+							step={slider.step}
+							bind:value={params[slider.id]}
+						/>
+					</label>
+				{/each}
+				<label class="select-row">
+					<span>spacing curve</span>
+					<select bind:value={params.spacingCurve}>
+						<option value="coverage">Coverage (true tone)</option>
+						<option value="gamma">Gamma</option>
+						<option value="log">Log</option>
+						<option value="linear">Linear</option>
+					</select>
+				</label>
+			</section>
+		</aside>
+
+		<!-------------------------------------------------------------
+			STAGE — the render is the centerpiece
+		-------------------------------------------------------------->
+		<main
+			class="stage"
+			class:drag-active={dragActive}
+			ondragover={(event) => {
+				event.preventDefault();
+				dragActive = true;
+			}}
+			ondragleave={() => (dragActive = false)}
+			ondrop={onDrop}
+		>
+			<canvas
+				bind:this={hatchCanvas}
+				class="render"
+				class:hidden={!hatchReady || adjustActive}
 				width={imgWidth}
 				height={imgHeight}
-				viewBox={`0 0 ${imgWidth} ${imgHeight}`}
-				class="preview-svg"
-			>
-				<!--	INPUT IMAGE AS BG -->
-				<image
-					href={inputImage}
-					x="0"
-					y="0"
-					width={imgWidth}
-					height={imgHeight}
-					opacity={params.imageOpacity}
-				/>
-
-				<!--	REGION SHAPES -->
-				{#if params.showShapes}
-					{#each layerResults as result (result.layerId)}
-						{@const layer = layerById(result.layerId)}
-						{#if layer?.enabled}
-							<g id="shapes-{layer.id}" style="mix-blend-mode: multiply;">
-								{#each result.regions as region}
-									<path
-										d={region.d}
-										fill={layer.color}
-										fill-opacity={region.ink * params.shapeOpacity}
-										stroke={params.debug ? '#FF00FF' : 'none'}
-										stroke-width={params.debug ? 1 : 0}
-									/>
-								{/each}
-							</g>
-						{/if}
-					{/each}
+			></canvas>
+			<canvas
+				bind:this={adjustCanvas}
+				class="render"
+				class:hidden={!adjustActive || !previewBase}
+				width={previewBase?.w ?? 0}
+				height={previewBase?.h ?? 0}
+			></canvas>
+			{#if !adjustActive && !hatchReady}
+				{#if inputImage}
+					<img class="render placeholder" src={inputImage} alt="input" />
+				{:else}
+					<div class="dropzone-hint">
+						<p class="hint-title">drop an image here</p>
+						<p class="hint-sub">everything stays in your browser</p>
+					</div>
 				{/if}
-
-				<!--	HATCHING PREVIEW (canvas render embedded as image) -->
-				{#if params.showHatching && hatchDataURL}
-					<image
-						href={hatchDataURL}
-						x="0"
-						y="0"
-						width={imgWidth}
-						height={imgHeight}
-						style={`pointer-events: none; ${params.showShapes ? 'mix-blend-mode: multiply;' : ''}`}
-						opacity={params.hatchingOpacity}
-					/>
-				{/if}
-			</svg>
-		{:else}
-			<div class="dropzone-hint">
-				<p class="hint-title">drop an image here</p>
-				<p class="hint-sub">or click to browse — everything stays in your browser</p>
-			</div>
-		{/if}
-
-		<!--	STATUS BAR -->
-		<div class="status-bar">
-			{#if status.busy}
-				<span class="busy-dot"></span> computing…
-			{:else if cellGrid}
-				{cellGrid.cols}×{cellGrid.rows} cells · {status.regions} regions · {status.lines} lines
-				{#if params.debug}
-					· seg {status.segMs.toFixed(0)}ms · hatch {status.hatchMs.toFixed(0)}ms
-				{/if}
-			{:else}
-				select an image to start
 			{/if}
-		</div>
+		</main>
+
+		<!-------------------------------------------------------------
+			RIGHT PANE — layers + export
+		-------------------------------------------------------------->
+		<aside class="pane right">
+			<section class="panel-group">
+				<div class="group-title">layers · one per pen</div>
+				{#each layers as layer, index (layer.id)}
+					<div class="layer-card" class:disabled={!layer.enabled}>
+						<div class="layer-row">
+							<input type="checkbox" bind:checked={layer.enabled} title="Enable layer" />
+							<input
+								class="layer-color"
+								type="color"
+								bind:value={layer.color}
+								title="Layer color"
+							/>
+							<input class="layer-name" type="text" bind:value={layer.name} />
+							<button
+								class="icon-btn"
+								onclick={() => moveLayer(layer.id, -1)}
+								disabled={index === 0}
+								title="Move up">▲</button
+							>
+							<button
+								class="icon-btn"
+								onclick={() => moveLayer(layer.id, 1)}
+								disabled={index === layers.length - 1}
+								title="Move down">▼</button
+							>
+							<button
+								class="icon-btn remove"
+								onclick={() => removeLayer(layer.id)}
+								disabled={layers.length <= 1}
+								title="Remove layer">✕</button
+							>
+						</div>
+						<details class="layer-settings">
+							<summary>
+								settings
+								{#if overrideCount(layer) > 0}
+									<span class="override-count"
+										>{overrideCount(layer)} override{overrideCount(layer) > 1 ? 's' : ''}</span
+									>
+								{/if}
+							</summary>
+							<div class="layer-row">
+								<label>
+									channel
+									<select bind:value={layer.channel}>
+										{#each Object.entries(CHANNEL_LABELS) as [value, label]}
+											<option {value}>{label}</option>
+										{/each}
+									</select>
+								</label>
+							</div>
+							<div class="layer-row">
+								<label>
+									angle min°
+									<input type="number" bind:value={layer.angleMin} min="-360" max="360" step="5" />
+								</label>
+								<label>
+									angle max°
+									<input type="number" bind:value={layer.angleMax} min="-360" max="360" step="5" />
+								</label>
+							</div>
+							<div class="override-hint">
+								below: empty = inherits the global lines value (<em>grey italic</em>)
+							</div>
+							<div class="layer-row">
+								<label>
+									pen (mm)
+									<input
+										type="number"
+										class:overridden={layer.penWidthMm !== null}
+										bind:value={layer.penWidthMm}
+										placeholder={String(params.penWidthMm)}
+										min="0.05"
+										max="5"
+										step="0.05"
+									/>
+								</label>
+								<label>
+									threshold
+									<input
+										type="number"
+										class:overridden={layer.threshold !== null}
+										bind:value={layer.threshold}
+										placeholder={String(params.hatchThreshold)}
+										min="0"
+										max="1"
+										step="0.05"
+									/>
+								</label>
+							</div>
+							<div class="layer-row">
+								<label>
+									spacing min
+									<input
+										type="number"
+										class:overridden={layer.spacingMinMm !== null}
+										bind:value={layer.spacingMinMm}
+										placeholder={String(params.spacingMinMm)}
+										min="0.05"
+										max="20"
+										step="0.05"
+									/>
+								</label>
+								<label>
+									spacing max
+									<input
+										type="number"
+										class:overridden={layer.spacingMaxMm !== null}
+										bind:value={layer.spacingMaxMm}
+										placeholder={String(params.spacingMaxMm)}
+										min="0.05"
+										max="20"
+										step="0.05"
+									/>
+								</label>
+							</div>
+							<div class="layer-row">
+								<label>
+									ink gamma
+									<input
+										type="number"
+										class:overridden={layer.inkGamma !== null}
+										bind:value={layer.inkGamma}
+										placeholder={String(params.hatchGamma)}
+										min="0.5"
+										max="4"
+										step="0.05"
+									/>
+								</label>
+								<label>
+									ink boost
+									<input
+										type="number"
+										class:overridden={layer.inkBoost !== null}
+										bind:value={layer.inkBoost}
+										placeholder={String(params.inkBoost)}
+										min="0.25"
+										max="4"
+										step="0.05"
+									/>
+								</label>
+							</div>
+							{#if overrideCount(layer) > 0}
+								<button class="clear-overrides" onclick={() => clearOverrides(layer)}>
+									↺ clear overrides
+								</button>
+							{/if}
+						</details>
+					</div>
+				{/each}
+				<div class="layers-actions">
+					<button onclick={addLayer}>+ add layer</button>
+					<button onclick={resetLayers}>reset to CMY</button>
+				</div>
+			</section>
+
+			<section class="panel-group">
+				<div class="group-title">export</div>
+				<label class="slider-row">
+					<span>width (mm)</span>
+					<input type="range" min="10" max="1000" step="1" bind:value={params.outputWidthMm} />
+					<input type="number" min="10" max="1000" step="1" bind:value={params.outputWidthMm} />
+				</label>
+				<div class="export-actions">
+					<button class="primary-btn" onclick={downloadSvg} disabled={!hatchReady || status.busy}>
+						↓ SVG
+					</button>
+					<button class="primary-btn" onclick={downloadPng} disabled={!hatchReady || status.busy}>
+						↓ PNG
+					</button>
+				</div>
+				<div class="blip">
+					{#if status.busy}
+						<span class="busy-dot"></span> computing…
+					{:else if cellGrid}
+						{cellGrid.cols}×{cellGrid.rows} cells · {status.regions} regions · {status.lines} lines ·
+						{(status.segMs + status.hatchMs).toFixed(0)}ms
+					{:else}
+						waiting for an image
+					{/if}
+				</div>
+			</section>
+
+			<div class="spacer"></div>
+			<a class="credit" href="https://d17e.dev" target="_blank" rel="noopener">
+				made with 🧡 by d17e.dev
+			</a>
+		</aside>
 	</div>
 
-	<!-- Hidden canvas for the hatching preview -->
-	<canvas
-		bind:this={hatchCanvas}
-		width={imgWidth}
-		height={imgHeight}
-		style="position: absolute; pointer-events: none; visibility: hidden;"
-	></canvas>
 	<input
 		bind:this={fileInput}
 		type="file"
@@ -589,525 +944,363 @@
 		style="display: none;"
 		onchange={(event) => openFile(event.currentTarget.files)}
 	/>
-
-	<!-------------------------------------------------------------
-		CONTROL PANEL
-	-------------------------------------------------------------->
-	<aside class="panel">
-		<section class="panel-group">
-			<div class="group-title">image</div>
-			<button class="wide-btn" onclick={() => fileInput?.click()}>
-				{inputImage ? 'replace image' : 'choose image'}
-			</button>
-			<label class="slider-row">
-				<span>image opacity</span>
-				<input type="range" min="0" max="1" step="0.05" bind:value={params.imageOpacity} />
-				<input type="number" min="0" max="1" step="0.05" bind:value={params.imageOpacity} />
-			</label>
-		</section>
-
-		<!--	LAYER STACK -->
-		<section class="panel-group">
-			<div class="group-title">layers · one per pen</div>
-			{#each layers as layer, index (layer.id)}
-				<div class="layer-card" class:disabled={!layer.enabled}>
-					<div class="layer-row">
-						<input type="checkbox" bind:checked={layer.enabled} title="Enable layer" />
-						<input class="layer-color" type="color" bind:value={layer.color} title="Layer color" />
-						<input class="layer-name" type="text" bind:value={layer.name} />
-						<button
-							class="icon-btn"
-							onclick={() => moveLayer(layer.id, -1)}
-							disabled={index === 0}
-							title="Move up">▲</button
-						>
-						<button
-							class="icon-btn"
-							onclick={() => moveLayer(layer.id, 1)}
-							disabled={index === layers.length - 1}
-							title="Move down">▼</button
-						>
-						<button
-							class="icon-btn remove"
-							onclick={() => removeLayer(layer.id)}
-							disabled={layers.length <= 1}
-							title="Remove layer">✕</button
-						>
-					</div>
-					<div class="layer-row">
-						<label>
-							channel
-							<select bind:value={layer.channel}>
-								{#each Object.entries(CHANNEL_LABELS) as [value, label]}
-									<option {value}>{label}</option>
-								{/each}
-							</select>
-						</label>
-					</div>
-					<div class="layer-row">
-						<label>
-							angle min°
-							<input type="number" bind:value={layer.angleMin} min="-360" max="360" step="5" />
-						</label>
-						<label>
-							angle max°
-							<input type="number" bind:value={layer.angleMax} min="-360" max="360" step="5" />
-						</label>
-					</div>
-					<details class="overrides">
-						<summary>
-							overrides
-							{#if overrideCount(layer) > 0}
-								<span class="override-count">{overrideCount(layer)} active</span>
-							{:else}
-								<span class="override-none">all inherited</span>
-							{/if}
-						</summary>
-						<div class="override-hint">
-							empty = inherits the global Lines value (shown in <em>grey italic</em>)
-						</div>
-						<div class="layer-row">
-							<label>
-								pen (mm)
-								<input
-									type="number"
-									class:overridden={layer.penWidthMm !== null}
-									bind:value={layer.penWidthMm}
-									placeholder={String(params.penWidthMm)}
-									min="0.05"
-									max="5"
-									step="0.05"
-								/>
-							</label>
-							<label>
-								threshold
-								<input
-									type="number"
-									class:overridden={layer.threshold !== null}
-									bind:value={layer.threshold}
-									placeholder={String(params.hatchThreshold)}
-									min="0"
-									max="1"
-									step="0.05"
-								/>
-							</label>
-						</div>
-						<div class="layer-row">
-							<label>
-								spacing min
-								<input
-									type="number"
-									class:overridden={layer.spacingMinMm !== null}
-									bind:value={layer.spacingMinMm}
-									placeholder={String(params.spacingMinMm)}
-									min="0.05"
-									max="20"
-									step="0.05"
-								/>
-							</label>
-							<label>
-								spacing max
-								<input
-									type="number"
-									class:overridden={layer.spacingMaxMm !== null}
-									bind:value={layer.spacingMaxMm}
-									placeholder={String(params.spacingMaxMm)}
-									min="0.05"
-									max="20"
-									step="0.05"
-								/>
-							</label>
-						</div>
-						<div class="layer-row">
-							<label>
-								ink gamma
-								<input
-									type="number"
-									class:overridden={layer.inkGamma !== null}
-									bind:value={layer.inkGamma}
-									placeholder={String(params.hatchGamma)}
-									min="0.5"
-									max="4"
-									step="0.05"
-								/>
-							</label>
-							<label>
-								ink boost
-								<input
-									type="number"
-									class:overridden={layer.inkBoost !== null}
-									bind:value={layer.inkBoost}
-									placeholder={String(params.inkBoost)}
-									min="0.25"
-									max="4"
-									step="0.05"
-								/>
-							</label>
-						</div>
-						{#if overrideCount(layer) > 0}
-							<button class="clear-overrides" onclick={() => clearOverrides(layer)}>
-								↺ clear overrides
-							</button>
-						{/if}
-					</details>
-				</div>
-			{/each}
-			<div class="layers-actions">
-				<button onclick={addLayer}>+ Add layer</button>
-				<button onclick={resetLayers}>Reset to CMY</button>
-			</div>
-		</section>
-
-		<details class="panel-group collapsible" open>
-			<summary class="group-title">lines</summary>
-			{#each LINE_SLIDERS as slider (slider.id)}
-				<label class="slider-row">
-					<span>{slider.label}</span>
-					<input
-						type="range"
-						min={slider.min}
-						max={slider.max}
-						step={slider.step}
-						bind:value={params[slider.id]}
-					/>
-					<input
-						type="number"
-						min={slider.min}
-						max={slider.max}
-						step={slider.step}
-						bind:value={params[slider.id]}
-					/>
-				</label>
-			{/each}
-			<label class="select-row">
-				<span>spacing curve</span>
-				<select bind:value={params.spacingCurve}>
-					<option value="coverage">Coverage (true tone)</option>
-					<option value="gamma">Gamma</option>
-					<option value="log">Log</option>
-					<option value="linear">Linear</option>
-				</select>
-			</label>
-		</details>
-
-		<details class="panel-group collapsible">
-			<summary class="group-title">segmentation</summary>
-			<label class="select-row">
-				<span>algorithm</span>
-				<select bind:value={params.algorithm}>
-					<option value="watershed">Watershed</option>
-					<option value="posterize">Posterize</option>
-					<option value="kmeans">K-means</option>
-				</select>
-			</label>
-			{#each SEGMENTATION_SLIDERS as slider (slider.id)}
-				<label class="slider-row">
-					<span>{slider.label}</span>
-					<input
-						type="range"
-						min={slider.min}
-						max={slider.max}
-						step={slider.step}
-						bind:value={params[slider.id]}
-					/>
-					<input
-						type="number"
-						min={slider.min}
-						max={slider.max}
-						step={slider.step}
-						bind:value={params[slider.id]}
-					/>
-				</label>
-			{/each}
-		</details>
-
-		<details class="panel-group collapsible">
-			<summary class="group-title">adjust</summary>
-			{#each ADJUST_SLIDERS as slider (slider.id)}
-				<label class="slider-row">
-					<span>{slider.label}</span>
-					<input
-						type="range"
-						min={slider.min}
-						max={slider.max}
-						step={slider.step}
-						bind:value={params[slider.id]}
-					/>
-					<input
-						type="number"
-						min={slider.min}
-						max={slider.max}
-						step={slider.step}
-						bind:value={params[slider.id]}
-					/>
-				</label>
-			{/each}
-		</details>
-
-		<details class="panel-group collapsible">
-			<summary class="group-title">display</summary>
-			<label class="check-row">
-				<input type="checkbox" bind:checked={params.showShapes} /> show shapes
-			</label>
-			<label class="slider-row">
-				<span>shape opacity</span>
-				<input type="range" min="0" max="1" step="0.05" bind:value={params.shapeOpacity} />
-				<input type="number" min="0" max="1" step="0.05" bind:value={params.shapeOpacity} />
-			</label>
-			<label class="check-row">
-				<input type="checkbox" bind:checked={params.showHatching} /> show hatching
-			</label>
-			<label class="slider-row">
-				<span>hatching opacity</span>
-				<input type="range" min="0" max="1" step="0.05" bind:value={params.hatchingOpacity} />
-				<input type="number" min="0" max="1" step="0.05" bind:value={params.hatchingOpacity} />
-			</label>
-			<label class="check-row">
-				<input type="checkbox" bind:checked={params.debug} /> debug
-			</label>
-		</details>
-
-		<section class="panel-group">
-			<div class="group-title">export</div>
-			<label class="slider-row">
-				<span>output width (mm)</span>
-				<input type="range" min="10" max="1000" step="1" bind:value={params.outputWidthMm} />
-				<input type="number" min="10" max="1000" step="1" bind:value={params.outputWidthMm} />
-			</label>
-			<div class="export-actions">
-				<button class="wide-btn" onclick={downloadSvg} disabled={!imgWidth || status.busy}>
-					↓ SVG
-				</button>
-				<button class="wide-btn" onclick={downloadPng} disabled={!hatchDataURL || status.busy}>
-					↓ PNG
-				</button>
-			</div>
-		</section>
-	</aside>
 </div>
 
 <style>
-	.tool {
-		display: flex;
-		flex-direction: row;
-		gap: 1rem;
-		width: 100%;
-		align-items: flex-start;
-		padding: 0 1rem;
+	@font-face {
+		font-family: 'nudica_monobold';
+		src: url('/fonts/nudicamono-bold-webfont.woff') format('woff');
+		font-weight: normal;
+		font-style: normal;
+		font-display: swap;
 	}
 
-	/* ------------------------------------------------- canvas area */
+	@font-face {
+		font-family: 'nudica_monolight';
+		src: url('/fonts/nudicamono-light-webfont.woff') format('woff');
+		font-weight: normal;
+		font-style: normal;
+		font-display: swap;
+	}
 
-	.canvas-area {
+	@font-face {
+		font-family: 'argesta_regular';
+		src: url('/fonts/argestatext-regular-webfont.woff') format('woff');
+		font-weight: normal;
+		font-style: normal;
+		font-display: swap;
+	}
+
+	/* Full-viewport app shell in the d17e.dev brand — deliberately covers the
+	   site chrome of the root layout without touching any other page. */
+	.app {
+		/* d17e.dev palette */
+		--accent-cyan: #23d0ff;
+		--accent-cyan-color: #00bfe8;
+		--accent-magenta: #ff3db4;
+		--accent-magenta-color: #ff2aa6;
+		--accent-yellow: #ffcc33;
+		--accent-yellow-color: #ffb000;
+		--ink: #1a202c;
+		--bg: #fdfaff;
+		--border: #e1e4e8;
+		--muted: #60739f;
+		--muted-light: #eef1f6;
+
+		position: fixed;
+		inset: 0;
+		z-index: 200;
+		display: flex;
+		flex-direction: column;
+		background: var(--bg);
+		color: var(--ink);
+		font-family: 'nudica_monolight', monospace;
+		font-size: 0.8rem;
+	}
+
+	/* neutralize the root layout's global link/button styling inside the app */
+	.app a {
+		border: none;
+		color: var(--ink);
+	}
+
+	.app button {
+		font-family: 'nudica_monobold', monospace !important;
+		font-size: 0.75rem !important;
+		transition: all 0.1s ease;
+	}
+
+	.app button:hover:not(:disabled) {
+		background-color: var(--muted-light) !important;
+	}
+
+	.app button:active:not(:disabled) {
+		transform: scale(0.95);
+	}
+
+	.app :focus-visible {
+		outline: var(--accent-magenta-color) dashed 1px;
+	}
+
+	/* ------------------------------------------------- top bar */
+
+	.topbar {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		padding: 0.4rem 1rem;
+		border-bottom: 1px solid var(--border);
+		flex-shrink: 0;
+	}
+
+	.logo-link {
+		display: flex;
+		align-items: center;
+	}
+
+	.logo {
+		height: 26px;
+		width: auto;
+		color: var(--ink);
+	}
+
+	.logo-link:hover .logo {
+		color: var(--accent-magenta-color);
+	}
+
+	.wordmark {
+		font-family: 'nudica_monobold', monospace;
+		font-size: 1.15rem;
+		letter-spacing: 0.08em;
+	}
+
+	.tagline {
+		font-family: 'argesta_regular', serif;
+		color: var(--muted);
+		font-size: 0.8rem;
+	}
+
+	.spacer {
+		flex: 1;
+	}
+
+	.top-link {
+		font-family: 'nudica_monobold', monospace;
+		padding: 0.1rem 0.55rem;
+		border: 1px solid var(--border) !important;
+		border-radius: 999px;
+	}
+
+	.top-link:hover {
+		color: var(--accent-magenta-color);
+		border-color: var(--accent-magenta-color) !important;
+	}
+
+	/* ------------------------------------------------- workspace */
+
+	.workspace {
+		flex: 1;
+		display: flex;
+		min-height: 0;
+	}
+
+	.pane {
+		width: 272px;
+		flex-shrink: 0;
+		overflow-y: auto;
+		padding: 0.75rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+
+	.pane.left {
+		border-right: 1px solid var(--border);
+	}
+
+	.pane.right {
+		border-left: 1px solid var(--border);
+	}
+
+	.panel-group {
+		display: flex;
+		flex-direction: column;
+		gap: 0.45rem;
+	}
+
+	.panel-group + .panel-group {
+		border-top: 1px solid var(--border);
+		padding-top: 0.75rem;
+	}
+
+	.group-title {
+		font-family: 'nudica_monobold', monospace;
+		font-size: 0.72rem;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+	}
+
+	.credit {
+		font-family: 'argesta_regular', serif;
+		font-size: 0.72rem;
+		color: var(--muted);
+		text-align: center;
+		padding-bottom: 0.25rem;
+	}
+
+	.credit:hover {
+		color: var(--accent-magenta-color);
+	}
+
+	/* ------------------------------------------------- stage */
+
+	.stage {
 		position: relative;
 		flex: 1;
 		min-width: 0;
-		min-height: 24rem;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		border: 1px dashed transparent;
-		border-radius: 0.5rem;
+		padding: 0.75rem;
+		overflow: hidden;
 	}
 
-	.canvas-area.drag-active {
-		border-color: darkorange;
-		background: rgba(255, 140, 0, 0.05);
+	.stage.drag-active {
+		outline: 2px dashed var(--accent-magenta-color);
+		outline-offset: -6px;
 	}
 
-	.preview-svg {
+	.render {
 		max-width: 100%;
-		max-height: 80vh;
+		max-height: 100%;
 		width: auto;
 		height: auto;
-		box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.1);
 		background: #fffef7;
+		box-shadow:
+			0 2px 6px rgba(96, 115, 159, 0.25),
+			0 8px 24px rgba(96, 115, 159, 0.2);
+	}
+
+	.render.hidden {
+		display: none;
+	}
+
+	.render.placeholder {
+		border-radius: 0;
+		opacity: 0.9;
 	}
 
 	.dropzone-hint {
 		text-align: center;
-		color: #6b7280;
-		cursor: pointer;
+		color: var(--muted);
 		padding: 4rem 2rem;
-		border: 2px dashed #e2e8f0;
-		border-radius: 0.75rem;
-	}
-
-	.dropzone-hint:hover {
-		border-color: darkorange;
+		border: 2px dashed var(--border);
+		border-radius: 8px;
 	}
 
 	.hint-title {
-		font-family: Bitter, serif;
-		font-size: 1.4rem;
-		font-weight: bold;
+		font-family: 'nudica_monobold', monospace;
+		font-size: 1.3rem;
+		margin: 0;
 	}
 
 	.hint-sub {
-		font-size: 0.8rem;
-		margin-top: 0.5rem;
+		font-family: 'argesta_regular', serif;
+		font-size: 0.85rem;
+		margin: 0.4rem 0 0;
 	}
 
-	.status-bar {
-		position: absolute;
-		bottom: 0.5rem;
-		left: 0.5rem;
-		padding: 0.25rem 0.6rem;
-		background: rgba(255, 255, 255, 0.85);
-		border: 1px solid #e2e8f0;
-		border-radius: 0.375rem;
-		font-size: 0.7rem;
-		color: #6b7280;
+	/* ------------------------------------------------- image picker */
+
+	.image-picker {
+		display: flex;
+		gap: 0.4rem;
+		align-items: flex-end;
+	}
+
+	.thumb {
+		padding: 0;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: #fff;
+		cursor: pointer;
+		overflow: hidden;
+		width: 44px;
+		height: 44px;
 		display: flex;
 		align-items: center;
-		gap: 0.4rem;
-		pointer-events: none;
+		justify-content: center;
+		font-size: 1.2rem !important;
+		color: var(--muted);
 	}
 
-	.busy-dot {
-		width: 0.5rem;
-		height: 0.5rem;
-		border-radius: 50%;
-		background: darkorange;
-		animation: pulse 1s ease-in-out infinite;
+	.thumb.current {
+		width: 64px;
+		height: 64px;
 	}
 
-	@keyframes pulse {
-		0%,
-		100% {
-			opacity: 0.3;
-		}
-		50% {
-			opacity: 1;
-		}
+	.thumb.active {
+		border-color: var(--accent-magenta-color);
+		box-shadow: 0 0 0 1px var(--accent-magenta-color);
 	}
 
-	/* ------------------------------------------------- control panel */
-
-	.panel {
-		width: 280px;
-		flex-shrink: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
-		font-size: 0.75rem;
-		max-height: 85vh;
-		overflow-y: auto;
-		padding-bottom: 2rem;
+	.thumb img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		border-radius: 0;
 	}
 
-	.panel-group {
-		border: 1px solid #e2e8f0;
-		border-radius: 0.5rem;
-		padding: 0.6rem;
-		background: rgba(255, 255, 255, 0.92);
-		display: flex;
-		flex-direction: column;
-		gap: 0.4rem;
+	.hint {
+		font-family: 'argesta_regular', serif;
+		color: var(--muted);
+		font-size: 0.7rem;
+		margin: 0;
+		line-height: 1.4;
 	}
 
-	.group-title {
-		font-family: Bitter, serif;
-		font-weight: bold;
-		font-size: 0.75rem;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		color: #374151;
-	}
-
-	details.collapsible summary.group-title {
-		cursor: pointer;
-		user-select: none;
-	}
+	/* ------------------------------------------------- controls */
 
 	.slider-row {
 		display: grid;
-		grid-template-columns: 1fr;
-		gap: 0.1rem;
-		color: #6b7280;
+		grid-template-columns: 6rem 1fr 3.2rem;
+		align-items: center;
+		gap: 0.35rem;
+		color: var(--muted);
 	}
 
 	.slider-row > span {
-		font-size: 0.65rem;
-	}
-
-	.slider-row {
-		grid-template-columns: 5.5rem 1fr 3.4rem;
-		align-items: center;
-		gap: 0.35rem;
+		font-size: 0.68rem;
 	}
 
 	.slider-row input[type='range'] {
 		width: 100%;
-		accent-color: darkorange;
 		min-width: 0;
+		accent-color: var(--accent-magenta-color);
 	}
 
 	.slider-row input[type='number'] {
 		width: 100%;
 		box-sizing: border-box;
 		padding: 0.1rem 0.2rem;
-		border: 1px solid #e2e8f0;
-		border-radius: 0.25rem;
-		font-size: 0.65rem;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		background: #fff;
+		color: var(--ink);
+		font-family: 'nudica_monolight', monospace;
+		font-size: 0.68rem;
 	}
 
 	.select-row {
 		display: flex;
 		align-items: center;
 		gap: 0.35rem;
-		color: #6b7280;
+		color: var(--muted);
 	}
 
 	.select-row > span {
-		font-size: 0.65rem;
-		width: 5.5rem;
+		font-size: 0.68rem;
+		width: 6rem;
 		flex-shrink: 0;
 	}
 
 	.select-row select {
 		flex: 1;
+		min-width: 0;
 		padding: 0.15rem 0.25rem;
-		border: 1px solid #e2e8f0;
-		border-radius: 0.25rem;
-		font-family: inherit;
-		font-size: 0.7rem;
-	}
-
-	.check-row {
-		display: flex;
-		align-items: center;
-		gap: 0.4rem;
-		color: #6b7280;
-		font-size: 0.7rem;
-		cursor: pointer;
-	}
-
-	.wide-btn {
-		width: 100%;
-		padding: 0.35rem;
-		border: 1px solid #e2e8f0;
+		border: 1px solid var(--border);
+		border-radius: 4px;
 		background: #fff;
-		border-radius: 0.375rem;
-		cursor: pointer;
+		color: var(--ink);
 		font-family: inherit;
-	}
-
-	.wide-btn:disabled {
-		opacity: 0.4;
-		cursor: default;
-	}
-
-	.export-actions {
-		display: flex;
-		gap: 0.4rem;
+		font-size: 0.72rem;
 	}
 
 	/* ------------------------------------------------- layer cards */
 
 	.layer-card {
-		border: 1px solid #e2e8f0;
-		border-radius: 0.375rem;
+		border: 1px solid var(--border);
+		border-radius: 8px;
 		padding: 0.4rem;
 		display: flex;
 		flex-direction: column;
@@ -1125,87 +1318,79 @@
 		align-items: center;
 	}
 
-	details.overrides {
-		margin-top: 0.15rem;
-		border-top: 1px dashed #e2e8f0;
+	details.layer-settings {
+		border-top: 1px dashed var(--border);
 		padding-top: 0.25rem;
 	}
 
-	details.overrides summary {
+	details.layer-settings summary {
 		cursor: pointer;
-		font-size: 0.65rem;
-		color: #6b7280;
+		font-size: 0.66rem;
+		color: var(--muted);
 		user-select: none;
 		display: flex;
 		align-items: center;
 		gap: 0.35rem;
 	}
 
-	details.overrides summary::before {
+	details.layer-settings summary::before {
 		content: '▸';
 		font-size: 0.6rem;
 	}
 
-	details.overrides[open] summary::before {
+	details.layer-settings[open] summary::before {
 		content: '▾';
 	}
 
-	details.overrides summary::-webkit-details-marker {
+	details.layer-settings summary::-webkit-details-marker {
 		display: none;
 	}
 
-	details.overrides summary::marker {
+	details.layer-settings summary::marker {
 		content: '';
 	}
 
-	.override-count {
-		background: #ffedd5;
-		color: #c2410c;
-		border-radius: 0.5rem;
-		padding: 0 0.35rem;
-		font-size: 0.6rem;
-		font-weight: 600;
+	details.layer-settings > .layer-row {
+		margin-top: 0.3rem;
 	}
 
-	.override-none {
-		color: #b6bcc6;
+	.override-count {
+		background: var(--accent-yellow);
+		color: var(--ink);
+		border-radius: 999px;
+		padding: 0 0.4rem;
 		font-size: 0.6rem;
+		font-family: 'nudica_monobold', monospace;
 	}
 
 	.override-hint {
-		font-size: 0.6rem;
-		color: #9ca3af;
-		margin: 0.2rem 0;
+		font-family: 'argesta_regular', serif;
+		font-size: 0.62rem;
+		color: var(--muted);
+		margin: 0.3rem 0 0;
 	}
 
 	/* inherited (placeholder) values read clearly as "not set here" */
-	details.overrides input::placeholder {
+	details.layer-settings input::placeholder {
 		color: #c3c9d4;
 		font-style: italic;
 	}
 
 	/* an active override stands out from inherited fields */
-	details.overrides input.overridden {
-		border-color: darkorange;
-		background: #fff7ed;
-		font-weight: 600;
+	details.layer-settings input.overridden {
+		border-color: var(--accent-magenta-color);
+		background: #fff5fb;
 	}
 
 	.clear-overrides {
-		margin-top: 0.25rem;
+		margin-top: 0.3rem;
 		width: 100%;
-		border: 1px solid #e2e8f0;
+		border: 1px solid var(--border);
 		background: #fff;
-		border-radius: 0.25rem;
+		border-radius: 4px;
 		cursor: pointer;
 		padding: 0.2rem;
-		font-family: inherit;
-		font-size: 0.65rem;
-		color: #6b7280;
-	}
-
-	.clear-overrides:hover {
-		background: #f3f4f6;
+		color: var(--muted);
 	}
 
 	.layer-row label {
@@ -1213,7 +1398,8 @@
 		flex-direction: column;
 		gap: 0.1rem;
 		flex: 1;
-		color: #6b7280;
+		color: var(--muted);
+		font-size: 0.66rem;
 	}
 
 	.layer-row input[type='number'],
@@ -1222,10 +1408,12 @@
 		width: 100%;
 		box-sizing: border-box;
 		padding: 0.15rem 0.25rem;
-		border: 1px solid #e2e8f0;
-		border-radius: 0.25rem;
-		font-family: inherit;
-		font-size: 0.75rem;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		background: #fff;
+		color: var(--ink);
+		font-family: 'nudica_monolight', monospace;
+		font-size: 0.72rem;
 	}
 
 	.layer-name {
@@ -1234,8 +1422,8 @@
 	}
 
 	.layer-color {
-		width: 1.6rem;
-		height: 1.6rem;
+		width: 1.7rem;
+		height: 1.7rem;
 		padding: 0;
 		border: none;
 		background: none;
@@ -1243,22 +1431,22 @@
 	}
 
 	.icon-btn {
-		border: 1px solid #e2e8f0;
+		border: 1px solid var(--border);
 		background: #fff;
-		border-radius: 0.25rem;
+		border-radius: 4px;
 		cursor: pointer;
 		padding: 0.1rem 0.3rem;
-		font-size: 0.7rem !important;
+		color: var(--ink);
 	}
 
 	.icon-btn:disabled {
-		opacity: 0.4;
+		opacity: 0.35;
 		cursor: default;
 	}
 
 	.icon-btn.remove:hover:not(:disabled) {
-		background: #fee2e2;
-		border-color: #ef4444;
+		background: #ffe3f2 !important;
+		border-color: var(--accent-magenta-color);
 	}
 
 	.layers-actions {
@@ -1269,29 +1457,103 @@
 	.layers-actions button {
 		flex: 1;
 		padding: 0.3rem;
-		border: 1px solid #e2e8f0;
+		border: 1px solid var(--border);
 		background: #fff;
-		border-radius: 0.25rem;
+		border-radius: 4px;
 		cursor: pointer;
-		font-family: inherit;
-		font-size: 0.7rem !important;
+		color: var(--ink);
 	}
 
-	.layers-actions button:hover {
-		background: #f3f4f6;
+	/* ------------------------------------------------- export */
+
+	.export-actions {
+		display: flex;
+		gap: 0.4rem;
+	}
+
+	.primary-btn {
+		flex: 1;
+		padding: 0.45rem;
+		border: 1px solid var(--ink);
+		background: var(--ink);
+		color: var(--bg);
+		border-radius: 8px;
+		cursor: pointer;
+	}
+
+	.primary-btn:hover:not(:disabled) {
+		background: var(--accent-magenta-color) !important;
+		border-color: var(--accent-magenta-color);
+		color: #fff;
+	}
+
+	.primary-btn:disabled {
+		opacity: 0.35;
+		cursor: default;
+	}
+
+	.blip {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		padding: 0.3rem 0.5rem;
+		border: 1px solid var(--border);
+		border-radius: 999px;
+		background: #fff;
+		color: var(--muted);
+		font-size: 0.65rem;
+		justify-content: center;
+		text-align: center;
+	}
+
+	.busy-dot {
+		width: 0.5rem;
+		height: 0.5rem;
+		flex-shrink: 0;
+		border-radius: 50%;
+		background: var(--accent-cyan-color);
+		animation: pulse 1s ease-in-out infinite;
+	}
+
+	@keyframes pulse {
+		0%,
+		100% {
+			opacity: 0.3;
+		}
+		50% {
+			opacity: 1;
+		}
 	}
 
 	/* ------------------------------------------------- responsive */
 
-	@media (max-width: 850px) {
-		.tool {
+	@media (max-width: 900px) {
+		.workspace {
 			flex-direction: column;
-			align-items: stretch;
+			overflow-y: auto;
 		}
 
-		.panel {
-			width: 100%;
-			max-height: none;
+		.pane {
+			width: auto;
+			overflow-y: visible;
+		}
+
+		.pane.left {
+			border-right: none;
+			border-top: 1px solid var(--border);
+			order: 2;
+		}
+
+		.stage {
+			min-height: 55vh;
+			order: 1;
+			flex-shrink: 0;
+		}
+
+		.pane.right {
+			border-left: none;
+			border-top: 1px solid var(--border);
+			order: 3;
 		}
 	}
 </style>

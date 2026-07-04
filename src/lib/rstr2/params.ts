@@ -6,8 +6,6 @@ export type SegmentationAlgorithm = 'watershed' | 'posterize' | 'kmeans';
 export type SpacingCurveName = 'coverage' | 'gamma' | 'log' | 'linear';
 
 export interface Rstr2Params {
-	// image
-	imageOpacity: number;
 	// adjust (pre-segmentation color pipeline)
 	brightness: number;
 	contrast: number;
@@ -20,11 +18,6 @@ export interface Rstr2Params {
 	smoothing: number;
 	tolerance: number;
 	minRegionSize: number;
-	// display
-	showShapes: boolean;
-	shapeOpacity: number;
-	showHatching: boolean;
-	hatchingOpacity: number;
 	// lines (layer overrides inherit from these)
 	penWidthMm: number;
 	spacingMinMm: number;
@@ -35,12 +28,9 @@ export interface Rstr2Params {
 	inkBoost: number;
 	// export
 	outputWidthMm: number;
-	// debug
-	debug: boolean;
 }
 
 export const defaultParams = (): Rstr2Params => ({
-	imageOpacity: 0.2,
 	brightness: 0,
 	contrast: 0,
 	imageGamma: 1,
@@ -51,10 +41,6 @@ export const defaultParams = (): Rstr2Params => ({
 	smoothing: 1,
 	tolerance: 0.08,
 	minRegionSize: 4,
-	showShapes: true,
-	shapeOpacity: 0.9,
-	showHatching: true,
-	hatchingOpacity: 0.9,
 	penWidthMm: 0.4,
 	spacingMinMm: 0.5,
 	spacingMaxMm: 4,
@@ -62,8 +48,7 @@ export const defaultParams = (): Rstr2Params => ({
 	spacingCurve: 'coverage',
 	hatchGamma: 1.8,
 	inkBoost: 1,
-	outputWidthMm: 200,
-	debug: false
+	outputWidthMm: 200
 });
 
 export const PARAMS_STORAGE_KEY = 'rstr:v2:params';
