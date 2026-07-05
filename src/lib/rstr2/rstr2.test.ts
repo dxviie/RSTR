@@ -4,8 +4,19 @@ import { segmentGrid } from './segmentation';
 import { buildRegionGeometries } from './regionTools';
 import { hatchPolygon, spacingForInk, segmentsToSvgPath } from './hatchTools';
 import { adjustColors, isNeutralAdjustment } from './imageAdjust';
-import { extractChannel, defaultCmyLayers, parseStoredLayers } from './layers';
+import {
+	extractChannel,
+	defaultCmyLayers,
+	defaultClassicLayers,
+	parseStoredLayers
+} from './layers';
 import { defaultParams, parseStoredParams } from './params';
+import {
+	builtinPresets,
+	parseSettingsFile,
+	parseStoredPresets,
+	serializeSettings
+} from './presets';
 import { buildSvgDocument } from './svgExport';
 
 const neutral = { brightness: 0, contrast: 0, gamma: 1, saturation: 1, vibrance: 0 };
@@ -266,6 +277,56 @@ describe('param persistence', () => {
 	it('falls back to defaults on corrupt storage', () => {
 		expect(parseStoredParams('{{{')).toEqual(defaultParams());
 		expect(parseStoredParams(null)).toEqual(defaultParams());
+	});
+});
+
+describe('settings presets', () => {
+	it('ships CMY and Classic black as built-ins', () => {
+		const names = builtinPresets().map((preset) => preset.name);
+		expect(names).toEqual(['CMY', 'Classic black']);
+		const classic = builtinPresets()[1].settings;
+		expect(classic.layers).toEqual(defaultClassicLayers());
+		expect(classic.layers).toHaveLength(1);
+		expect(classic.layers[0].channel).toBe('luma-inv');
+	});
+
+	it('round-trips settings through the JSON file format', () => {
+		const settings = {
+			params: { ...defaultParams(), resolution: 128 },
+			layers: defaultCmyLayers()
+		};
+		const parsed = parseSettingsFile(serializeSettings(settings));
+		expect(parsed).toEqual(settings);
+	});
+
+	it('rejects files without a usable layer stack', () => {
+		expect(parseSettingsFile('not json')).toBeNull();
+		expect(parseSettingsFile('{}')).toBeNull();
+		expect(parseSettingsFile(JSON.stringify({ params: defaultParams(), layers: [] }))).toBeNull();
+		expect(parseSettingsFile(JSON.stringify({ layers: [{ id: 1 }] }))).toBeNull();
+	});
+
+	it('fills missing or junk params with defaults', () => {
+		const parsed = parseSettingsFile(
+			JSON.stringify({ params: { resolution: 64, algorithm: 'bogus' }, layers: defaultCmyLayers() })
+		);
+		expect(parsed).not.toBeNull();
+		expect(parsed!.params.resolution).toBe(64);
+		expect(parsed!.params.algorithm).toBe(defaultParams().algorithm);
+		expect(parsed!.params.penWidthMm).toBe(defaultParams().penWidthMm);
+	});
+
+	it('parses stored user presets and drops broken entries', () => {
+		const good = { name: 'my preset', settings: builtinPresets()[0].settings };
+		const stored = JSON.stringify([
+			good,
+			{ name: '', settings: good.settings },
+			{ name: 'broken', settings: { params: {}, layers: 'nope' } },
+			'garbage'
+		]);
+		expect(parseStoredPresets(stored)).toEqual([good]);
+		expect(parseStoredPresets(null)).toEqual([]);
+		expect(parseStoredPresets('{{{')).toEqual([]);
 	});
 });
 
