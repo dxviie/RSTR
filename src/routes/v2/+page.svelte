@@ -30,6 +30,14 @@
 	import { buildRegionGeometries } from '$lib/rstr2/regionTools';
 	import { hatchPolygon, spacingForInk, type HatchSegments } from '$lib/rstr2/hatchTools';
 	import { buildSvgDocument } from '$lib/rstr2/svgExport';
+	import {
+		defaultPlotterConfig,
+		estimateLayerPlotTime,
+		formatPlotTime,
+		parseStoredPlotterConfig,
+		PLOTTER_STORAGE_KEY,
+		type PlotterConfig
+	} from '$lib/rstr2/plotTime';
 
 	//***************************************************************
 	// 														STATE
@@ -252,29 +260,33 @@
 		adjustedGrid = { ...grid, r, g, b };
 	});
 
-	// Segmentation only depends on channels/enabled flags, not on mapping
-	// tweaks like pen width or color — keep the keys separate so slider moves
-	// don't retrigger the watershed.
-	const segLayersKey = $derived(
-		JSON.stringify(layers.map((l) => ({ id: l.id, channel: l.channel, enabled: l.enabled })))
-	);
-	const hatchLayersKey = $derived(
-		JSON.stringify(
-			layers.map((l) => [
-				l.id,
-				l.enabled,
-				l.angleMin,
-				l.angleMax,
-				l.penWidthMm,
-				l.spacingMinMm,
-				l.spacingMaxMm,
-				l.threshold,
-				l.inkGamma,
-				l.inkBoost,
-				l.color
-			])
-		)
-	);
+	// Per-layer dependency reads for the segmentation and hatch effects. These
+	// MUST be called directly inside the effect body: routing the reads
+	// through a $derived key string doesn't re-trigger the effects on deep
+	// per-layer mutations in the pinned Svelte 5 prerelease. The field lists
+	// stay deliberately narrow — segmentation only cares about channel/enabled
+	// (mapping tweaks must not retrigger the watershed), hatching about
+	// everything that shapes or colors the lines.
+	const trackSegLayerDeps = () => {
+		for (const layer of layers) {
+			void layer.channel;
+			void layer.enabled;
+		}
+	};
+	const trackHatchLayerDeps = () => {
+		for (const layer of layers) {
+			void layer.enabled;
+			void layer.angleMin;
+			void layer.angleMax;
+			void layer.penWidthMm;
+			void layer.spacingMinMm;
+			void layer.spacingMaxMm;
+			void layer.threshold;
+			void layer.inkGamma;
+			void layer.inkBoost;
+			void layer.color;
+		}
+	};
 
 	// Per-layer overrides fall back to the global parameters
 	const effectiveHatch = (layer: LayerConfig) => ({
@@ -290,7 +302,7 @@
 	let segGeneration = 0;
 	$effect(() => {
 		// reactive dependencies
-		void segLayersKey;
+		trackSegLayerDeps();
 		void params.algorithm;
 		void params.tolerance;
 		void params.smoothing;
@@ -348,7 +360,7 @@
 	// 4. segmentation + mapping config -> hatch lines on the visible canvas
 	let hatchGeneration = 0;
 	$effect(() => {
-		void hatchLayersKey;
+		trackHatchLayerDeps();
 		void params.outputWidthMm;
 		void params.penWidthMm;
 		void params.spacingMinMm;
@@ -442,6 +454,71 @@
 		status.hatchMs = performance.now() - t0;
 		status.lines = totalLines;
 	};
+
+	//***************************************************************
+	// 														PLOT TIME
+	//***************************************************************
+
+	// The plotter profile is about the user's machine, not the artwork — it
+	// lives in its own storage key and is deliberately not part of presets.
+	const loadPlotterConfig = (): PlotterConfig => {
+		if (typeof localStorage === 'undefined') return defaultPlotterConfig();
+		return parseStoredPlotterConfig(localStorage.getItem(PLOTTER_STORAGE_KEY));
+	};
+
+	const plotter: PlotterConfig = $state(loadPlotterConfig());
+
+	$effect(() => {
+		const json = JSON.stringify(plotter);
+		if (typeof localStorage !== 'undefined') localStorage.setItem(PLOTTER_STORAGE_KEY, json);
+	});
+
+	const resetPlotter = () => Object.assign(plotter, defaultPlotterConfig());
+
+	interface PlotEstimate {
+		seconds: number;
+		perLayer: { name: string; seconds: number }[];
+	}
+
+	let plotEstimate: PlotEstimate | null = $state(null);
+
+	// re-estimate whenever a hatch pass lands or the plotter profile changes
+	$effect(() => {
+		void status.hatchMs;
+		void status.lines;
+		const config: PlotterConfig = JSON.parse(JSON.stringify(plotter));
+		if (!hatchReady || !imgWidth) {
+			plotEstimate = null;
+			return;
+		}
+		const pxPerMm = imgWidth / params.outputWidthMm;
+		const perLayer = layers
+			.filter((layer) => layer.enabled)
+			.map((layer) => {
+				const result = layerResults.find((res) => res.layerId === layer.id);
+				const segmentLists = result?.regions.map((region) => region.hatchSegments ?? []) ?? [];
+				return {
+					name: layer.name,
+					seconds: estimateLayerPlotTime(segmentLists, pxPerMm, config).seconds
+				};
+			});
+		plotEstimate = {
+			seconds: perLayer.reduce((sum, layer) => sum + layer.seconds, 0),
+			perLayer
+		};
+	});
+
+	const plotTimeTip = $derived.by(() => {
+		let tip =
+			'estimated plotting time on an AxiDraw-style machine (saxi motion model): pen-down drawing, pen-up travel and pen lifts';
+		if (plotEstimate && plotEstimate.perLayer.length > 1) {
+			const breakdown = plotEstimate.perLayer
+				.map((layer) => `${layer.name} ${formatPlotTime(layer.seconds)}`)
+				.join(' · ');
+			tip += ` — per pen: ${breakdown} (pen changes not included)`;
+		}
+		return tip + ' — tune the profile under plotter settings';
+	});
 
 	//***************************************************************
 	// 														LAYERS
@@ -745,6 +822,73 @@
 
 	const SPACING_TIP =
 		'nominal min/max line spacing — each region lands in this range based on its ink; layers can override';
+
+	interface PlotterFieldDef {
+		id: keyof PlotterConfig;
+		label: string;
+		min: number;
+		step: number;
+		tip: string;
+	}
+
+	const PLOTTER_FIELDS: PlotterFieldDef[] = [
+		{
+			id: 'penDownMaxVelocity',
+			label: 'pen-down speed',
+			min: 1,
+			step: 1,
+			tip: 'max drawing speed (mm/s) — saxi default 50'
+		},
+		{
+			id: 'penDownAcceleration',
+			label: 'pen-down accel',
+			min: 1,
+			step: 10,
+			tip: 'drawing acceleration (mm/s²) — saxi default 200'
+		},
+		{
+			id: 'penDownCorneringFactor',
+			label: 'cornering factor',
+			min: 0,
+			step: 0.001,
+			tip: 'how fast corners are taken — saxi default 0.127'
+		},
+		{
+			id: 'penUpMaxVelocity',
+			label: 'pen-up speed',
+			min: 1,
+			step: 1,
+			tip: 'max travel speed between lines (mm/s) — saxi default 200'
+		},
+		{
+			id: 'penUpAcceleration',
+			label: 'pen-up accel',
+			min: 1,
+			step: 10,
+			tip: 'travel acceleration (mm/s²) — saxi default 400'
+		},
+		{
+			id: 'penDropDuration',
+			label: 'pen drop (s)',
+			min: 0,
+			step: 0.01,
+			tip: 'pause to put the pen on the paper — saxi default 0.12'
+		},
+		{
+			id: 'penLiftDuration',
+			label: 'pen lift (s)',
+			min: 0,
+			step: 0.01,
+			tip: 'pause to lift the pen off the paper — saxi default 0.12'
+		},
+		{
+			id: 'pathJoinRadiusMm',
+			label: 'join radius (mm)',
+			min: 0,
+			step: 0.1,
+			tip: "lines closer than this are drawn without lifting the pen — saxi's join nearby paths, default 0.5"
+		}
+	];
 
 	// Dual-range slider for the spacing bounds
 	let spacingMinEl: HTMLInputElement | undefined = $state();
@@ -1210,13 +1354,13 @@
 						class="preset-save"
 						onclick={savePreset}
 						disabled={!presetName.trim()}
-						title="save the current settings and layers as a preset in this browser">save</button
+						title="save the current settings and layers as a preset in this browser">+ save</button
 					>
 				</div>
 				<div class="settings-io">
 					<button
 						onclick={exportSettings}
-						title="download all current settings and layers as a JSON file">↓ settings .json</button
+						title="download all current settings and layers as a JSON file">↓ export .json</button
 					>
 					<button
 						onclick={() => settingsFileInput?.click()}
@@ -1257,16 +1401,90 @@
 						↓ PNG
 					</button>
 				</div>
-				<div class="blip" title="grid size · regions found · hatch lines drawn · compute time">
+				<div class="stats">
 					{#if status.busy}
-						<span class="busy-dot"></span> computing…
+						<div class="stat-row wide"><span class="busy-dot"></span> computing…</div>
 					{:else if cellGrid}
-						{cellGrid.cols}×{cellGrid.rows} cells · {status.regions} regions · {status.lines} lines ·
-						{(status.segMs + status.hatchMs).toFixed(0)}ms
+						<div
+							class="stat-row"
+							title="sampling grid the image is reduced to (cells across × down)"
+						>
+							<svg viewBox="0 0 16 16" aria-hidden="true">
+								<rect x="1.5" y="1.5" width="13" height="13" rx="1" />
+								<path d="M5.8 1.5v13M10.2 1.5v13M1.5 5.8h13M1.5 10.2h13" />
+							</svg>
+							<span class="stat-label">grid</span>
+							<span class="stat-value">{cellGrid.cols}×{cellGrid.rows}</span>
+						</div>
+						<div
+							class="stat-row"
+							title="tonal regions found by segmentation, across all enabled layers"
+						>
+							<svg viewBox="0 0 16 16" aria-hidden="true">
+								<circle cx="6" cy="6.2" r="4.2" />
+								<circle cx="10.8" cy="10.6" r="3.2" />
+							</svg>
+							<span class="stat-label">regions</span>
+							<span class="stat-value">{status.regions}</span>
+						</div>
+						<div class="stat-row" title="hatch lines drawn, across all enabled layers">
+							<svg viewBox="0 0 16 16" aria-hidden="true">
+								<path d="M2 7 7 2M2 12 12 2M4.5 14.5 14.5 4.5M9.5 14.5 14.5 9.5" />
+							</svg>
+							<span class="stat-label">lines</span>
+							<span class="stat-value">{status.lines}</span>
+						</div>
+						<div
+							class="stat-row"
+							title="time your browser needed to compute this render (segmentation + hatching) — not plotting time"
+						>
+							<svg viewBox="0 0 16 16" aria-hidden="true">
+								<path d="M9 1.5 3.5 9h4L6.8 14.5 12.5 7h-4z" />
+							</svg>
+							<span class="stat-label">render</span>
+							<span class="stat-value">{(status.segMs + status.hatchMs).toFixed(0)}ms</span>
+						</div>
+						<div class="stat-row wide" title={plotTimeTip}>
+							<svg viewBox="0 0 16 16" aria-hidden="true">
+								<circle cx="8" cy="8" r="6.3" />
+								<path d="M8 4.4V8l2.6 1.6" />
+							</svg>
+							<span class="stat-label">plot time</span>
+							<span class="stat-value">
+								{#if plotEstimate}~{formatPlotTime(plotEstimate.seconds)}{:else}—{/if}
+							</span>
+						</div>
 					{:else}
-						waiting for an image
+						<div class="stat-row wide">waiting for an image</div>
 					{/if}
 				</div>
+				<details class="plotter-settings">
+					<summary title="motion profile behind the plot time estimate — for power users">
+						plotter settings
+					</summary>
+					<p class="plotter-hint">
+						motion profile for the plot time estimate, mirroring saxi's plan options — match it to
+						your machine setup
+					</p>
+					{#each PLOTTER_FIELDS as field (field.id)}
+						<label class="plotter-row" title={field.tip}>
+							<span>{field.label}</span>
+							<input
+								type="number"
+								min={field.min}
+								step={field.step}
+								bind:value={plotter[field.id]}
+							/>
+						</label>
+					{/each}
+					<button
+						class="plotter-reset"
+						onclick={resetPlotter}
+						title="restore saxi's default AxiDraw profile"
+					>
+						↺ saxi defaults
+					</button>
+				</details>
 			</section>
 
 			<div class="spacer"></div>
@@ -1746,7 +1964,7 @@
 		background: #fff;
 		border-radius: 4px;
 		cursor: pointer;
-		padding: 0.1rem 0.6rem;
+		padding: 0.1rem 0.5rem;
 		color: var(--ink);
 	}
 
@@ -1762,12 +1980,19 @@
 
 	.settings-io button {
 		flex: 1;
-		padding: 0.3rem;
+		padding: 0.2rem;
 		border: 1px solid var(--border);
 		background: #fff;
 		border-radius: 4px;
 		cursor: pointer;
 		color: var(--ink);
+	}
+
+	/* preset actions are secondary — keep them compact (the .app button rule
+	   sets its size with !important, so this needs to as well) */
+	.pane .preset-save,
+	.pane .settings-io button {
+		font-size: 0.66rem !important;
 	}
 
 	.settings-notice {
@@ -1972,18 +2197,126 @@
 		cursor: default;
 	}
 
-	.blip {
-		display: flex;
-		align-items: center;
-		gap: 0.4rem;
-		padding: 0.3rem 0.5rem;
+	/* details readout below the export buttons */
+	.stats {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 0.35rem 0.6rem;
+		padding: 0.45rem 0.55rem;
 		border: 1px solid var(--border);
-		border-radius: 999px;
+		border-radius: 8px;
 		background: #fff;
 		color: var(--muted);
 		font-size: 0.65rem;
-		justify-content: center;
-		text-align: center;
+	}
+
+	.stat-row {
+		display: flex;
+		align-items: center;
+		gap: 0.3rem;
+		min-width: 0;
+	}
+
+	.stat-row.wide {
+		grid-column: 1 / -1;
+	}
+
+	.stat-row svg {
+		width: 0.8rem;
+		height: 0.8rem;
+		flex-shrink: 0;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.2;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+	}
+
+	.stat-label {
+		white-space: nowrap;
+	}
+
+	.stat-value {
+		margin-left: auto;
+		color: var(--ink);
+		font-family: 'nudica_monobold', monospace;
+		white-space: nowrap;
+	}
+
+	/* the plot estimate is the headline number for plotter users */
+	.stat-row.wide:not(:first-child) {
+		border-top: 1px dashed var(--border);
+		padding-top: 0.35rem;
+	}
+
+	/* ------------------------------------------------- plotter settings */
+
+	/* deliberately unassuming — a power-user corner, collapsed by default */
+	details.plotter-settings summary {
+		cursor: pointer;
+		font-size: 0.66rem;
+		color: var(--muted);
+		user-select: none;
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+	}
+
+	details.plotter-settings summary::before {
+		content: '▸';
+		font-size: 0.6rem;
+	}
+
+	details.plotter-settings[open] summary::before {
+		content: '▾';
+	}
+
+	details.plotter-settings summary::-webkit-details-marker {
+		display: none;
+	}
+
+	details.plotter-settings summary::marker {
+		content: '';
+	}
+
+	.plotter-hint {
+		font-family: 'argesta_regular', serif;
+		font-size: 0.62rem;
+		color: var(--muted);
+		margin: 0.3rem 0;
+	}
+
+	.plotter-row {
+		display: grid;
+		grid-template-columns: 1fr 4rem;
+		align-items: center;
+		gap: 0.35rem;
+		color: var(--muted);
+		font-size: 0.66rem;
+		margin-top: 0.25rem;
+	}
+
+	.plotter-row input[type='number'] {
+		width: 100%;
+		box-sizing: border-box;
+		padding: 0.1rem 0.2rem;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		background: #fff;
+		color: var(--ink);
+		font-family: 'nudica_monolight', monospace;
+		font-size: 0.68rem;
+	}
+
+	.plotter-reset {
+		margin-top: 0.35rem;
+		width: 100%;
+		border: 1px solid var(--border);
+		background: #fff;
+		border-radius: 4px;
+		cursor: pointer;
+		padding: 0.2rem;
+		color: var(--muted);
 	}
 
 	.busy-dot {
