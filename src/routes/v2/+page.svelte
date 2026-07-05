@@ -17,6 +17,15 @@
 		PARAMS_STORAGE_KEY,
 		type Rstr2Params
 	} from '$lib/rstr2/params';
+	import {
+		builtinPresets,
+		parseSettingsFile,
+		parseStoredPresets,
+		PRESETS_STORAGE_KEY,
+		serializeSettings,
+		type Rstr2Settings,
+		type SettingsPreset
+	} from '$lib/rstr2/presets';
 	import { segmentGrid } from '$lib/rstr2/segmentation';
 	import { buildRegionGeometries } from '$lib/rstr2/regionTools';
 	import { hatchPolygon, spacingForInk, type HatchSegments } from '$lib/rstr2/hatchTools';
@@ -454,10 +463,6 @@
 		layers.splice(target, 0, layer);
 	};
 
-	const resetLayers = () => {
-		layers = defaultCmyLayers();
-	};
-
 	const OVERRIDE_FIELDS = [
 		'penWidthMm',
 		'spacingMinMm',
@@ -474,6 +479,99 @@
 		for (const field of OVERRIDE_FIELDS) {
 			layer[field] = null;
 		}
+	};
+
+	//***************************************************************
+	// 												PRESETS & SETTINGS
+	//***************************************************************
+
+	const BUILTIN_PRESETS = builtinPresets();
+
+	const loadUserPresets = (): SettingsPreset[] => {
+		if (typeof localStorage === 'undefined') return [];
+		return parseStoredPresets(localStorage.getItem(PRESETS_STORAGE_KEY));
+	};
+
+	let userPresets: SettingsPreset[] = $state(loadUserPresets());
+	let selectedPreset = $state('');
+	let presetName = $state('');
+	let settingsFileInput: HTMLInputElement | undefined = $state();
+	let settingsNotice = $state('');
+	let noticeTimer: ReturnType<typeof setTimeout> | undefined;
+
+	$effect(() => {
+		const json = JSON.stringify(userPresets);
+		if (typeof localStorage !== 'undefined') localStorage.setItem(PRESETS_STORAGE_KEY, json);
+	});
+
+	const notice = (message: string) => {
+		settingsNotice = message;
+		clearTimeout(noticeTimer);
+		noticeTimer = setTimeout(() => (settingsNotice = ''), 4000);
+	};
+
+	/** plain deep copy of the live (proxied) state, ready to store or export */
+	const currentSettings = (): Rstr2Settings => JSON.parse(JSON.stringify({ params, layers }));
+
+	// Deep-clone on apply so later edits never mutate the stored preset. JSON
+	// round-trip rather than structuredClone: user presets are $state proxies,
+	// which structuredClone refuses to touch.
+	const applySettings = (settings: Rstr2Settings) => {
+		const clone: Rstr2Settings = JSON.parse(JSON.stringify(settings));
+		Object.assign(params, clone.params);
+		layers = clone.layers;
+	};
+
+	const isUserPreset = $derived(userPresets.some((preset) => preset.name === selectedPreset));
+
+	const applySelectedPreset = () => {
+		const preset =
+			BUILTIN_PRESETS.find((entry) => entry.name === selectedPreset) ??
+			userPresets.find((entry) => entry.name === selectedPreset);
+		if (preset) applySettings(preset.settings);
+	};
+
+	const savePreset = () => {
+		const name = presetName.trim();
+		if (!name) return;
+		if (BUILTIN_PRESETS.some((preset) => preset.name.toLowerCase() === name.toLowerCase())) {
+			notice(`"${name}" is a built-in preset — pick another name`);
+			return;
+		}
+		const preset: SettingsPreset = { name, settings: currentSettings() };
+		const index = userPresets.findIndex((entry) => entry.name === name);
+		if (index >= 0) userPresets[index] = preset;
+		else userPresets.push(preset);
+		selectedPreset = name;
+		presetName = '';
+		notice(index >= 0 ? `updated preset "${name}"` : `saved preset "${name}"`);
+	};
+
+	const deleteSelectedPreset = () => {
+		if (!isUserPreset) return;
+		userPresets = userPresets.filter((preset) => preset.name !== selectedPreset);
+		notice(`deleted preset "${selectedPreset}"`);
+		selectedPreset = '';
+	};
+
+	const exportSettings = () => {
+		const json = serializeSettings(currentSettings());
+		downloadBlob(new Blob([json], { type: 'application/json' }), `rstr-settings-${stamp()}.json`);
+	};
+
+	const importSettings = (files: FileList | null | undefined) => {
+		const file = files?.[0];
+		if (!file) return;
+		file.text().then((text) => {
+			const settings = parseSettingsFile(text);
+			if (!settings) {
+				notice(`could not read ${file.name} — not an RSTR settings file?`);
+				return;
+			}
+			applySettings(settings);
+			selectedPreset = '';
+			notice(`imported ${file.name}`);
+		});
 	};
 
 	//***************************************************************
@@ -1067,12 +1165,68 @@
 				{/each}
 				<div class="layers-actions">
 					<button onclick={addLayer} title="add a new pen layer">+ add layer</button>
+				</div>
+			</section>
+
+			<section class="panel-group">
+				<div class="group-title">presets</div>
+				<div class="preset-row">
+					<select
+						bind:value={selectedPreset}
+						onchange={applySelectedPreset}
+						title="apply a preset — replaces all settings and layers"
+					>
+						<option value="" disabled>apply a preset…</option>
+						<optgroup label="built-in">
+							{#each BUILTIN_PRESETS as preset (preset.name)}
+								<option value={preset.name}>{preset.name}</option>
+							{/each}
+						</optgroup>
+						{#if userPresets.length > 0}
+							<optgroup label="saved in this browser">
+								{#each userPresets as preset (preset.name)}
+									<option value={preset.name}>{preset.name}</option>
+								{/each}
+							</optgroup>
+						{/if}
+					</select>
 					<button
-						onclick={resetLayers}
-						title="replace the stack with the default cyan, magenta and yellow pens"
-						>reset to CMY</button
+						class="icon-btn remove"
+						onclick={deleteSelectedPreset}
+						disabled={!isUserPreset}
+						title="delete the selected preset from this browser">✕</button
 					>
 				</div>
+				<div class="preset-row">
+					<input
+						type="text"
+						class="preset-name"
+						placeholder="preset name"
+						bind:value={presetName}
+						onkeydown={(event) => event.key === 'Enter' && savePreset()}
+						title="name for the current settings — saved in this browser"
+					/>
+					<button
+						class="preset-save"
+						onclick={savePreset}
+						disabled={!presetName.trim()}
+						title="save the current settings and layers as a preset in this browser">save</button
+					>
+				</div>
+				<div class="settings-io">
+					<button
+						onclick={exportSettings}
+						title="download all current settings and layers as a JSON file">↓ settings .json</button
+					>
+					<button
+						onclick={() => settingsFileInput?.click()}
+						title="load settings and layers from a previously exported JSON file"
+						>↑ import .json</button
+					>
+				</div>
+				{#if settingsNotice}
+					<div class="settings-notice">{settingsNotice}</div>
+				{/if}
 			</section>
 
 			<section class="panel-group">
@@ -1128,6 +1282,17 @@
 		accept="image/*"
 		style="display: none;"
 		onchange={(event) => openFile(event.currentTarget.files)}
+	/>
+
+	<input
+		bind:this={settingsFileInput}
+		type="file"
+		accept="application/json,.json"
+		style="display: none;"
+		onchange={(event) => {
+			importSettings(event.currentTarget.files);
+			event.currentTarget.value = '';
+		}}
 	/>
 </div>
 
@@ -1541,6 +1706,75 @@
 		--dri-track-height: 0.2rem;
 		--dri-track-color: #ccc;
 		--dri-track-filled-color: var(--ink);
+	}
+
+	/* ------------------------------------------------- presets */
+
+	.preset-row {
+		display: flex;
+		gap: 0.3rem;
+		align-items: stretch;
+	}
+
+	.preset-row select {
+		flex: 1;
+		min-width: 0;
+		padding: 0.15rem 0.25rem;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		background: #fff;
+		color: var(--ink);
+		font-family: inherit;
+		font-size: 0.72rem;
+	}
+
+	.preset-name {
+		flex: 1;
+		min-width: 0;
+		box-sizing: border-box;
+		padding: 0.15rem 0.25rem;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		background: #fff;
+		color: var(--ink);
+		font-family: 'nudica_monolight', monospace;
+		font-size: 0.72rem;
+	}
+
+	.preset-save {
+		border: 1px solid var(--border);
+		background: #fff;
+		border-radius: 4px;
+		cursor: pointer;
+		padding: 0.1rem 0.6rem;
+		color: var(--ink);
+	}
+
+	.preset-save:disabled {
+		opacity: 0.35;
+		cursor: default;
+	}
+
+	.settings-io {
+		display: flex;
+		gap: 0.4rem;
+	}
+
+	.settings-io button {
+		flex: 1;
+		padding: 0.3rem;
+		border: 1px solid var(--border);
+		background: #fff;
+		border-radius: 4px;
+		cursor: pointer;
+		color: var(--ink);
+	}
+
+	.settings-notice {
+		font-family: 'argesta_regular', serif;
+		font-size: 0.68rem;
+		color: var(--muted);
+		text-align: center;
 	}
 
 	/* ------------------------------------------------- layer cards */

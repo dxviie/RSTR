@@ -93,6 +93,21 @@ export const defaultCmyLayers = (): LayerConfig[] => [
 	}
 ];
 
+// The RSTR v1 look: a single black pen driven by darkness, hatched in one
+// direction — the classic Vera Molnár-inspired line raster.
+export const defaultClassicLayers = (): LayerConfig[] => [
+	{
+		id: 'black',
+		name: 'Black',
+		channel: 'luma-inv',
+		color: '#1A1A1A',
+		angleMin: 0,
+		angleMax: 0,
+		...inheritedHatchSettings(),
+		enabled: true
+	}
+];
+
 export const createLayer = (): LayerConfig => ({
 	id: nextLayerId(),
 	name: 'New layer',
@@ -201,16 +216,21 @@ const migrateLayer = (layer: unknown): unknown => {
 	return l;
 };
 
+/**
+ * Validate (and migrate) a parsed layer stack. Used for both localStorage and
+ * imported settings files.
+ */
+export const sanitizeLayers = (parsed: unknown): LayerConfig[] | null => {
+	if (!Array.isArray(parsed) || parsed.length === 0) return null;
+	const migrated = parsed.map(migrateLayer);
+	return migrated.every(isValidLayer) ? migrated : null;
+};
+
 export const parseStoredLayers = (json: string | null): LayerConfig[] | null => {
 	if (!json) return null;
 	try {
-		const parsed = JSON.parse(json);
-		if (Array.isArray(parsed) && parsed.length > 0) {
-			const migrated = parsed.map(migrateLayer);
-			if (migrated.every(isValidLayer)) return migrated;
-		}
+		return sanitizeLayers(JSON.parse(json));
 	} catch {
-		// fall through to null
+		return null;
 	}
-	return null;
 };

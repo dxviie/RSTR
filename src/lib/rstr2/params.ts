@@ -50,24 +50,32 @@ export const defaultParams = (): Rstr2Params => ({
 
 export const PARAMS_STORAGE_KEY = 'rstr:v2:params';
 
+const ALGORITHMS: SegmentationAlgorithm[] = ['watershed', 'posterize', 'kmeans'];
+
 /**
- * Merge stored values over the defaults, keeping only keys that exist in the
+ * Merge a parsed value over the defaults, keeping only keys that exist in the
  * defaults with a matching type — unknown or stale keys are dropped silently.
+ * Used for both localStorage and imported settings files.
  */
-export const parseStoredParams = (json: string | null): Rstr2Params => {
+export const sanitizeParams = (parsed: unknown): Rstr2Params => {
 	const params = defaultParams();
-	if (!json) return params;
-	try {
-		const parsed = JSON.parse(json);
-		if (typeof parsed !== 'object' || parsed === null) return params;
-		for (const key of Object.keys(params) as (keyof Rstr2Params)[]) {
-			const value = (parsed as Record<string, unknown>)[key];
-			if (typeof value === typeof params[key]) {
-				(params as unknown as Record<string, unknown>)[key] = value;
-			}
+	if (typeof parsed !== 'object' || parsed === null) return params;
+	for (const key of Object.keys(params) as (keyof Rstr2Params)[]) {
+		const value = (parsed as Record<string, unknown>)[key];
+		if (typeof value === typeof params[key]) {
+			(params as unknown as Record<string, unknown>)[key] = value;
 		}
+	}
+	if (!ALGORITHMS.includes(params.algorithm)) params.algorithm = defaultParams().algorithm;
+	return params;
+};
+
+export const parseStoredParams = (json: string | null): Rstr2Params => {
+	if (!json) return defaultParams();
+	try {
+		return sanitizeParams(JSON.parse(json));
 	} catch {
 		// corrupted storage falls back to defaults
+		return defaultParams();
 	}
-	return params;
 };
