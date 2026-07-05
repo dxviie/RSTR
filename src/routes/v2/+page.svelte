@@ -260,29 +260,33 @@
 		adjustedGrid = { ...grid, r, g, b };
 	});
 
-	// Segmentation only depends on channels/enabled flags, not on mapping
-	// tweaks like pen width or color — keep the keys separate so slider moves
-	// don't retrigger the watershed.
-	const segLayersKey = $derived(
-		JSON.stringify(layers.map((l) => ({ id: l.id, channel: l.channel, enabled: l.enabled })))
-	);
-	const hatchLayersKey = $derived(
-		JSON.stringify(
-			layers.map((l) => [
-				l.id,
-				l.enabled,
-				l.angleMin,
-				l.angleMax,
-				l.penWidthMm,
-				l.spacingMinMm,
-				l.spacingMaxMm,
-				l.threshold,
-				l.inkGamma,
-				l.inkBoost,
-				l.color
-			])
-		)
-	);
+	// Per-layer dependency reads for the segmentation and hatch effects. These
+	// MUST be called directly inside the effect body: routing the reads
+	// through a $derived key string doesn't re-trigger the effects on deep
+	// per-layer mutations in the pinned Svelte 5 prerelease. The field lists
+	// stay deliberately narrow — segmentation only cares about channel/enabled
+	// (mapping tweaks must not retrigger the watershed), hatching about
+	// everything that shapes or colors the lines.
+	const trackSegLayerDeps = () => {
+		for (const layer of layers) {
+			void layer.channel;
+			void layer.enabled;
+		}
+	};
+	const trackHatchLayerDeps = () => {
+		for (const layer of layers) {
+			void layer.enabled;
+			void layer.angleMin;
+			void layer.angleMax;
+			void layer.penWidthMm;
+			void layer.spacingMinMm;
+			void layer.spacingMaxMm;
+			void layer.threshold;
+			void layer.inkGamma;
+			void layer.inkBoost;
+			void layer.color;
+		}
+	};
 
 	// Per-layer overrides fall back to the global parameters
 	const effectiveHatch = (layer: LayerConfig) => ({
@@ -298,7 +302,7 @@
 	let segGeneration = 0;
 	$effect(() => {
 		// reactive dependencies
-		void segLayersKey;
+		trackSegLayerDeps();
 		void params.algorithm;
 		void params.tolerance;
 		void params.smoothing;
@@ -356,7 +360,7 @@
 	// 4. segmentation + mapping config -> hatch lines on the visible canvas
 	let hatchGeneration = 0;
 	$effect(() => {
-		void hatchLayersKey;
+		trackHatchLayerDeps();
 		void params.outputWidthMm;
 		void params.penWidthMm;
 		void params.spacingMinMm;
