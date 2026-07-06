@@ -4,7 +4,9 @@
 <head>
 	<meta charset="utf-8" />
 	<link rel="icon" href="%sveltekit.assets%/favicon.png" />
-	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<!-- maximum-scale stops mobile Safari's automatic zoom when focusing small
+	     inputs; since iOS 10 it does not block manual pinch-to-zoom -->
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
 	<!-- OpenGraph tags -->
 	<meta property="og:title" content="RSTR" />
 	<meta property="og:type" content="website" />

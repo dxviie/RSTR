@@ -2346,9 +2346,29 @@
 			overflow-y: auto;
 		}
 
+		/* The render stays pinned at the top while the control panes scroll
+		   over it on a translucent, blurred backdrop (same overlay trick as
+		   the v1 page) — the effect of every tweak stays visible. */
+		.stage {
+			position: sticky;
+			top: 0;
+			order: 1;
+			/* the base rule's flex: 1 means flex-basis: 0%, which would
+			   collapse the height in the column layout */
+			flex: none;
+			height: 52vh;
+			height: 52svh;
+			z-index: 0;
+		}
+
 		.pane {
 			width: auto;
 			overflow-y: visible;
+			position: relative;
+			z-index: 1;
+			background: rgba(253, 250, 255, 0.82);
+			-webkit-backdrop-filter: blur(6px);
+			backdrop-filter: blur(6px);
 		}
 
 		.pane.left {
@@ -2357,16 +2377,43 @@
 			order: 2;
 		}
 
-		.stage {
-			min-height: 55vh;
-			order: 1;
-			flex-shrink: 0;
-		}
-
 		.pane.right {
 			border-left: none;
 			border-top: 1px solid var(--border);
 			order: 3;
+		}
+
+		/* let the render shimmer through the cards too */
+		.layer-card,
+		.stats {
+			background: rgba(255, 255, 255, 0.55);
+		}
+
+		/* Mobile browsers zoom the whole page when a focused control renders
+		   under 16px — keep every text-editable control at 16px on small
+		   screens (also easier to hit), and widen the value columns to fit. */
+		.slider-row input[type='number'],
+		.spacing-head input[type='number'],
+		.layer-row input[type='number'],
+		.layer-row input[type='text'],
+		.layer-row select,
+		.plotter-row input[type='number'],
+		.select-row select,
+		.preset-row select,
+		.preset-name {
+			font-size: 16px;
+		}
+
+		.slider-row {
+			grid-template-columns: 5.4rem 1fr 4.4rem;
+		}
+
+		.spacing-head {
+			grid-template-columns: 1fr 4.4rem auto 4.4rem;
+		}
+
+		.plotter-row {
+			grid-template-columns: 1fr 5rem;
 		}
 	}
 </style>
