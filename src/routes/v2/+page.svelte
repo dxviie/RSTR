@@ -1543,6 +1543,7 @@
 		<main
 			class="stage"
 			class:drag-active={dragActive}
+			style={`--stage-aspect: ${imgWidth && imgHeight ? imgHeight / imgWidth : 0.75}`}
 			ondragover={(event) => {
 				event.preventDefault();
 				dragActive = true;
@@ -2246,6 +2247,9 @@
 		flex: 1;
 		display: flex;
 		min-height: 0;
+		/* size container for the mobile stage height (cqw sees the true
+		   content width, unlike 100vw which includes scrollbars) */
+		container-type: inline-size;
 	}
 
 	.pane {
@@ -3117,8 +3121,17 @@
 			/* the base rule's flex: 1 means flex-basis: 0%, which would
 			   collapse the height in the column layout */
 			flex: none;
-			height: 52vh;
-			height: 52svh;
+			/* Follow the content's aspect so the render always spans the full
+			   width (portrait content used to letterbox inside a fixed-height
+			   band). Clamped: at 80svh a 9:16 phone video still fits the full
+			   width and the controls keep peeking in (they scroll over the
+			   sticky stage anyway); panoramas keep a usable drop target. The
+			   1.5rem compensates the stage's own padding. */
+			height: clamp(25vh, calc((100vw - 1.5rem) * var(--stage-aspect, 0.75) + 1.5rem), 80vh);
+			height: clamp(25svh, calc((100vw - 1.5rem) * var(--stage-aspect, 0.75) + 1.5rem), 80svh);
+			/* exact fit where container units are supported — 100cqw is the
+			   workspace's content width, scrollbars already excluded */
+			height: clamp(25svh, calc((100cqw - 1.5rem) * var(--stage-aspect, 0.75) + 1.5rem), 80svh);
 			z-index: 0;
 		}
 
