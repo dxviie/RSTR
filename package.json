@@ -47,8 +47,6 @@
   },
   "type": "module",
   "dependencies": {
-    "@fontsource/bitter": "^5.0.19",
-    "@fontsource/poppins": "^5.0.14",
     "@stanko/dual-range-input": "^1.0.1",
     "bits-ui": "^0.21.11",
     "clsx": "^2.1.1",
