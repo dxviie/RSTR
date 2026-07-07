@@ -4,6 +4,8 @@
 	// d17e.dev/projects/rstr and d17e.dev/projects/plotter-art; the images are
 	// hotlinked from media.d17e.dev as placeholders.
 
+	import BrandFooter from '$lib/components/BrandFooter.svelte';
+
 	const MEDIA = 'https://media.d17e.dev/images';
 
 	const HERO_IMAGE = `${MEDIA}/703d5084-54e3-4552-a8fa-78e8c5fdf3b4/1200w.webp`;
@@ -171,7 +173,7 @@
 	</main>
 
 	<footer class="footer">
-		<a href="https://d17e.dev" target="_blank" rel="noopener">made with 🧡 by d17e.dev</a>
+		<BrandFooter align="right" />
 	</footer>
 </div>
 
@@ -594,18 +596,7 @@
 
 	.footer {
 		border-top: 1px solid var(--border);
-		text-align: center;
-		padding: 1.5rem;
-	}
-
-	.footer a {
-		font-family: 'argesta_regular', serif;
-		font-size: 0.8rem;
-		color: var(--muted);
-	}
-
-	.footer a:hover {
-		color: var(--ink);
+		padding: 1rem 1.5rem;
 	}
 
 	/* ------------------------------------------------- responsive */
