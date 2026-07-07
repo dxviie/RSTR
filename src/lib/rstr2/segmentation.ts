@@ -12,8 +12,11 @@
 //   component labeling. Blocky, banded look.
 // - kmeans: 1D k-means clustering on intensity (k derived from tolerance),
 //   then connected component labeling. Adaptive posterize.
+// - slic: SLIC superpixels — localized k-means over (x, y, intensity) that
+//   carves the grid into compact, roughly cell-size regions. Tolerance-based
+//   merging then joins similar neighbouring superpixels, mosaic-style.
 
-export type SegmentationAlgorithm = 'watershed' | 'posterize' | 'kmeans';
+export type SegmentationAlgorithm = 'watershed' | 'posterize' | 'kmeans' | 'slic';
 
 export interface SegmentationOptions {
 	algorithm: SegmentationAlgorithm;
@@ -23,6 +26,10 @@ export interface SegmentationOptions {
 	minRegionSize: number;
 	/** box-blur passes applied to the values before segmentation */
 	smoothing: number;
+	/** slic only — superpixel grid spacing in cells (default 8) */
+	slicCellSize?: number;
+	/** slic only — 0..1 spatial rigidity of the superpixels (default 0.5) */
+	slicCompactness?: number;
 }
 
 export interface Segmentation {
@@ -393,6 +400,131 @@ const kmeansClasses = (values: Float32Array, tolerance: number): Int32Array => {
 };
 
 //***************************************************************
+// 														SLIC SUPERPIXELS
+//***************************************************************
+
+/**
+ * SLIC (simple linear iterative clustering) on the intensity grid: k-means in
+ * (x, y, value) space where each cluster only competes for cells inside a
+ * 2S x 2S window around its center. Returns a per-cell cluster id; fragments
+ * of a cluster that end up spatially disconnected are split apart afterwards
+ * by the caller's connected-component pass.
+ */
+const slicClasses = (
+	values: Float32Array,
+	width: number,
+	height: number,
+	cellSize: number,
+	compactness: number
+): Int32Array => {
+	const n = values.length;
+	const S = Math.max(2, Math.round(cellSize));
+	const gridCols = Math.max(1, Math.round(width / S));
+	const gridRows = Math.max(1, Math.round(height / S));
+	const k = gridCols * gridRows;
+	const stepX = width / gridCols;
+	const stepY = height / gridRows;
+
+	const cx = new Float64Array(k);
+	const cy = new Float64Array(k);
+	const cv = new Float64Array(k);
+
+	// seed centers on a regular grid, nudged to the lowest-gradient cell in
+	// their 3x3 neighbourhood so they don't start on an edge
+	const gradient = gradientMagnitude(values, width, height);
+	for (let gy = 0; gy < gridRows; gy++) {
+		for (let gx = 0; gx < gridCols; gx++) {
+			const x = Math.min(width - 1, Math.floor((gx + 0.5) * stepX));
+			const y = Math.min(height - 1, Math.floor((gy + 0.5) * stepY));
+			let best = y * width + x;
+			const y0 = Math.max(0, y - 1);
+			const y1 = Math.min(height - 1, y + 1);
+			const x0 = Math.max(0, x - 1);
+			const x1 = Math.min(width - 1, x + 1);
+			for (let yy = y0; yy <= y1; yy++) {
+				for (let xx = x0; xx <= x1; xx++) {
+					if (gradient[yy * width + xx] < gradient[best]) best = yy * width + xx;
+				}
+			}
+			const c = gy * gridCols + gx;
+			cx[c] = best % width;
+			cy[c] = Math.floor(best / width);
+			cv[c] = values[best];
+		}
+	}
+
+	// squared spatial weight: dividing by S² makes compactness independent of
+	// the superpixel size — 1 pins cells to the grid, near 0 follows intensity
+	const m2 = Math.max(compactness, 0.01) ** 2 / (S * S);
+
+	const classes = new Int32Array(n);
+	const dist = new Float64Array(n);
+	const sumX = new Float64Array(k);
+	const sumY = new Float64Array(k);
+	const sumV = new Float64Array(k);
+	const counts = new Int32Array(k);
+
+	for (let iter = 0; iter < 10; iter++) {
+		dist.fill(Infinity);
+		classes.fill(-1);
+		for (let c = 0; c < k; c++) {
+			const x0 = Math.max(0, Math.floor(cx[c] - S));
+			const x1 = Math.min(width - 1, Math.ceil(cx[c] + S));
+			const y0 = Math.max(0, Math.floor(cy[c] - S));
+			const y1 = Math.min(height - 1, Math.ceil(cy[c] + S));
+			for (let y = y0; y <= y1; y++) {
+				for (let x = x0; x <= x1; x++) {
+					const i = y * width + x;
+					const dv = values[i] - cv[c];
+					const dx = x - cx[c];
+					const dy = y - cy[c];
+					const d = dv * dv + (dx * dx + dy * dy) * m2;
+					if (d < dist[i]) {
+						dist[i] = d;
+						classes[i] = c;
+					}
+				}
+			}
+		}
+
+		// cells outside every search window (possible when centers drift near an
+		// uneven grid edge) fall back to their regular grid cluster
+		for (let i = 0; i < n; i++) {
+			if (classes[i] < 0) {
+				const gx = Math.min(gridCols - 1, Math.floor((i % width) / stepX));
+				const gy = Math.min(gridRows - 1, Math.floor(Math.floor(i / width) / stepY));
+				classes[i] = gy * gridCols + gx;
+			}
+		}
+
+		// move centers to the mean of their assigned cells
+		sumX.fill(0);
+		sumY.fill(0);
+		sumV.fill(0);
+		counts.fill(0);
+		for (let i = 0; i < n; i++) {
+			const c = classes[i];
+			sumX[c] += i % width;
+			sumY[c] += Math.floor(i / width);
+			sumV[c] += values[i];
+			counts[c]++;
+		}
+		let moved = 0;
+		for (let c = 0; c < k; c++) {
+			if (counts[c] === 0) continue;
+			const nx = sumX[c] / counts[c];
+			const ny = sumY[c] / counts[c];
+			moved += Math.abs(nx - cx[c]) + Math.abs(ny - cy[c]);
+			cx[c] = nx;
+			cy[c] = ny;
+			cv[c] = sumV[c] / counts[c];
+		}
+		if (moved < 0.5) break;
+	}
+	return classes;
+};
+
+//***************************************************************
 // 														POST-PROCESSING
 //***************************************************************
 
@@ -506,15 +638,18 @@ const finalizeSegmentation = (
 		// Absorb thin transition regions ("streaks" along soft edges): regions
 		// whose mean sits between two neighbours' means and whose perimeter is
 		// large relative to their area are watershed artifacts of wide gradient
-		// bands, not intentional detail.
+		// bands, not intentional detail. Only watershed produces these; SLIC
+		// superpixels are compact by construction and skip this pass — it
+		// would eat legitimate regions.
 		const perimeter = new Int32Array(initialCount);
 		const bestDiff = new Float64Array(initialCount);
 		const bestTo = new Int32Array(initialCount);
 		const nbMin = new Float64Array(initialCount);
 		const nbMax = new Float64Array(initialCount);
 		const sizeCap = Math.max(64, n * 0.05);
+		const streakPasses = options.algorithm === 'watershed' ? 4 : 0;
 
-		for (let pass = 0; pass < 4; pass++) {
+		for (let pass = 0; pass < streakPasses; pass++) {
 			perimeter.fill(0);
 			bestDiff.fill(Infinity);
 			bestTo.fill(-1);
@@ -669,6 +804,23 @@ export const segmentGrid = (
 			labels
 		);
 		applyToleranceMerge = false;
+	} else if (options.algorithm === 'slic') {
+		// the component pass doubles as SLIC's connectivity enforcement:
+		// disconnected fragments of a cluster become their own regions and the
+		// min-size absorption sweeps up the crumbs
+		initialCount = connectedComponents(
+			slicClasses(
+				smoothed,
+				width,
+				height,
+				options.slicCellSize ?? 8,
+				options.slicCompactness ?? 0.5
+			),
+			width,
+			height,
+			labels
+		);
+		applyToleranceMerge = true;
 	} else {
 		const gradient = gradientMagnitude(smoothed, width, height);
 		labels.fill(-1);
