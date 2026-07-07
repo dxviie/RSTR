@@ -163,9 +163,13 @@
 	// 														IMAGE INPUT
 	//***************************************************************
 
-	// start with a random sample so there is something to play with right away
+	// Start with a random sample so there is something to play with right
+	// away — once. Later transitions through an empty input (switching from
+	// video back to an image) must not race the user's own pick.
+	let sampleOffered = false;
 	$effect(() => {
-		if (!inputImage && !videoSrc) {
+		if (!inputImage && !videoSrc && !sampleOffered) {
+			sampleOffered = true;
 			inputImage = SAMPLE_IMAGES[Math.floor(Math.random() * SAMPLE_IMAGES.length)];
 		}
 	});
@@ -178,9 +182,10 @@
 			return;
 		}
 		if (!file.type.startsWith('image/')) return;
-		closeVideo();
 		const reader = new FileReader();
 		reader.onload = () => {
+			// only drop a running video once the image is actually ready
+			closeVideo();
 			inputImage = reader.result as string;
 		};
 		reader.readAsDataURL(file);
@@ -215,6 +220,13 @@
 	const onVideoMetadata = () => {
 		const el = videoEl;
 		if (!el) return;
+		// Mobile browsers won't decode frames from a video that never played;
+		// a muted inline play/pause kick makes drawImage deliver pixels there.
+		el.play()
+			.then(() => el.pause())
+			.catch(() => {
+				/* autoplay denied — desktop browsers decode without it */
+			});
 		if (!isFinite(el.duration)) {
 			// screen/browser recordings (MediaRecorder webm) report Infinity
 			// until the decoder is pushed to the end once — force that, then
@@ -266,7 +278,8 @@
 	const grabFrame = async (el: HTMLVideoElement, frame: number) => {
 		const token = ++grabToken;
 		await seekVideo(el, frameTime(frame, video.fps, videoDuration));
-		if (token !== grabToken || !el.videoWidth) return;
+		// bail if outrun by a newer grab or the video was swapped for an image
+		if (token !== grabToken || !videoSrc || !el.videoWidth) return;
 		const canvas = document.createElement('canvas');
 		canvas.width = el.videoWidth;
 		canvas.height = el.videoHeight;
@@ -288,6 +301,44 @@
 		if (video.startFrame > total - 1) video.startFrame = total - 1;
 	});
 
+	// The export window is edited as [start, end] on a dual-range slider;
+	// internally it stays start offset + frame cap, so a longer video (or a
+	// higher fps) keeps growing the window until the cap bites again.
+	const videoEndFrame = $derived(
+		Math.min(video.startFrame + video.maxFrames - 1, Math.max(videoTotalFrames - 1, 0))
+	);
+
+	const setFrameWindow = (start: number, end: number) => {
+		const last = Math.max(videoTotalFrames - 1, 0);
+		const s = Math.min(Math.max(Math.floor(start), 0), last);
+		const e = Math.min(Math.max(Math.floor(end), s), last);
+		video.startFrame = s;
+		video.maxFrames = Math.min(e - s + 1, MAX_SEQUENCE_FRAMES);
+	};
+
+	// dual-range slider for the export window, same setup as the spacing one
+	let frameMinEl: HTMLInputElement | undefined = $state();
+	let frameMaxEl: HTMLInputElement | undefined = $state();
+	let frameDri: DualRangeInput | undefined;
+
+	$effect(() => {
+		if (!frameMinEl || !frameMaxEl) return;
+		frameDri = new DualRangeInput(frameMinEl, frameMaxEl);
+		return () => {
+			frameDri?.destroy();
+			frameDri = undefined;
+		};
+	});
+
+	// keep the track fill in sync when the window changes from the number
+	// inputs or the frame count changes with the fps
+	$effect(() => {
+		void video.startFrame;
+		void video.maxFrames;
+		void videoTotalFrames;
+		frameDri?.update();
+	});
+
 	//***************************************************************
 	// 														PIPELINE
 	//***************************************************************
@@ -299,6 +350,8 @@
 		hatchReady = false;
 		const img = new Image();
 		img.onload = () => {
+			// a newer source (another image, or a video frame) won the race
+			if (inputImage !== src) return;
 			const canvas = document.createElement('canvas');
 			canvas.width = img.width;
 			canvas.height = img.height;
@@ -1324,43 +1377,57 @@
 						<input type="range" min="1" max="30" step="1" bind:value={video.fps} />
 						<input type="number" min="1" max="60" step="1" bind:value={video.fps} />
 					</label>
-					<label
-						class="slider-row"
-						title="skip this many frames from the start of the video (counted at the output fps)"
+					<div
+						class="spacing-control"
+						title="exported frame window — start frame offset and last frame; the timeline shades this range"
 					>
-						<span>start frame</span>
-						<input
-							type="range"
-							min="0"
-							max={Math.max(videoTotalFrames - 1, 0)}
-							step="1"
-							bind:value={video.startFrame}
-						/>
-						<input
-							type="number"
-							min="0"
-							max={Math.max(videoTotalFrames - 1, 0)}
-							step="1"
-							bind:value={video.startFrame}
-						/>
-					</label>
-					<label class="slider-row" title="cap on the number of exported frames">
-						<span>frame limit</span>
-						<input
-							type="range"
-							min="1"
-							max={Math.min(Math.max(videoTotalFrames, 1), MAX_SEQUENCE_FRAMES)}
-							step="1"
-							bind:value={video.maxFrames}
-						/>
-						<input
-							type="number"
-							min="1"
-							max={MAX_SEQUENCE_FRAMES}
-							step="1"
-							bind:value={video.maxFrames}
-						/>
-					</label>
+						<div class="spacing-head">
+							<span>frames</span>
+							<input
+								type="number"
+								min="0"
+								max={videoEndFrame}
+								step="1"
+								value={video.startFrame}
+								oninput={(event) =>
+									setFrameWindow(Number(event.currentTarget.value), videoEndFrame)}
+								title="first exported frame — skips everything before it"
+							/>
+							<span class="spacing-dash">–</span>
+							<input
+								type="number"
+								min={video.startFrame}
+								max={Math.max(videoTotalFrames - 1, 0)}
+								step="1"
+								value={videoEndFrame}
+								oninput={(event) =>
+									setFrameWindow(video.startFrame, Number(event.currentTarget.value))}
+								title="last exported frame"
+							/>
+						</div>
+						<div class="dual-range-input">
+							<input
+								bind:this={frameMinEl}
+								type="range"
+								min="0"
+								max={Math.max(videoTotalFrames - 1, 0)}
+								step="1"
+								value={video.startFrame}
+								oninput={(event) =>
+									setFrameWindow(Number(event.currentTarget.value), videoEndFrame)}
+							/>
+							<input
+								bind:this={frameMaxEl}
+								type="range"
+								min="0"
+								max={Math.max(videoTotalFrames - 1, 0)}
+								step="1"
+								value={videoEndFrame}
+								oninput={(event) =>
+									setFrameWindow(video.startFrame, Number(event.currentTarget.value))}
+							/>
+						</div>
+					</div>
 					<div
 						class="video-summary"
 						title="what the current fps, start frame and limit select out of the video"
@@ -2867,8 +2934,16 @@
 
 	/* ------------------------------------------------- video */
 
+	/* parked offscreen rather than display:none — mobile browsers refuse to
+	   decode frames from an unrendered video element */
 	.hidden-video {
-		display: none;
+		position: fixed;
+		right: 0;
+		bottom: 0;
+		width: 2px;
+		height: 2px;
+		opacity: 0.01;
+		pointer-events: none;
 	}
 
 	.thumb-video {
