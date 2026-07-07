@@ -1,6 +1,5 @@
+made with &hearts; by [D17E](https://www.d17e.dev)
 
-[d17e.dev](https://www.d17e.dev) - [contact](https://forms.d17e.dev/contact) - [newsletter](https://forms.d17e.dev/subscribe) 
+© 2022 - 2026
 
 KvK - 87650770 / BTW - NL004463884B92
-
-[© CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) | 2024

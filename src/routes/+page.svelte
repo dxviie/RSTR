@@ -31,8 +31,8 @@
     .spinner {
         width: 50px;
         height: 50px;
-        border: 5px solid #f3f3f3;
-        border-top: 5px solid darkorange;
+        border: 5px solid #eef1f6;
+        border-top: 5px solid #ff2aa6;
         border-radius: 50%;
         animation: spin 1s linear infinite;
         position: fixed;
@@ -88,10 +88,10 @@
     }
 
     :global(.title) {
-        font-family: Bitter, serif;
+        font-family: 'nudica_monobold', monospace;
     }
 
     :global(.description) {
-        font-family: Poppins, sans-serif;
+        font-family: 'argesta_regular', serif;
     }
 </style>
