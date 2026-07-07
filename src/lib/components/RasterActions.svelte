@@ -279,8 +279,8 @@
     }
 
     :global(.start) {
-        background-color: darkorange;
-        color: black;
+        background-color: hsl(var(--foreground));
+        color: hsl(var(--background));
     }
 
     :global(.start:hover) {

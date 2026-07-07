@@ -219,7 +219,7 @@ export class Rstr {
 		const clr = new paper.Path.Rectangle({
 			from: from,
 			to: pixel.rect.bounds.bottomRight,
-			fillColor: 'darkorange',
+			fillColor: '#ff2aa6',
 			opacity: 0.7
 		});
 		this.gridAverageColorLayer.addChild(clr);
@@ -339,7 +339,7 @@ class RstrPixelImpl implements RstrPixel {
 		this.rect = new paper.Path.Rectangle({
 			from: [x, y],
 			to: [x + width, y + height],
-			strokeColor: 'darkorange',
+			strokeColor: '#ff2aa6',
 			strokeWidth: 1
 		});
 		if (layer) {

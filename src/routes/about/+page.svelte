@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
 </script>
 
 <div class="content">
@@ -46,5 +45,11 @@
     .intro {
         width: 90vw;
         max-width: 40rem;
+        font-family: 'argesta_regular', serif;
+        line-height: 1.65;
+    }
+
+    .intro b {
+        font-family: 'nudica_monobold', monospace;
     }
 </style>
