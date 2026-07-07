@@ -1,71 +1,58 @@
-<script>
-    const year = new Date().getFullYear();
+<script lang="ts">
+	let { align = 'center' }: { align?: 'center' | 'right' } = $props();
+	const year = new Date().getFullYear();
 </script>
 
-<div class="footer description">
-  <div class="footer-content">
-    <div class="footer-content__left">
-      <div>
-        <p>made with 🧡 by <a href="https://www.d17e.dev" target="_blank">d17e.dev</a></p>
-        <p><a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank">© CC BY-NC 4.0</a>{" "}| {year} </p>
-      </div>
-    </div>
-    <div class="footer-content__right">
-      <span>KvK - 87650770</span>
-      <span>BTW - NL004463884B92</span>
-    </div>
-  </div>
+<div class="brand-footer {align}">
+	<p class="made">
+		made with <span class="heart" role="img" aria-label="love">&hearts;</span> by
+		<a href="https://www.d17e.dev" target="_blank" rel="noopener">D17E</a>
+	</p>
+	<p class="line">&copy; 2022 - {year}</p>
+	<p class="line">KvK - 87650770</p>
+	<p class="line">BTW - NL004463884B92</p>
 </div>
 
 <style>
-    a {
-        border-style: dashed;
-        border-bottom-width: 1px;
-        border-color: hsl(var(--foreground));
-    }
+	/* self-contained brand colors so the footer renders the same inside the
+	   v2 app shell, the landing page and the root layout */
+	.brand-footer {
+		--bf-ink: #1a202c;
+		--bf-muted: #60739f;
+		--bf-magenta: #ff2aa6;
 
-    a:hover {
-        border-color: darkorange;
-    }
+		font-family: 'nudica_monolight', monospace;
+		font-size: 0.72rem;
+		line-height: 1.5;
+		color: var(--bf-muted);
+		text-align: center;
+		padding: 0.5rem 0;
+	}
 
-    .footer {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        padding: 1rem 0
-    }
+	.brand-footer.right {
+		text-align: right;
+	}
 
-    @media (max-width: 768px) {
-        .footer-content {
-            flex-direction: column;
-            gap: .5rem;
-        }
+	.brand-footer p {
+		margin: 0;
+	}
 
-        .footer-content__left {
-            text-align: center;
-        }
+	.made {
+		color: var(--bf-ink);
+	}
 
-        .footer-content__right {
-            text-align: center;
-        }
-    }
+	.heart {
+		color: var(--bf-magenta);
+	}
 
-    .footer-content {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        width: 100%;
-        /*max-width: 50rem;*/
-        padding: 0 20px;
-    }
+	.brand-footer a {
+		color: var(--bf-ink);
+		border: none;
+		border-bottom: 1px dashed var(--bf-muted);
+	}
 
-    .footer-content__left {
-        font-size: 0.8rem;
-    }
-
-    .footer-content__right {
-        display: flex;
-        flex-direction: column;
-        font-size: 0.8rem;
-    }
+	.brand-footer a:hover {
+		border-bottom-color: var(--bf-magenta);
+		color: var(--bf-magenta);
+	}
 </style>

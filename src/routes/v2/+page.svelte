@@ -1,6 +1,7 @@
 <script lang="ts">
 	import DualRangeInput from '@stanko/dual-range-input';
 	import '@stanko/dual-range-input/dist/index.css';
+	import BrandFooter from '$lib/components/BrandFooter.svelte';
 	import { computeCellGrid, type CellGrid } from '$lib/rstr2/grid';
 	import { adjustColors, isNeutralAdjustment } from '$lib/rstr2/imageAdjust';
 	import {
@@ -2104,9 +2105,7 @@
 			</section>
 
 			<div class="spacer"></div>
-			<a class="credit" href="https://d17e.dev" target="_blank" rel="noopener">
-				made with 🧡 by d17e.dev
-			</a>
+			<BrandFooter align="right" />
 		</aside>
 	</div>
 
@@ -2322,18 +2321,6 @@
 		font-size: 0.72rem;
 		text-transform: uppercase;
 		letter-spacing: 0.08em;
-	}
-
-	.credit {
-		font-family: 'argesta_regular', serif;
-		font-size: 0.72rem;
-		color: var(--muted);
-		text-align: center;
-		padding-bottom: 0.25rem;
-	}
-
-	.credit:hover {
-		color: var(--ink);
 	}
 
 	/* ------------------------------------------------- stage */
