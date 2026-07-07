@@ -2,7 +2,7 @@
 // localStorage persistence. Layers have their own config in layers.ts;
 // per-layer overrides fall back to these globals.
 
-export type SegmentationAlgorithm = 'watershed' | 'posterize' | 'kmeans';
+export type SegmentationAlgorithm = 'watershed' | 'posterize' | 'kmeans' | 'slic';
 
 export interface Rstr2Params {
 	// adjust (pre-segmentation color pipeline)
@@ -17,6 +17,8 @@ export interface Rstr2Params {
 	smoothing: number;
 	tolerance: number;
 	minRegionSize: number;
+	slicCellSize: number;
+	slicCompactness: number;
 	// lines (layer overrides inherit from these)
 	penWidthMm: number;
 	spacingMinMm: number;
@@ -39,6 +41,8 @@ export const defaultParams = (): Rstr2Params => ({
 	smoothing: 1,
 	tolerance: 0.08,
 	minRegionSize: 4,
+	slicCellSize: 8,
+	slicCompactness: 0.5,
 	penWidthMm: 0.4,
 	spacingMinMm: 0.5,
 	spacingMaxMm: 4,
@@ -50,7 +54,7 @@ export const defaultParams = (): Rstr2Params => ({
 
 export const PARAMS_STORAGE_KEY = 'rstr:v2:params';
 
-const ALGORITHMS: SegmentationAlgorithm[] = ['watershed', 'posterize', 'kmeans'];
+const ALGORITHMS: SegmentationAlgorithm[] = ['watershed', 'posterize', 'kmeans', 'slic'];
 
 /**
  * Merge a parsed value over the defaults, keeping only keys that exist in the

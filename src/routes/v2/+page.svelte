@@ -15,7 +15,8 @@
 		defaultParams,
 		parseStoredParams,
 		PARAMS_STORAGE_KEY,
-		type Rstr2Params
+		type Rstr2Params,
+		type SegmentationAlgorithm
 	} from '$lib/rstr2/params';
 	import {
 		builtinPresets,
@@ -498,6 +499,8 @@
 		void params.tolerance;
 		void params.smoothing;
 		void params.minRegionSize;
+		void params.slicCellSize;
+		void params.slicCompactness;
 		const grid = adjustedGrid;
 		if (!grid) return;
 		recomputeSegmentation(grid);
@@ -517,7 +520,9 @@
 				algorithm: params.algorithm,
 				tolerance: params.tolerance,
 				smoothing: params.smoothing,
-				minRegionSize: params.minRegionSize
+				minRegionSize: params.minRegionSize,
+				slicCellSize: params.slicCellSize,
+				slicCompactness: params.slicCompactness
 			});
 			const geometries = buildRegionGeometries(
 				seg.labels,
@@ -917,7 +922,9 @@
 					algorithm: params.algorithm,
 					tolerance: params.tolerance,
 					smoothing: params.smoothing,
-					minRegionSize: params.minRegionSize
+					minRegionSize: params.minRegionSize,
+					slicCellSize: params.slicCellSize,
+					slicCompactness: params.slicCompactness
 				});
 				const geometries = buildRegionGeometries(
 					seg.labels,
@@ -1072,6 +1079,8 @@
 		step: number;
 		/** tooltip explaining what the control does */
 		tip: string;
+		/** only shown while one of these algorithms is selected (absent = always) */
+		algorithms?: SegmentationAlgorithm[];
 	}
 
 	const ADJUST_SLIDERS: SliderDef[] = [
@@ -1135,6 +1144,24 @@
 			tip: 'blur passes before segmentation — higher = fewer, larger regions'
 		},
 		{
+			id: 'slicCellSize',
+			label: 'superpixel size',
+			min: 2,
+			max: 64,
+			step: 1,
+			algorithms: ['slic'],
+			tip: 'superpixel spacing in grid cells — smaller = more, finer superpixels'
+		},
+		{
+			id: 'slicCompactness',
+			label: 'compactness',
+			min: 0,
+			max: 1,
+			step: 0.02,
+			algorithms: ['slic'],
+			tip: 'shape regularity — high keeps superpixels grid-like, low lets them follow image detail'
+		},
+		{
 			id: 'tolerance',
 			label: 'tolerance',
 			min: 0,
@@ -1151,6 +1178,14 @@
 			tip: 'regions with fewer cells get absorbed into a neighbour'
 		}
 	];
+
+	// sliders scoped to an algorithm (SLIC's size/compactness) only show while
+	// that algorithm is selected
+	const segmentationSliders = $derived(
+		SEGMENTATION_SLIDERS.filter(
+			(slider) => !slider.algorithms || slider.algorithms.includes(params.algorithm)
+		)
+	);
 
 	const LINE_SLIDERS: SliderDef[] = [
 		{
@@ -1443,16 +1478,17 @@
 				<div class="group-title">segmentation</div>
 				<label
 					class="select-row"
-					title="segmentation strategy — watershed follows tonal basins, posterize bands intensities, k-means clusters them"
+					title="segmentation strategy — watershed follows tonal basins, posterize bands intensities, k-means clusters them, SLIC carves compact superpixels"
 				>
 					<span>algorithm</span>
 					<select bind:value={params.algorithm}>
 						<option value="watershed">Watershed</option>
 						<option value="posterize">Posterize</option>
 						<option value="kmeans">K-means</option>
+						<option value="slic">SLIC superpixels</option>
 					</select>
 				</label>
-				{#each SEGMENTATION_SLIDERS as slider (slider.id)}
+				{#each segmentationSliders as slider (slider.id)}
 					<label class="slider-row" title={slider.tip}>
 						<span>{slider.label}</span>
 						<input
