@@ -21,7 +21,7 @@ class RstrClassicGroup implements RstrGroup {
 			from: [pixel.x, pixel.y],
 			to: [pixel.x + pixel.rect.bounds.width, pixel.y + pixel.rect.bounds.height],
 			fillColor: fill,
-			strokeColor: 'darkorange',
+			strokeColor: '#ff2aa6',
 			strokeWidth: 1
 		});
 		this.timesVisited = 0;
