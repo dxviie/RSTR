@@ -64,7 +64,7 @@ describe('segmentGrid', () => {
 		return values;
 	};
 
-	it.each(['watershed', 'posterize', 'kmeans'] as const)(
+	it.each(['watershed', 'posterize', 'kmeans', 'slic'] as const)(
 		'%s splits a two-tone grid into two regions',
 		(algorithm) => {
 			const w = 16;
@@ -95,6 +95,51 @@ describe('segmentGrid', () => {
 		});
 		expect(seg.regionCount).toBe(1);
 		expect(seg.regionMean[0]).toBeCloseTo(0.5);
+	});
+
+	it('slic tiles a gradient into roughly cell-size superpixels', () => {
+		const w = 32;
+		const h = 32;
+		const values = new Float32Array(w * h);
+		for (let y = 0; y < h; y++) {
+			for (let x = 0; x < w; x++) {
+				values[y * w + x] = (x + y) / (w + h - 2);
+			}
+		}
+		const seg = segmentGrid(values, w, h, {
+			algorithm: 'slic',
+			tolerance: 0,
+			smoothing: 0,
+			minRegionSize: 1,
+			slicCellSize: 8,
+			slicCompactness: 0.9
+		});
+		// a 32x32 grid at cell size 8 seeds a 4x4 superpixel lattice
+		expect(seg.regionCount).toBeGreaterThanOrEqual(12);
+		expect(seg.regionCount).toBeLessThanOrEqual(24);
+		const total = Array.from(seg.regionSize).reduce((a, b) => a + b, 0);
+		expect(total).toBe(w * h);
+	});
+
+	it('slic cell size controls the superpixel count', () => {
+		const w = 32;
+		const h = 32;
+		const values = new Float32Array(w * h);
+		for (let y = 0; y < h; y++) {
+			for (let x = 0; x < w; x++) {
+				values[y * w + x] = (x + y) / (w + h - 2);
+			}
+		}
+		const options = {
+			algorithm: 'slic' as const,
+			tolerance: 0,
+			smoothing: 0,
+			minRegionSize: 1,
+			slicCompactness: 0.9
+		};
+		const fine = segmentGrid(values, w, h, { ...options, slicCellSize: 4 });
+		const coarse = segmentGrid(values, w, h, { ...options, slicCellSize: 16 });
+		expect(fine.regionCount).toBeGreaterThan(coarse.regionCount);
 	});
 
 	it('absorbs regions below the minimum size', () => {
@@ -281,6 +326,19 @@ describe('param persistence', () => {
 		expect(params.algorithm).toBe('kmeans');
 		expect(params.tolerance).toBe(defaultParams().tolerance);
 		expect('bogus' in params).toBe(false);
+	});
+
+	it('accepts slic and its parameters', () => {
+		const params = parseStoredParams(
+			JSON.stringify({ algorithm: 'slic', slicCellSize: 12, slicCompactness: 0.25 })
+		);
+		expect(params.algorithm).toBe('slic');
+		expect(params.slicCellSize).toBe(12);
+		expect(params.slicCompactness).toBe(0.25);
+		// settings saved before slic existed fall back to the defaults
+		const legacy = parseStoredParams(JSON.stringify({ algorithm: 'watershed' }));
+		expect(legacy.slicCellSize).toBe(defaultParams().slicCellSize);
+		expect(legacy.slicCompactness).toBe(defaultParams().slicCompactness);
 	});
 
 	it('falls back to defaults on corrupt storage', () => {
