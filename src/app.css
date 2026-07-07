@@ -2,10 +2,36 @@
 @tailwind components;
 @tailwind utilities;
 
+/* d17e.dev house fonts */
+@font-face {
+    font-family: 'nudica_monobold';
+    src: url('/fonts/nudicamono-bold-webfont.woff') format('woff');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'nudica_monolight';
+    src: url('/fonts/nudicamono-light-webfont.woff') format('woff');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'argesta_regular';
+    src: url('/fonts/argestatext-regular-webfont.woff') format('woff');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
 @layer base {
     :root {
-        --background: 0 0% 100%;
-        --foreground: 222.2 84% 4.9%;
+        /* d17e.dev palette: bg #fdfaff, ink #1a202c, magenta accent #ff2aa6 */
+        --background: 276 100% 99%;
+        --foreground: 220 26% 14%;
 
         --muted: 210 40% 96.1%;
         --muted-foreground: 215.4 16.3% 46.9%;
@@ -19,19 +45,19 @@
         --border: 214.3 31.8% 91.4%;
         --input: 214.3 31.8% 91.4%;
 
-        --primary: 222.2 47.4% 11.2%;
-        --primary-foreground: 210 40% 98%;
+        --primary: 220 26% 14%;
+        --primary-foreground: 276 100% 99%;
 
         --secondary: 210 40% 96.1%;
-        --secondary-foreground: 222.2 47.4% 11.2%;
+        --secondary-foreground: 220 26% 14%;
 
-        --accent: 210 40% 96.1%;
-        --accent-foreground: 222.2 47.4% 11.2%;
+        --accent: 325 100% 58%;
+        --accent-foreground: 276 100% 99%;
 
         --destructive: 0 72.2% 50.6%;
         --destructive-foreground: 210 40% 98%;
 
-        --ring: 222.2 84% 4.9%;
+        --ring: 220 26% 14%;
 
         --radius: 0.5rem;
 
@@ -40,23 +66,23 @@
          */
         --tp-base-background-color: hsla(230, 0%, 100%, 0);
         --tp-base-shadow-color: hsla(0, 0%, 0%, 0.10);
-        --tp-button-background-color: hsla(222, 47%, 11%, 1.00);
-        --tp-button-background-color-active: hsla(222, 47%, 26%, 1.00);
-        --tp-button-background-color-focus: hsla(222, 48%, 21%, 1.00);
-        --tp-button-background-color-hover: hsla(223, 46%, 16%, 1.00);
+        --tp-button-background-color: hsla(220, 26%, 14%, 1.00);
+        --tp-button-background-color-active: hsla(220, 26%, 30%, 1.00);
+        --tp-button-background-color-focus: hsla(220, 26%, 25%, 1.00);
+        --tp-button-background-color-hover: hsla(220, 26%, 20%, 1.00);
         --tp-button-foreground-color: hsla(230, 0%, 100%, 1.00);
-        --tp-container-background-color: hsla(222, 47%, 11%, 1.00);
-        --tp-container-background-color-active: hsla(222, 47%, 26%, 1.00);
-        --tp-container-background-color-focus: hsla(222, 48%, 21%, 1.00);
-        --tp-container-background-color-hover: hsla(223, 46%, 16%, 1.00);
+        --tp-container-background-color: hsla(220, 26%, 14%, 1.00);
+        --tp-container-background-color-active: hsla(220, 26%, 30%, 1.00);
+        --tp-container-background-color-focus: hsla(220, 26%, 25%, 1.00);
+        --tp-container-background-color-hover: hsla(220, 26%, 20%, 1.00);
         --tp-container-foreground-color: hsla(230, 0%, 100%, 1.00);
         --tp-groove-foreground-color: hsla(230, 0%, 100%, 1.00);
         --tp-input-background-color: hsla(230, 0%, 94%, 1.00);
         --tp-input-background-color-active: hsla(0, 0%, 79%, 1.00);
         --tp-input-background-color-focus: hsla(0, 0%, 84%, 1.00);
         --tp-input-background-color-hover: hsla(0, 0%, 89%, 1.00);
-        --tp-input-foreground-color: hsla(222, 47%, 11%, 1.00);
-        --tp-label-foreground-color: hsla(222, 47%, 11%, 1.00);
+        --tp-input-foreground-color: hsla(220, 26%, 14%, 1.00);
+        --tp-label-foreground-color: hsla(220, 26%, 14%, 1.00);
         --tp-monitor-background-color: hsla(230, 0%, 60%, 0.10);
         --tp-monitor-foreground-color: hsla(230, 0%, 0%, 0.50);
 
@@ -96,8 +122,7 @@
 }
 
 button {
-    font-family: Bitter, serif;
-    font-weight: bold;
+    font-family: 'nudica_monobold', monospace;
 }
 
 button:active {
