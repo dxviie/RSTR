@@ -29,7 +29,7 @@
 	import { segmentGrid } from '$lib/rstr2/segmentation';
 	import { buildRegionGeometries } from '$lib/rstr2/regionTools';
 	import { hatchPolygon, spacingForInk, type HatchSegments } from '$lib/rstr2/hatchTools';
-	import { buildSvgDocument } from '$lib/rstr2/svgExport';
+	import { buildSvgDocument, type ExportLayer } from '$lib/rstr2/svgExport';
 	import {
 		defaultPlotterConfig,
 		estimateLayerPlotTime,
@@ -38,6 +38,17 @@
 		PLOTTER_STORAGE_KEY,
 		type PlotterConfig
 	} from '$lib/rstr2/plotTime';
+	import {
+		defaultVideoConfig,
+		exportFrameRange,
+		frameTime,
+		MAX_SEQUENCE_FRAMES,
+		parseStoredVideoConfig,
+		totalFrameCount,
+		VIDEO_STORAGE_KEY,
+		type VideoExportConfig
+	} from '$lib/rstr2/video';
+	import { buildZip, type ZipEntry } from '$lib/rstr2/zip';
 
 	//***************************************************************
 	// 														STATE
@@ -102,6 +113,23 @@
 	let fileInput: HTMLInputElement | undefined = $state();
 	let dragActive = $state(false);
 
+	// video input — the source element stays hidden, frames are pulled out of
+	// it on demand and fed into the same pipeline an image goes through
+	const loadVideoConfig = (): VideoExportConfig => {
+		if (typeof localStorage === 'undefined') return defaultVideoConfig();
+		return parseStoredVideoConfig(localStorage.getItem(VIDEO_STORAGE_KEY));
+	};
+	const video: VideoExportConfig = $state(loadVideoConfig());
+	let videoSrc = $state('');
+	let videoName = $state('');
+	let videoEl: HTMLVideoElement | undefined = $state();
+	let videoDuration = $state(0);
+	/** timeline position, in output frames at the chosen fps */
+	let currentFrame = $state(0);
+
+	const videoTotalFrames = $derived(totalFrameCount(videoDuration, video.fps));
+	const videoRange = $derived(exportFrameRange(videoDuration, video));
+
 	// While the user works the adjust sliders we show the (adjusted) input
 	// image instead of the hatch render, so the effect of the sliders on the
 	// source is visible; shortly after the last interaction we flip back.
@@ -126,23 +154,38 @@
 		const json = JSON.stringify(layers);
 		if (typeof localStorage !== 'undefined') localStorage.setItem(LAYER_STORAGE_KEY, json);
 	});
+	$effect(() => {
+		const json = JSON.stringify(video);
+		if (typeof localStorage !== 'undefined') localStorage.setItem(VIDEO_STORAGE_KEY, json);
+	});
 
 	//***************************************************************
 	// 														IMAGE INPUT
 	//***************************************************************
 
-	// start with a random sample so there is something to play with right away
+	// Start with a random sample so there is something to play with right
+	// away — once. Later transitions through an empty input (switching from
+	// video back to an image) must not race the user's own pick.
+	let sampleOffered = false;
 	$effect(() => {
-		if (!inputImage) {
+		if (!inputImage && !videoSrc && !sampleOffered) {
+			sampleOffered = true;
 			inputImage = SAMPLE_IMAGES[Math.floor(Math.random() * SAMPLE_IMAGES.length)];
 		}
 	});
 
 	const openFile = (files: FileList | null | undefined) => {
 		const file = files?.[0];
-		if (!file || !file.type.startsWith('image/')) return;
+		if (!file) return;
+		if (file.type.startsWith('video/')) {
+			openVideoFile(file);
+			return;
+		}
+		if (!file.type.startsWith('image/')) return;
 		const reader = new FileReader();
 		reader.onload = () => {
+			// only drop a running video once the image is actually ready
+			closeVideo();
 			inputImage = reader.result as string;
 		};
 		reader.readAsDataURL(file);
@@ -155,6 +198,148 @@
 	};
 
 	//***************************************************************
+	// 														VIDEO INPUT
+	//***************************************************************
+
+	const openVideoFile = (file: File) => {
+		closeVideo();
+		inputImage = '';
+		hatchReady = false;
+		videoName = file.name;
+		videoSrc = URL.createObjectURL(file);
+	};
+
+	const closeVideo = () => {
+		if (videoSrc) URL.revokeObjectURL(videoSrc);
+		videoSrc = '';
+		videoName = '';
+		videoDuration = 0;
+		currentFrame = 0;
+	};
+
+	const onVideoMetadata = () => {
+		const el = videoEl;
+		if (!el) return;
+		// Mobile browsers won't decode frames from a video that never played;
+		// a muted inline play/pause kick makes drawImage deliver pixels there.
+		el.play()
+			.then(() => el.pause())
+			.catch(() => {
+				/* autoplay denied — desktop browsers decode without it */
+			});
+		if (!isFinite(el.duration)) {
+			// screen/browser recordings (MediaRecorder webm) report Infinity
+			// until the decoder is pushed to the end once — force that, then
+			// read the real duration
+			const fix = () => {
+				el.removeEventListener('durationchange', fix);
+				if (isFinite(el.duration)) applyVideoDuration(el.duration);
+			};
+			el.addEventListener('durationchange', fix);
+			el.currentTime = Number.MAX_SAFE_INTEGER;
+			return;
+		}
+		applyVideoDuration(el.duration);
+	};
+
+	const applyVideoDuration = (duration: number) => {
+		videoDuration = duration;
+		// land the playhead on the first exported frame
+		currentFrame = exportFrameRange(duration, video).start;
+	};
+
+	const seekVideo = (el: HTMLVideoElement, t: number): Promise<void> =>
+		new Promise((resolve) => {
+			if (el.readyState >= 2 && Math.abs(el.currentTime - t) < 1e-3) {
+				resolve();
+				return;
+			}
+			const done = () => {
+				el.removeEventListener('seeked', done);
+				resolve();
+			};
+			el.addEventListener('seeked', done);
+			el.currentTime = t;
+		});
+
+	// scrub / fps change / new video -> current frame into the pipeline (the
+	// same entry point a loaded image uses: pixels + preview base)
+	let grabToken = 0;
+	$effect(() => {
+		const frame = currentFrame;
+		void video.fps;
+		const el = videoEl;
+		// the export loop owns the video element while it runs; when it ends
+		// this effect re-runs and restores the scrubbed frame
+		if (!videoSrc || !el || !videoDuration || exporting.running) return;
+		grabFrame(el, frame);
+	});
+
+	const grabFrame = async (el: HTMLVideoElement, frame: number) => {
+		const token = ++grabToken;
+		await seekVideo(el, frameTime(frame, video.fps, videoDuration));
+		// bail if outrun by a newer grab or the video was swapped for an image
+		if (token !== grabToken || !videoSrc || !el.videoWidth) return;
+		const canvas = document.createElement('canvas');
+		canvas.width = el.videoWidth;
+		canvas.height = el.videoHeight;
+		const ctx = canvas.getContext('2d');
+		if (!ctx) return;
+		ctx.drawImage(el, 0, 0);
+		imgWidth = canvas.width;
+		imgHeight = canvas.height;
+		pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+		previewBase = buildPreviewBase(canvas, canvas.width, canvas.height);
+	};
+
+	// keep the playhead and the start offset inside the video when the fps
+	// (and with it the frame count) changes
+	$effect(() => {
+		const total = videoTotalFrames;
+		if (!total) return;
+		if (currentFrame > total - 1) currentFrame = total - 1;
+		if (video.startFrame > total - 1) video.startFrame = total - 1;
+	});
+
+	// The export window is edited as [start, end] on a dual-range slider;
+	// internally it stays start offset + frame cap, so a longer video (or a
+	// higher fps) keeps growing the window until the cap bites again.
+	const videoEndFrame = $derived(
+		Math.min(video.startFrame + video.maxFrames - 1, Math.max(videoTotalFrames - 1, 0))
+	);
+
+	const setFrameWindow = (start: number, end: number) => {
+		const last = Math.max(videoTotalFrames - 1, 0);
+		const s = Math.min(Math.max(Math.floor(start), 0), last);
+		const e = Math.min(Math.max(Math.floor(end), s), last);
+		video.startFrame = s;
+		video.maxFrames = Math.min(e - s + 1, MAX_SEQUENCE_FRAMES);
+	};
+
+	// dual-range slider for the export window, same setup as the spacing one
+	let frameMinEl: HTMLInputElement | undefined = $state();
+	let frameMaxEl: HTMLInputElement | undefined = $state();
+	let frameDri: DualRangeInput | undefined;
+
+	$effect(() => {
+		if (!frameMinEl || !frameMaxEl) return;
+		frameDri = new DualRangeInput(frameMinEl, frameMaxEl);
+		return () => {
+			frameDri?.destroy();
+			frameDri = undefined;
+		};
+	});
+
+	// keep the track fill in sync when the window changes from the number
+	// inputs or the frame count changes with the fps
+	$effect(() => {
+		void video.startFrame;
+		void video.maxFrames;
+		void videoTotalFrames;
+		frameDri?.update();
+	});
+
+	//***************************************************************
 	// 														PIPELINE
 	//***************************************************************
 
@@ -165,6 +350,8 @@
 		hatchReady = false;
 		const img = new Image();
 		img.onload = () => {
+			// a newer source (another image, or a video frame) won the race
+			if (inputImage !== src) return;
 			const canvas = document.createElement('canvas');
 			canvas.width = img.width;
 			canvas.height = img.height;
@@ -174,21 +361,25 @@
 			imgWidth = img.width;
 			imgHeight = img.height;
 			pixels = ctx.getImageData(0, 0, img.width, img.height).data;
-			previewBase = buildPreviewBase(img);
+			previewBase = buildPreviewBase(img, img.width, img.height);
 		};
 		img.src = src;
 	});
 
-	const buildPreviewBase = (img: HTMLImageElement): PreviewBase | null => {
-		const scale = Math.min(1, PREVIEW_MAX_PX / Math.max(img.width, img.height));
-		const w = Math.max(1, Math.round(img.width * scale));
-		const h = Math.max(1, Math.round(img.height * scale));
+	const buildPreviewBase = (
+		source: HTMLImageElement | HTMLCanvasElement,
+		width: number,
+		height: number
+	): PreviewBase | null => {
+		const scale = Math.min(1, PREVIEW_MAX_PX / Math.max(width, height));
+		const w = Math.max(1, Math.round(width * scale));
+		const h = Math.max(1, Math.round(height * scale));
 		const canvas = document.createElement('canvas');
 		canvas.width = w;
 		canvas.height = h;
 		const ctx = canvas.getContext('2d');
 		if (!ctx) return null;
-		ctx.drawImage(img, 0, 0, w, h);
+		ctx.drawImage(source, 0, 0, w, h);
 		const data = ctx.getImageData(0, 0, w, h).data;
 		const n = w * h;
 		const r = new Float32Array(n);
@@ -376,7 +567,10 @@
 	// Pick a hatch angle within the layer's range based on the region's own
 	// shape (bbox diagonal): wide regions and tall regions get different
 	// directions within the same layer.
-	const angleForRegion = (layer: LayerConfig, region: RenderRegion): number => {
+	const angleForRegion = (
+		layer: LayerConfig,
+		region: Pick<RenderRegion, 'boundsW' | 'boundsH'>
+	): number => {
 		const base = Math.atan2(region.boundsH, region.boundsW) * (180 / Math.PI); // 0..90
 		return layer.angleMin + (base / 90) * (layer.angleMax - layer.angleMin);
 	};
@@ -690,6 +884,179 @@
 	};
 
 	//***************************************************************
+	// 												SEQUENCE EXPORT
+	//***************************************************************
+
+	const exporting = $state({ running: false, done: 0, total: 0, bytes: 0, cancel: false });
+
+	const rasterExt = $derived(video.rasterFormat === 'jpeg' ? 'jpg' : video.rasterFormat);
+
+	/**
+	 * Run one frame through the full pipeline off-screen: grid -> adjust ->
+	 * per-layer segmentation -> hatching. Same math as the interactive
+	 * effects, but synchronous and without touching any reactive state.
+	 */
+	const computeExportLayers = (px: Uint8ClampedArray, w: number, h: number): ExportLayer[] => {
+		const adjustments = {
+			brightness: params.brightness,
+			contrast: params.contrast,
+			gamma: params.imageGamma,
+			saturation: params.saturation,
+			vibrance: params.vibrance
+		};
+		const grid = computeCellGrid(px, w, h, params.resolution);
+		const adjusted = isNeutralAdjustment(adjustments)
+			? grid
+			: { ...grid, ...adjustColors(grid.r, grid.g, grid.b, adjustments) };
+		const pxPerMm = w / params.outputWidthMm;
+		return layers
+			.filter((layer) => layer.enabled)
+			.map((layer) => {
+				const values = extractChannel(adjusted.r, adjusted.g, adjusted.b, layer.channel);
+				const seg = segmentGrid(values, adjusted.cols, adjusted.rows, {
+					algorithm: params.algorithm,
+					tolerance: params.tolerance,
+					smoothing: params.smoothing,
+					minRegionSize: params.minRegionSize
+				});
+				const geometries = buildRegionGeometries(
+					seg.labels,
+					seg.regionCount,
+					adjusted.cols,
+					adjusted.rows,
+					adjusted.cellW,
+					adjusted.cellH
+				);
+				const hatch = effectiveHatch(layer);
+				const penWidthPx = hatch.penWidthMm * pxPerMm;
+				const minSpacingPx = Math.max(hatch.spacingMinMm * pxPerMm, 0.1);
+				const maxSpacingPx = Math.max(hatch.spacingMaxMm * pxPerMm, minSpacingPx);
+				const spacingOptions = {
+					curve: 'coverage' as const,
+					gamma: hatch.gamma,
+					inkBoost: hatch.inkBoost
+				};
+				const segments = geometries.map((geometry) => {
+					const ink = seg.regionMean[geometry.id];
+					if (ink < hatch.threshold) return [];
+					const spacing = spacingForInk(
+						ink,
+						penWidthPx,
+						minSpacingPx,
+						maxSpacingPx,
+						spacingOptions
+					);
+					const angle = angleForRegion(layer, {
+						boundsW: geometry.maxX - geometry.minX,
+						boundsH: geometry.maxY - geometry.minY
+					});
+					return hatchPolygon(geometry.loops, angle, spacing, penWidthPx);
+				});
+				return { layer, penWidthPx, segments };
+			});
+	};
+
+	/** render export layers to a raster blob, mirroring the preview style */
+	const renderRasterBlob = (
+		exportLayers: ExportLayer[],
+		w: number,
+		h: number
+	): Promise<Blob | null> => {
+		const canvas = document.createElement('canvas');
+		canvas.width = Math.max(1, Math.round(w * video.rasterScale));
+		canvas.height = Math.max(1, Math.round(h * video.rasterScale));
+		const ctx = canvas.getContext('2d');
+		if (!ctx) return Promise.resolve(null);
+		ctx.scale(canvas.width / w, canvas.height / h);
+		ctx.fillStyle = '#FFFEF7'; // warm paper white
+		ctx.fillRect(0, 0, w, h);
+		ctx.lineCap = 'round';
+		ctx.globalCompositeOperation = 'multiply';
+		ctx.globalAlpha = 0.85;
+		for (const { layer, penWidthPx, segments } of exportLayers) {
+			ctx.strokeStyle = layer.color;
+			ctx.lineWidth = penWidthPx;
+			ctx.beginPath();
+			for (const segmentList of segments) {
+				for (let k = 0; k < segmentList.length; k += 4) {
+					ctx.moveTo(segmentList[k], segmentList[k + 1]);
+					ctx.lineTo(segmentList[k + 2], segmentList[k + 3]);
+				}
+			}
+			ctx.stroke();
+		}
+		const mime =
+			video.rasterFormat === 'png'
+				? 'image/png'
+				: video.rasterFormat === 'jpeg'
+					? 'image/jpeg'
+					: 'image/webp';
+		return new Promise((resolve) => canvas.toBlob(resolve, mime, video.rasterQuality));
+	};
+
+	const exportSequence = async () => {
+		const el = videoEl;
+		if (!el || !videoDuration || exporting.running) return;
+		if (!video.exportSvg && !video.exportRaster) return;
+		const range = exportFrameRange(videoDuration, video);
+		if (range.count === 0) return;
+		exporting.running = true;
+		exporting.cancel = false;
+		exporting.done = 0;
+		exporting.total = range.count;
+		exporting.bytes = 0;
+
+		const encoder = new TextEncoder();
+		const entries: ZipEntry[] = [];
+		// both formats in one archive get sorted into subfolders
+		const both = video.exportSvg && video.exportRaster;
+		const grabCanvas = document.createElement('canvas');
+		grabCanvas.width = el.videoWidth;
+		grabCanvas.height = el.videoHeight;
+		const grabCtx = grabCanvas.getContext('2d', { willReadFrequently: true });
+		try {
+			if (!grabCtx) return;
+			for (let i = 0; i < range.count; i++) {
+				if (exporting.cancel) return;
+				const frame = range.start + i;
+				await seekVideo(el, frameTime(frame, video.fps, videoDuration));
+				grabCtx.drawImage(el, 0, 0);
+				const px = grabCtx.getImageData(0, 0, grabCanvas.width, grabCanvas.height).data;
+				const exportLayers = computeExportLayers(px, grabCanvas.width, grabCanvas.height);
+				const name = `frame-${String(frame).padStart(5, '0')}`;
+				if (video.exportSvg) {
+					const svg = buildSvgDocument(
+						exportLayers,
+						grabCanvas.width,
+						grabCanvas.height,
+						params.outputWidthMm
+					);
+					const data = encoder.encode(svg);
+					entries.push({ name: `${both ? 'svg/' : ''}${name}.svg`, data });
+					exporting.bytes += data.length;
+				}
+				if (video.exportRaster) {
+					const blob = await renderRasterBlob(exportLayers, grabCanvas.width, grabCanvas.height);
+					if (blob) {
+						const data = new Uint8Array(await blob.arrayBuffer());
+						entries.push({ name: `${both ? `${rasterExt}/` : ''}${name}.${rasterExt}`, data });
+						exporting.bytes += data.length;
+					}
+				}
+				exporting.done = i + 1;
+				// let the progress bar paint between frames
+				await nextFrame();
+			}
+			if (entries.length > 0) {
+				const zip = buildZip(entries);
+				downloadBlob(new Blob([zip], { type: 'application/zip' }), `rstr-seq-${stamp()}.zip`);
+			}
+		} finally {
+			exporting.running = false;
+		}
+	};
+
+	//***************************************************************
 	// 														CONTROLS
 	//***************************************************************
 
@@ -954,10 +1321,12 @@
 					<button
 						class="thumb current"
 						onclick={() => fileInput?.click()}
-						title="browse for an image"
+						title="browse for an image or video"
 					>
 						{#if inputImage}
 							<img src={inputImage} alt="current input" />
+						{:else if videoSrc}
+							<span class="thumb-video" title={videoName}>🎞</span>
 						{:else}
 							+
 						{/if}
@@ -965,11 +1334,14 @@
 					<button
 						class="browse-btn"
 						onclick={() => fileInput?.click()}
-						title="pick an image from your device — it never leaves the browser"
+						title="pick an image or video from your device — it never leaves the browser"
 					>
-						browse an image<span class="browse-sub">or drop one on the render</span>
+						browse image / video<span class="browse-sub">or drop one on the render</span>
 					</button>
 				</div>
+				{#if videoSrc}
+					<div class="video-name" title={videoName}>{videoName}</div>
+				{/if}
 				{#each ADJUST_SLIDERS as slider (slider.id)}
 					<label class="slider-row" title={slider.tip}>
 						<span>{slider.label}</span>
@@ -993,6 +1365,79 @@
 					</label>
 				{/each}
 			</section>
+
+			{#if videoSrc}
+				<section class="panel-group">
+					<div class="group-title">video</div>
+					<label
+						class="slider-row"
+						title="output frame rate the video is sampled at — fewer frames per second means fewer, smaller files"
+					>
+						<span>output fps</span>
+						<input type="range" min="1" max="30" step="1" bind:value={video.fps} />
+						<input type="number" min="1" max="60" step="1" bind:value={video.fps} />
+					</label>
+					<div
+						class="spacing-control"
+						title="exported frame window — start frame offset and last frame; the timeline shades this range"
+					>
+						<div class="spacing-head">
+							<span>frames</span>
+							<input
+								type="number"
+								min="0"
+								max={videoEndFrame}
+								step="1"
+								value={video.startFrame}
+								oninput={(event) =>
+									setFrameWindow(Number(event.currentTarget.value), videoEndFrame)}
+								title="first exported frame — skips everything before it"
+							/>
+							<span class="spacing-dash">–</span>
+							<input
+								type="number"
+								min={video.startFrame}
+								max={Math.max(videoTotalFrames - 1, 0)}
+								step="1"
+								value={videoEndFrame}
+								oninput={(event) =>
+									setFrameWindow(video.startFrame, Number(event.currentTarget.value))}
+								title="last exported frame"
+							/>
+						</div>
+						<div class="dual-range-input">
+							<input
+								bind:this={frameMinEl}
+								type="range"
+								min="0"
+								max={Math.max(videoTotalFrames - 1, 0)}
+								step="1"
+								value={video.startFrame}
+								oninput={(event) =>
+									setFrameWindow(Number(event.currentTarget.value), videoEndFrame)}
+							/>
+							<input
+								bind:this={frameMaxEl}
+								type="range"
+								min="0"
+								max={Math.max(videoTotalFrames - 1, 0)}
+								step="1"
+								value={videoEndFrame}
+								oninput={(event) =>
+									setFrameWindow(video.startFrame, Number(event.currentTarget.value))}
+							/>
+						</div>
+					</div>
+					<div
+						class="video-summary"
+						title="what the current fps, start frame and limit select out of the video"
+					>
+						→ {videoRange.count} frame{videoRange.count === 1 ? '' : 's'} · {(
+							videoRange.count / video.fps
+						).toFixed(1)}s of {videoDuration.toFixed(1)}s
+					</div>
+				</section>
+			{/if}
 
 			<section class="panel-group">
 				<div class="group-title">segmentation</div>
@@ -1098,6 +1543,7 @@
 		<main
 			class="stage"
 			class:drag-active={dragActive}
+			style={`--stage-aspect: ${imgWidth && imgHeight ? imgHeight / imgWidth : 0.75}`}
 			ondragover={(event) => {
 				event.preventDefault();
 				dragActive = true;
@@ -1122,12 +1568,55 @@
 			{#if !adjustActive && !hatchReady}
 				{#if inputImage}
 					<img class="render placeholder" src={inputImage} alt="input" />
-				{:else}
+				{:else if !videoSrc}
 					<div class="dropzone-hint">
-						<p class="hint-title">drop an image here</p>
+						<p class="hint-title">drop an image or video here</p>
 						<p class="hint-sub">everything stays in your browser</p>
 					</div>
 				{/if}
+			{/if}
+			{#if videoSrc && videoTotalFrames > 0}
+				<div class="timeline">
+					<div class="timeline-buttons">
+						<button
+							class="icon-btn"
+							onclick={() => (currentFrame = Math.max(currentFrame - 1, 0))}
+							disabled={exporting.running || currentFrame <= 0}
+							title="previous frame">◂</button
+						>
+						<button
+							class="icon-btn"
+							onclick={() => (currentFrame = Math.min(currentFrame + 1, videoTotalFrames - 1))}
+							disabled={exporting.running || currentFrame >= videoTotalFrames - 1}
+							title="next frame">▸</button
+						>
+					</div>
+					<div
+						class="timeline-track"
+						title="scrub through the video — the shaded band is the exported range"
+					>
+						<div
+							class="timeline-window"
+							style={`left: ${(videoRange.start / videoTotalFrames) * 100}%; width: ${(videoRange.count / videoTotalFrames) * 100}%`}
+						></div>
+						<input
+							class="timeline-scrub"
+							type="range"
+							min="0"
+							max={videoTotalFrames - 1}
+							step="1"
+							bind:value={currentFrame}
+							disabled={exporting.running}
+						/>
+					</div>
+					<div class="timeline-readout" title="frame index and time of the playhead">
+						{currentFrame} / {videoTotalFrames - 1} · {frameTime(
+							currentFrame,
+							video.fps,
+							videoDuration
+						).toFixed(2)}s
+					</div>
+				</div>
 			{/if}
 		</main>
 
@@ -1401,6 +1890,97 @@
 						↓ PNG
 					</button>
 				</div>
+				{#if videoSrc}
+					<div class="seq-block">
+						<div
+							class="seq-title"
+							title="render every frame in the selected range and download them as one zip"
+						>
+							frame sequence
+						</div>
+						<div class="seq-formats">
+							<label title="one plottable SVG per frame — filesize follows the line count">
+								<input type="checkbox" bind:checked={video.exportSvg} /> svg
+							</label>
+							<label title="one rendered image per frame">
+								<input type="checkbox" bind:checked={video.exportRaster} /> image
+							</label>
+							<select
+								bind:value={video.rasterFormat}
+								disabled={!video.exportRaster}
+								title="image format — jpeg/webp trade quality for much smaller files, png is lossless"
+							>
+								<option value="png">png</option>
+								<option value="jpeg">jpeg</option>
+								<option value="webp">webp</option>
+							</select>
+						</div>
+						{#if video.exportRaster}
+							<label
+								class="slider-row"
+								title="jpeg/webp encoder quality — lower means smaller files; png ignores it"
+							>
+								<span>quality</span>
+								<input
+									type="range"
+									min="0.05"
+									max="1"
+									step="0.05"
+									bind:value={video.rasterQuality}
+									disabled={video.rasterFormat === 'png'}
+								/>
+								<input
+									type="number"
+									min="0.05"
+									max="1"
+									step="0.05"
+									bind:value={video.rasterQuality}
+									disabled={video.rasterFormat === 'png'}
+								/>
+							</label>
+							<label
+								class="slider-row"
+								title="image size relative to the video resolution — the main filesize lever"
+							>
+								<span>scale</span>
+								<input type="range" min="0.1" max="1" step="0.05" bind:value={video.rasterScale} />
+								<input type="number" min="0.1" max="1" step="0.05" bind:value={video.rasterScale} />
+							</label>
+						{/if}
+						{#if exporting.running}
+							<div class="seq-progress">
+								<div class="seq-progress-bar">
+									<div
+										class="seq-progress-fill"
+										style={`width: ${(exporting.done / Math.max(exporting.total, 1)) * 100}%`}
+									></div>
+								</div>
+								<span class="seq-progress-text"
+									>{exporting.done}/{exporting.total} · {(exporting.bytes / (1024 * 1024)).toFixed(
+										1
+									)}MB</span
+								>
+								<button
+									class="icon-btn remove"
+									onclick={() => (exporting.cancel = true)}
+									title="stop the export — nothing is downloaded">✕</button
+								>
+							</div>
+						{:else}
+							<button
+								class="primary-btn"
+								onclick={exportSequence}
+								disabled={!hatchReady ||
+									status.busy ||
+									videoRange.count === 0 ||
+									(!video.exportSvg && !video.exportRaster)}
+								title="render every frame in the selected range with the current settings and download the sequence as one zip"
+							>
+								↓ export {videoRange.count} frame{videoRange.count === 1 ? '' : 's'} (.zip)
+							</button>
+						{/if}
+					</div>
+				{/if}
 				<div class="stats">
 					{#if status.busy}
 						<div class="stat-row wide"><span class="busy-dot"></span> computing…</div>
@@ -1497,10 +2077,25 @@
 	<input
 		bind:this={fileInput}
 		type="file"
-		accept="image/*"
+		accept="image/*,video/*"
 		style="display: none;"
 		onchange={(event) => openFile(event.currentTarget.files)}
 	/>
+
+	{#if videoSrc}
+		<!-- hidden decoder — frames are seeked out of it into the pipeline -->
+		<video
+			bind:this={videoEl}
+			class="hidden-video"
+			src={videoSrc}
+			preload="auto"
+			muted
+			playsinline
+			onloadedmetadata={onVideoMetadata}
+		>
+			<track kind="captions" />
+		</video>
+	{/if}
 
 	<input
 		bind:this={settingsFileInput}
@@ -1652,6 +2247,9 @@
 		flex: 1;
 		display: flex;
 		min-height: 0;
+		/* size container for the mobile stage height (cqw sees the true
+		   content width, unlike 100vw which includes scrollbars) */
+		container-type: inline-size;
 	}
 
 	.pane {
@@ -2338,6 +2936,173 @@
 		}
 	}
 
+	/* ------------------------------------------------- video */
+
+	/* parked offscreen rather than display:none — mobile browsers refuse to
+	   decode frames from an unrendered video element */
+	.hidden-video {
+		position: fixed;
+		right: 0;
+		bottom: 0;
+		width: 2px;
+		height: 2px;
+		opacity: 0.01;
+		pointer-events: none;
+	}
+
+	.thumb-video {
+		font-size: 1.5rem;
+	}
+
+	.video-name {
+		font-family: 'argesta_regular', serif;
+		font-size: 0.66rem;
+		color: var(--muted);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.video-summary {
+		font-family: 'argesta_regular', serif;
+		font-size: 0.68rem;
+		color: var(--muted);
+	}
+
+	/* floating scrubber over the bottom edge of the stage */
+	.timeline {
+		position: absolute;
+		left: 0.75rem;
+		right: 0.75rem;
+		bottom: 0.75rem;
+		z-index: 2;
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.35rem 0.6rem;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: rgba(255, 255, 255, 0.88);
+		-webkit-backdrop-filter: blur(6px);
+		backdrop-filter: blur(6px);
+		box-shadow: 0 2px 6px rgba(96, 115, 159, 0.15);
+	}
+
+	.timeline-buttons {
+		display: flex;
+		gap: 0.25rem;
+	}
+
+	.timeline-track {
+		position: relative;
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		align-items: center;
+		height: 1.3rem;
+	}
+
+	/* the exported range shows as a shaded band under the scrubber */
+	.timeline-window {
+		position: absolute;
+		top: 50%;
+		transform: translateY(-50%);
+		height: 1rem;
+		background: var(--muted-light);
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		pointer-events: none;
+	}
+
+	.timeline-scrub {
+		position: relative;
+		width: 100%;
+		min-width: 0;
+		margin: 0;
+	}
+
+	.timeline-readout {
+		font-family: 'nudica_monobold', monospace;
+		font-size: 0.65rem;
+		color: var(--ink);
+		white-space: nowrap;
+	}
+
+	/* ------------------------------------------------- sequence export */
+
+	.seq-block {
+		display: flex;
+		flex-direction: column;
+		gap: 0.45rem;
+		border-top: 1px dashed var(--border);
+		padding-top: 0.45rem;
+	}
+
+	.seq-title {
+		font-size: 0.68rem;
+		color: var(--muted);
+	}
+
+	.seq-formats {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		color: var(--muted);
+		font-size: 0.7rem;
+	}
+
+	.seq-formats label {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+		cursor: pointer;
+	}
+
+	.seq-formats select {
+		flex: 1;
+		min-width: 0;
+		padding: 0.15rem 0.25rem;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		background: #fff;
+		color: var(--ink);
+		font-family: inherit;
+		font-size: 0.72rem;
+	}
+
+	.seq-formats select:disabled {
+		opacity: 0.45;
+	}
+
+	.seq-progress {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+	}
+
+	.seq-progress-bar {
+		flex: 1;
+		min-width: 0;
+		height: 0.45rem;
+		border: 1px solid var(--border);
+		border-radius: 999px;
+		background: #fff;
+		overflow: hidden;
+	}
+
+	.seq-progress-fill {
+		height: 100%;
+		background: var(--ink);
+		transition: width 0.15s ease;
+	}
+
+	.seq-progress-text {
+		font-family: 'nudica_monobold', monospace;
+		font-size: 0.62rem;
+		color: var(--muted);
+		white-space: nowrap;
+	}
+
 	/* ------------------------------------------------- responsive */
 
 	@media (max-width: 900px) {
@@ -2356,8 +3121,17 @@
 			/* the base rule's flex: 1 means flex-basis: 0%, which would
 			   collapse the height in the column layout */
 			flex: none;
-			height: 52vh;
-			height: 52svh;
+			/* Follow the content's aspect so the render always spans the full
+			   width (portrait content used to letterbox inside a fixed-height
+			   band). Clamped: at 80svh a 9:16 phone video still fits the full
+			   width and the controls keep peeking in (they scroll over the
+			   sticky stage anyway); panoramas keep a usable drop target. The
+			   1.5rem compensates the stage's own padding. */
+			height: clamp(25vh, calc((100vw - 1.5rem) * var(--stage-aspect, 0.75) + 1.5rem), 80vh);
+			height: clamp(25svh, calc((100vw - 1.5rem) * var(--stage-aspect, 0.75) + 1.5rem), 80svh);
+			/* exact fit where container units are supported — 100cqw is the
+			   workspace's content width, scrollbars already excluded */
+			height: clamp(25svh, calc((100cqw - 1.5rem) * var(--stage-aspect, 0.75) + 1.5rem), 80svh);
 			z-index: 0;
 		}
 

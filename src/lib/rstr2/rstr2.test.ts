@@ -18,6 +18,15 @@ import {
 	serializeSettings
 } from './presets';
 import { buildSvgDocument } from './svgExport';
+import {
+	defaultVideoConfig,
+	exportFrameRange,
+	frameTime,
+	parseStoredVideoConfig,
+	sanitizeVideoConfig,
+	totalFrameCount
+} from './video';
+import { buildZip, crc32 } from './zip';
 
 const neutral = { brightness: 0, contrast: 0, gamma: 1, saturation: 1, vibrance: 0 };
 
@@ -349,5 +358,93 @@ describe('buildSvgDocument', () => {
 		expect(svg).toContain('id="hatch-magenta"');
 		expect(svg).toContain('<path d="M0 0L10 10" />');
 		expect(svg).toContain(`stroke="${cyan.color}"`);
+	});
+});
+
+describe('video frame math', () => {
+	it('counts output frames from duration and fps', () => {
+		expect(totalFrameCount(10, 12)).toBe(120);
+		expect(totalFrameCount(0.02, 12)).toBe(1); // shorter than one slot still yields a frame
+		expect(totalFrameCount(0, 12)).toBe(0);
+		expect(totalFrameCount(NaN, 12)).toBe(0);
+	});
+
+	it('samples frames at slot midpoints, clamped inside the video', () => {
+		expect(frameTime(0, 10, 5)).toBeCloseTo(0.05);
+		expect(frameTime(9, 10, 5)).toBeCloseTo(0.95);
+		// last frame of a 1s/1fps video would land at 0.5 — inside the video
+		expect(frameTime(0, 1, 1)).toBeCloseTo(0.5);
+		// a frame index past the end clamps just before the duration
+		expect(frameTime(999, 10, 5)).toBeCloseTo(4.999);
+	});
+
+	it('resolves the export range against the actual duration', () => {
+		const config = { ...defaultVideoConfig(), fps: 10, startFrame: 20, maxFrames: 50 };
+		expect(exportFrameRange(10, config)).toEqual({ start: 20, count: 50, total: 100 });
+		// cap larger than what is left after the offset
+		expect(exportFrameRange(4, config)).toEqual({ start: 20, count: 20, total: 40 });
+		// offset beyond the video clamps to the last frame
+		expect(exportFrameRange(1.5, config)).toEqual({ start: 14, count: 1, total: 15 });
+		expect(exportFrameRange(0, config)).toEqual({ start: 0, count: 0, total: 0 });
+	});
+
+	it('sanitizes stored config and falls back on garbage', () => {
+		const stored = JSON.stringify({
+			fps: 24,
+			startFrame: -5,
+			maxFrames: 1e9,
+			rasterFormat: 'gif',
+			rasterQuality: 7,
+			exportRaster: true
+		});
+		const config = parseStoredVideoConfig(stored);
+		expect(config.fps).toBe(24);
+		expect(config.startFrame).toBe(0);
+		expect(config.maxFrames).toBe(2000);
+		expect(config.rasterFormat).toBe('png');
+		expect(config.rasterQuality).toBe(1);
+		expect(config.exportRaster).toBe(true);
+		expect(config.exportSvg).toBe(defaultVideoConfig().exportSvg);
+		expect(parseStoredVideoConfig(null)).toEqual(defaultVideoConfig());
+		expect(parseStoredVideoConfig('{{{')).toEqual(defaultVideoConfig());
+		expect(sanitizeVideoConfig(42)).toEqual(defaultVideoConfig());
+	});
+});
+
+describe('zip writer', () => {
+	it('computes the reference CRC-32 of "123456789"', () => {
+		const data = new TextEncoder().encode('123456789');
+		expect(crc32(data)).toBe(0xcbf43926);
+	});
+
+	it('assembles a well-formed stored archive', () => {
+		const a = new TextEncoder().encode('hello');
+		const b = new Uint8Array([1, 2, 3, 4]);
+		const zip = buildZip(
+			[
+				{ name: 'svg/a.svg', data: a },
+				{ name: 'png/b.png', data: b }
+			],
+			new Date(2026, 0, 2, 3, 4, 6)
+		);
+		const view = new DataView(zip.buffer);
+		// local header of the first entry
+		expect(view.getUint32(0, true)).toBe(0x04034b50);
+		expect(view.getUint16(8, true)).toBe(0); // stored
+		expect(view.getUint32(18, true)).toBe(a.length);
+		expect(new TextDecoder().decode(zip.slice(30, 30 + 9))).toBe('svg/a.svg');
+		// end of central directory record sits at the very end
+		const eocd = zip.length - 22;
+		expect(view.getUint32(eocd, true)).toBe(0x06054b50);
+		expect(view.getUint16(eocd + 10, true)).toBe(2); // entry count
+		const centralSize = view.getUint32(eocd + 12, true);
+		const centralOffset = view.getUint32(eocd + 16, true);
+		expect(centralOffset + centralSize).toBe(eocd);
+		// central directory points back at both local headers
+		expect(view.getUint32(centralOffset, true)).toBe(0x02014b50);
+		expect(view.getUint32(centralOffset + 42, true)).toBe(0);
+		const second = centralOffset + 46 + 9;
+		expect(view.getUint32(second, true)).toBe(0x02014b50);
+		expect(view.getUint32(second + 42, true)).toBe(30 + 9 + a.length);
 	});
 });
