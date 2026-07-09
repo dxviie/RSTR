@@ -144,6 +144,19 @@
 		adjustTimer = setTimeout(() => (adjustActive = false), 900);
 	};
 
+	// Holding the input thumb shows the same adjusted-source view for as long
+	// as the press lasts.
+	let previewHeld = $state(false);
+	const showAdjustPreview = $derived(adjustActive || previewHeld);
+
+	const holdPreview = (event: PointerEvent) => {
+		if (!previewBase) return;
+		// capture so the release fires even when the pointer leaves the thumb
+		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+		previewHeld = true;
+	};
+	const releasePreview = () => (previewHeld = false);
+
 	const status = $state({ busy: false, segMs: 0, hatchMs: 0, regions: 0, lines: 0 });
 
 	const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
@@ -397,6 +410,7 @@
 	};
 
 	// 1b. adjust preview: draw the adjusted source while sliders are active
+	// or the input thumb is held down
 	$effect(() => {
 		const adjustments = {
 			brightness: params.brightness,
@@ -407,7 +421,7 @@
 		};
 		const base = previewBase;
 		const canvas = adjustCanvas;
-		if (!adjustActive || !base || !canvas) return;
+		if (!showAdjustPreview || !base || !canvas) return;
 		const { r, g, b } = isNeutralAdjustment(adjustments)
 			? base
 			: adjustColors(base.r, base.g, base.b, adjustments);
@@ -1368,8 +1382,14 @@
 				<div class="image-picker">
 					<button
 						class="thumb current"
-						onclick={() => fileInput?.click()}
-						title="browse for an image or video"
+						onclick={() => {
+							if (!previewBase) fileInput?.click();
+						}}
+						onpointerdown={holdPreview}
+						onpointerup={releasePreview}
+						onpointercancel={releasePreview}
+						oncontextmenu={(event) => event.preventDefault()}
+						title="hold to see the input with the image adjustments applied"
 					>
 						{#if inputImage}
 							<img src={inputImage} alt="current input" />
@@ -1385,6 +1405,29 @@
 						title="pick an image or video from your device — it never leaves the browser"
 					>
 						browse image / video<span class="browse-sub">or drop one on the render</span>
+					</button>
+					<button
+						class="dice-btn"
+						onclick={randomize}
+						title="roll the dice — randomize all segmentation, lines and layer settings"
+					>
+						<svg viewBox="0 0 16 16" aria-hidden="true">
+							<rect
+								x="1.5"
+								y="1.5"
+								width="13"
+								height="13"
+								rx="2.5"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="1.4"
+							/>
+							<circle cx="5.2" cy="5.2" r="1.15" fill="currentColor" />
+							<circle cx="10.8" cy="5.2" r="1.15" fill="currentColor" />
+							<circle cx="8" cy="8" r="1.15" fill="currentColor" />
+							<circle cx="5.2" cy="10.8" r="1.15" fill="currentColor" />
+							<circle cx="10.8" cy="10.8" r="1.15" fill="currentColor" />
+						</svg>
 					</button>
 				</div>
 				{#if videoSrc}
@@ -1603,18 +1646,18 @@
 			<canvas
 				bind:this={hatchCanvas}
 				class="render"
-				class:hidden={!hatchReady || adjustActive}
+				class:hidden={!hatchReady || showAdjustPreview}
 				width={imgWidth}
 				height={imgHeight}
 			></canvas>
 			<canvas
 				bind:this={adjustCanvas}
 				class="render"
-				class:hidden={!adjustActive || !previewBase}
+				class:hidden={!showAdjustPreview || !previewBase}
 				width={previewBase?.w ?? 0}
 				height={previewBase?.h ?? 0}
 			></canvas>
-			{#if !adjustActive && !hatchReady}
+			{#if !showAdjustPreview && !hatchReady}
 				{#if inputImage}
 					<img class="render placeholder" src={inputImage} alt="input" />
 				{:else if !videoSrc}
@@ -1943,7 +1986,6 @@
 					<button onclick={addLayer} title="add a new pen layer">+ add layer</button>
 				</div>
 			</section>
-
 
 			<section class="panel-group">
 				<div class="group-title">export</div>
@@ -2450,6 +2492,12 @@
 		justify-content: center;
 		font-size: 1.2rem !important;
 		color: var(--muted);
+		/* held down to preview — no scroll grab, text select or long-press
+		   image callout while the finger stays on it */
+		touch-action: none;
+		user-select: none;
+		-webkit-user-select: none;
+		-webkit-touch-callout: none;
 	}
 
 	.thumb img {
@@ -2457,6 +2505,7 @@
 		height: 100%;
 		object-fit: cover;
 		border-radius: 0;
+		pointer-events: none;
 	}
 
 	.browse-btn {
@@ -2484,6 +2533,31 @@
 		font-size: 0.66rem;
 		color: var(--muted);
 		font-weight: normal;
+	}
+
+	/* secondary dice — same roll as the presets pane, one tap from the image
+	   controls */
+	.dice-btn {
+		width: 44px;
+		flex-shrink: 0;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: #fff;
+		cursor: pointer;
+		color: var(--ink);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0;
+	}
+
+	.dice-btn:hover {
+		border-color: var(--muted);
+	}
+
+	.dice-btn svg {
+		width: 22px;
+		height: 22px;
 	}
 
 	/* ------------------------------------------------- controls */
