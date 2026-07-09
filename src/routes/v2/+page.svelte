@@ -28,6 +28,7 @@
 		type Rstr2Settings,
 		type SettingsPreset
 	} from '$lib/rstr2/presets';
+	import { randomizeSettings } from '$lib/rstr2/randomize';
 	import { segmentGrid } from '$lib/rstr2/segmentation';
 	import { buildRegionGeometries } from '$lib/rstr2/regionTools';
 	import { hatchPolygon, spacingForInk, type HatchSegments } from '$lib/rstr2/hatchTools';
@@ -801,6 +802,14 @@
 
 	const isUserPreset = $derived(userPresets.some((preset) => preset.name === selectedPreset));
 
+	// the dice — gaussian rolls, curves live in $lib/rstr2/randomize.ts
+	let stickToPresets = $state(false);
+
+	const randomize = () => {
+		applySettings(randomizeSettings(currentSettings(), stickToPresets));
+		selectedPreset = '';
+	};
+
 	const applySelectedPreset = () => {
 		const preset =
 			BUILTIN_PRESETS.find((entry) => entry.name === selectedPreset) ??
@@ -1343,6 +1352,9 @@
 		<span class="wordmark">RSTR</span>
 		<span class="tagline">raster images to plottable svg</span>
 		<div class="spacer"></div>
+		<a class="top-link" href="/prep" title="plot prep — decorate an exported SVG for plotting"
+			>prep</a
+		>
 		<a class="top-link" href="/about" title="about RSTR">?</a>
 	</header>
 
@@ -1840,6 +1852,39 @@
 
 			<section class="panel-group">
 				<div class="group-title">presets</div>
+				<div class="randomize-row">
+					<button
+						class="randomize-btn"
+						onclick={randomize}
+						title="roll the dice — randomize all segmentation, lines and layer settings"
+					>
+						<svg viewBox="0 0 16 16" aria-hidden="true">
+							<rect
+								x="1.5"
+								y="1.5"
+								width="13"
+								height="13"
+								rx="2.5"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="1.4"
+							/>
+							<circle cx="5.2" cy="5.2" r="1.15" fill="currentColor" />
+							<circle cx="10.8" cy="5.2" r="1.15" fill="currentColor" />
+							<circle cx="8" cy="8" r="1.15" fill="currentColor" />
+							<circle cx="5.2" cy="10.8" r="1.15" fill="currentColor" />
+							<circle cx="10.8" cy="10.8" r="1.15" fill="currentColor" />
+						</svg>
+						randomize
+					</button>
+					<label
+						class="randomize-stick"
+						title="limit the roll to built-in presets — the ink + pen width combinations that physically exist, so the result can actually be plotted; spacings and angles still randomize"
+					>
+						<input type="checkbox" bind:checked={stickToPresets} />
+						stick to built-in presets
+					</label>
+				</div>
 				<div class="preset-row">
 					<select
 						bind:value={selectedPreset}
@@ -2545,6 +2590,42 @@
 		--dri-track-height: 0.2rem;
 		--dri-track-color: #ccc;
 		--dri-track-filled-color: var(--ink);
+	}
+
+	/* ------------------------------------------------- randomize */
+
+	.randomize-row {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.randomize-btn {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+		padding: 0.3rem 0.6rem;
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		background: #fff;
+		color: var(--ink);
+		cursor: pointer;
+		flex-shrink: 0;
+	}
+
+	.randomize-btn svg {
+		width: 15px;
+		height: 15px;
+	}
+
+	.randomize-stick {
+		display: flex;
+		align-items: center;
+		gap: 0.3rem;
+		font-size: 0.66rem;
+		color: var(--muted);
+		cursor: pointer;
+		line-height: 1.25;
 	}
 
 	/* ------------------------------------------------- presets */
