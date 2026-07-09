@@ -1413,20 +1413,21 @@
 					>
 						<svg viewBox="0 0 16 16" aria-hidden="true">
 							<rect
-								x="1.5"
-								y="1.5"
-								width="13"
-								height="13"
-								rx="2.5"
-								fill="none"
+								x="0.5"
+								y="0.5"
+								width="15"
+								height="15"
+								rx="2"
+								fill="#fff"
 								stroke="currentColor"
-								stroke-width="1.4"
+								stroke-width="1"
+								vector-effect="non-scaling-stroke"
 							/>
-							<circle cx="5.2" cy="5.2" r="1.15" fill="currentColor" />
-							<circle cx="10.8" cy="5.2" r="1.15" fill="currentColor" />
+							<circle cx="4.9" cy="4.9" r="1.15" fill="currentColor" />
+							<circle cx="11.1" cy="4.9" r="1.15" fill="currentColor" />
 							<circle cx="8" cy="8" r="1.15" fill="currentColor" />
-							<circle cx="5.2" cy="10.8" r="1.15" fill="currentColor" />
-							<circle cx="10.8" cy="10.8" r="1.15" fill="currentColor" />
+							<circle cx="4.9" cy="11.1" r="1.15" fill="currentColor" />
+							<circle cx="11.1" cy="11.1" r="1.15" fill="currentColor" />
 						</svg>
 					</button>
 				</div>
@@ -2536,14 +2537,14 @@
 	}
 
 	/* secondary dice — same roll as the presets pane; mobile-only (enabled in
-	   the responsive block below), on desktop the presets pane is in view */
+	   the responsive block below), on desktop the presets pane is in view.
+	   The dice glyph IS the button: no box of its own, the svg fills the
+	   thumb-sized square. */
 	.dice-btn {
-		/* thumb-sized square, full row height */
 		width: 64px;
 		flex-shrink: 0;
-		border: 1px solid var(--border);
-		border-radius: 8px;
-		background: #fff;
+		border: none;
+		background: none;
 		cursor: pointer;
 		color: var(--ink);
 		display: none;
@@ -2552,13 +2553,15 @@
 		padding: 0;
 	}
 
-	.dice-btn:hover {
-		border-color: var(--muted);
+	/* the app-wide hover rule paints the button box — keep the dice's box
+	   invisible, the svg face is the visual */
+	.app .dice-btn:hover:not(:disabled) {
+		background: none !important;
 	}
 
 	.dice-btn svg {
-		width: 28px;
-		height: 28px;
+		width: 100%;
+		height: 100%;
 	}
 
 	/* ------------------------------------------------- controls */
