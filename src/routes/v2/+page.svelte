@@ -2535,17 +2535,18 @@
 		font-weight: normal;
 	}
 
-	/* secondary dice — same roll as the presets pane, one tap from the image
-	   controls */
+	/* secondary dice — same roll as the presets pane; mobile-only (enabled in
+	   the responsive block below), on desktop the presets pane is in view */
 	.dice-btn {
-		width: 44px;
+		/* thumb-sized square, full row height */
+		width: 64px;
 		flex-shrink: 0;
 		border: 1px solid var(--border);
 		border-radius: 8px;
 		background: #fff;
 		cursor: pointer;
 		color: var(--ink);
-		display: flex;
+		display: none;
 		align-items: center;
 		justify-content: center;
 		padding: 0;
@@ -2556,8 +2557,8 @@
 	}
 
 	.dice-btn svg {
-		width: 22px;
-		height: 22px;
+		width: 28px;
+		height: 28px;
 	}
 
 	/* ------------------------------------------------- controls */
@@ -3288,6 +3289,12 @@
 		.workspace {
 			flex-direction: column;
 			overflow-y: auto;
+		}
+
+		/* the presets pane (and its dice) sits far below the fold here — show
+		   the secondary dice next to the image controls */
+		.dice-btn {
+			display: flex;
 		}
 
 		/* The render stays pinned at the top while the control panes scroll
