@@ -182,7 +182,7 @@
 			<h2>the story</h2>
 			<p>
 				RSTR started as a sketch for the Genuary '24 prompt
-				<a href="https://genuary.d17e.dev/?prompt=5" target="_blank" rel="noopener"
+				<a href="https://genuary24.d17e.dev/?prompt=5" target="_blank" rel="noopener"
 					><em>“In the style of Vera Molnár (1924–2023)”</em></a
 				>
 				— and never really stopped. It grew from a single experiment into the studio it is today;
