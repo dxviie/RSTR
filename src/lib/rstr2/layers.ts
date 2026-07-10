@@ -93,16 +93,16 @@ export const defaultCmyLayers = (): LayerConfig[] => [
 	}
 ];
 
-// The RSTR v1 look: a single black pen driven by darkness, hatched in one
-// direction — the classic Vera Molnár-inspired line raster.
+// A single black pen driven by darkness — the base of the black presets, free
+// to hatch in any direction (the Vera Molnár-inspired line raster).
 export const defaultClassicLayers = (): LayerConfig[] => [
 	{
 		id: 'black',
 		name: 'Black',
 		channel: 'luma-inv',
-		color: '#1A1A1A',
+		color: '#000000',
 		angleMin: 0,
-		angleMax: 0,
+		angleMax: 360,
 		...inheritedHatchSettings(),
 		enabled: true
 	}
