@@ -1,3 +1,4 @@
+// @ts-nocheck — /classic legacy code — kept for nostalgia, intentionally left as-is and not type-checked.
 import paper from 'paper';
 import { imageLoaded, renderingFinished } from '$lib/fsm.svelte.ts';
 import type { RstrConfig } from '$lib/rstr/config.svelte.ts';
@@ -31,14 +32,19 @@ export interface RstrGroup {
 
 	getBoundingBox(): paper.Rectangle;
 
-	getCornerPixels(): { topLeft: RstrPixel, topRight: RstrPixel, bottomLeft: RstrPixel, bottomRight: RstrPixel };
+	getCornerPixels(): {
+		topLeft: RstrPixel;
+		topRight: RstrPixel;
+		bottomLeft: RstrPixel;
+		bottomRight: RstrPixel;
+	};
 
 	getAverageColor(): paper.Color;
 }
 
 export type RstrColor = {
 	web: string;
-}
+};
 
 export interface RstrGroupingAlgo {
 	initGroups: (grid: RstrPixel[][], layer: paper.Layer, config: RstrConfig) => RstrGroup[];
@@ -52,7 +58,6 @@ export interface RstrFillingAlgo {
 
 /****** IMPLEMENTATION ******/
 export class Rstr {
-
 	classicGrouping: RstrGroupingAlgo = new RstrClassicGrouping();
 
 	paper: paper.PaperScope;
@@ -160,7 +165,7 @@ export class Rstr {
 			return `1.b grouping: ${iterations + 1} / ${config.iterations} iterations`;
 		}
 		/*** filling ***/
-		const hasUnfilledGroups = this.groups.some(group => !group.isFilled);
+		const hasUnfilledGroups = this.groups.some((group) => !group.isFilled);
 		if (hasUnfilledGroups) {
 			if (this.fillLayer === null) {
 				this.fillLayer = new paper.Layer();
@@ -214,7 +219,7 @@ export class Rstr {
 		pixel.color = avg;
 		const from = new paper.Point({
 			x: pixel.rect.bounds.topLeft.x,
-			y: pixel.rect.bounds.topLeft.y + ((1 - (avg.lightness || 0)) * pixel.rect.bounds.height)
+			y: pixel.rect.bounds.topLeft.y + (1 - (avg.lightness || 0)) * pixel.rect.bounds.height
 		});
 		const clr = new paper.Path.Rectangle({
 			from: from,
@@ -250,7 +255,7 @@ export class Rstr {
 			this.gridLayer = null;
 		}
 		if (this.grid) {
-			this.grid.forEach(row => row.forEach(pixel => pixel.rect.remove()));
+			this.grid.forEach((row) => row.forEach((pixel) => pixel.rect.remove()));
 		}
 	}
 
@@ -269,7 +274,7 @@ export class Rstr {
 			this.groupLayer = null;
 		}
 		if (this.groups) {
-			this.groups.forEach(group => group.shape.remove());
+			this.groups.forEach((group) => group.shape.remove());
 			console.warn('Groups removed');
 			this.groups = null;
 		}
@@ -321,7 +326,6 @@ function rgbToCmyk(color) {
 }
 
 class RstrPixelImpl implements RstrPixel {
-
 	x: number;
 	y: number;
 	gridX: number;
@@ -330,7 +334,15 @@ class RstrPixelImpl implements RstrPixel {
 	color: paper.Color | null;
 	group: RstrGroup | null;
 
-	constructor(x: number, y: number, width: number, height: number, layer: Layer, gridX: number, gridY: number) {
+	constructor(
+		x: number,
+		y: number,
+		width: number,
+		height: number,
+		layer: Layer,
+		gridX: number,
+		gridY: number
+	) {
 		this.color = null;
 		this.x = x;
 		this.y = y;

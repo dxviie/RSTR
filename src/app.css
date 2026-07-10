@@ -4,137 +4,137 @@
 
 /* d17e.dev house fonts */
 @font-face {
-    font-family: 'nudica_monobold';
-    src: url('/fonts/nudicamono-bold-webfont.woff') format('woff');
-    font-weight: normal;
-    font-style: normal;
-    font-display: swap;
+	font-family: 'nudica_monobold';
+	src: url('/fonts/nudicamono-bold-webfont.woff') format('woff');
+	font-weight: normal;
+	font-style: normal;
+	font-display: swap;
 }
 
 @font-face {
-    font-family: 'nudica_monolight';
-    src: url('/fonts/nudicamono-light-webfont.woff') format('woff');
-    font-weight: normal;
-    font-style: normal;
-    font-display: swap;
+	font-family: 'nudica_monolight';
+	src: url('/fonts/nudicamono-light-webfont.woff') format('woff');
+	font-weight: normal;
+	font-style: normal;
+	font-display: swap;
 }
 
 @font-face {
-    font-family: 'argesta_regular';
-    src: url('/fonts/argestatext-regular-webfont.woff') format('woff');
-    font-weight: normal;
-    font-style: normal;
-    font-display: swap;
+	font-family: 'argesta_regular';
+	src: url('/fonts/argestatext-regular-webfont.woff') format('woff');
+	font-weight: normal;
+	font-style: normal;
+	font-display: swap;
 }
 
 @layer base {
-    :root {
-        /* d17e.dev palette: bg #fdfaff, ink #1a202c, magenta accent #ff2aa6 */
-        --background: 276 100% 99%;
-        --foreground: 220 26% 14%;
+	:root {
+		/* d17e.dev palette: bg #fdfaff, ink #1a202c, magenta accent #ff2aa6 */
+		--background: 276 100% 99%;
+		--foreground: 220 26% 14%;
 
-        --muted: 210 40% 96.1%;
-        --muted-foreground: 215.4 16.3% 46.9%;
+		--muted: 210 40% 96.1%;
+		--muted-foreground: 215.4 16.3% 46.9%;
 
-        --popover: 0 0% 100%;
-        --popover-foreground: 222.2 84% 4.9%;
+		--popover: 0 0% 100%;
+		--popover-foreground: 222.2 84% 4.9%;
 
-        --card: 0 0% 100%;
-        --card-foreground: 222.2 84% 4.9%;
+		--card: 0 0% 100%;
+		--card-foreground: 222.2 84% 4.9%;
 
-        --border: 214.3 31.8% 91.4%;
-        --input: 214.3 31.8% 91.4%;
+		--border: 214.3 31.8% 91.4%;
+		--input: 214.3 31.8% 91.4%;
 
-        --primary: 220 26% 14%;
-        --primary-foreground: 276 100% 99%;
+		--primary: 220 26% 14%;
+		--primary-foreground: 276 100% 99%;
 
-        --secondary: 210 40% 96.1%;
-        --secondary-foreground: 220 26% 14%;
+		--secondary: 210 40% 96.1%;
+		--secondary-foreground: 220 26% 14%;
 
-        --accent: 325 100% 58%;
-        --accent-foreground: 276 100% 99%;
+		--accent: 325 100% 58%;
+		--accent-foreground: 276 100% 99%;
 
-        --destructive: 0 72.2% 50.6%;
-        --destructive-foreground: 210 40% 98%;
+		--destructive: 0 72.2% 50.6%;
+		--destructive-foreground: 210 40% 98%;
 
-        --ring: 220 26% 14%;
+		--ring: 220 26% 14%;
 
-        --radius: 0.5rem;
+		--radius: 0.5rem;
 
-        /**
+		/**
         TweakPane theme
          */
-        --tp-base-background-color: hsla(230, 0%, 100%, 0);
-        --tp-base-shadow-color: hsla(0, 0%, 0%, 0.10);
-        --tp-button-background-color: hsla(220, 26%, 14%, 1.00);
-        --tp-button-background-color-active: hsla(220, 26%, 30%, 1.00);
-        --tp-button-background-color-focus: hsla(220, 26%, 25%, 1.00);
-        --tp-button-background-color-hover: hsla(220, 26%, 20%, 1.00);
-        --tp-button-foreground-color: hsla(230, 0%, 100%, 1.00);
-        --tp-container-background-color: hsla(220, 26%, 14%, 1.00);
-        --tp-container-background-color-active: hsla(220, 26%, 30%, 1.00);
-        --tp-container-background-color-focus: hsla(220, 26%, 25%, 1.00);
-        --tp-container-background-color-hover: hsla(220, 26%, 20%, 1.00);
-        --tp-container-foreground-color: hsla(230, 0%, 100%, 1.00);
-        --tp-groove-foreground-color: hsla(230, 0%, 100%, 1.00);
-        --tp-input-background-color: hsla(230, 0%, 94%, 1.00);
-        --tp-input-background-color-active: hsla(0, 0%, 79%, 1.00);
-        --tp-input-background-color-focus: hsla(0, 0%, 84%, 1.00);
-        --tp-input-background-color-hover: hsla(0, 0%, 89%, 1.00);
-        --tp-input-foreground-color: hsla(220, 26%, 14%, 1.00);
-        --tp-label-foreground-color: hsla(220, 26%, 14%, 1.00);
-        --tp-monitor-background-color: hsla(230, 0%, 60%, 0.10);
-        --tp-monitor-foreground-color: hsla(230, 0%, 0%, 0.50);
+		--tp-base-background-color: hsla(230, 0%, 100%, 0);
+		--tp-base-shadow-color: hsla(0, 0%, 0%, 0.1);
+		--tp-button-background-color: hsla(220, 26%, 14%, 1);
+		--tp-button-background-color-active: hsla(220, 26%, 30%, 1);
+		--tp-button-background-color-focus: hsla(220, 26%, 25%, 1);
+		--tp-button-background-color-hover: hsla(220, 26%, 20%, 1);
+		--tp-button-foreground-color: hsla(230, 0%, 100%, 1);
+		--tp-container-background-color: hsla(220, 26%, 14%, 1);
+		--tp-container-background-color-active: hsla(220, 26%, 30%, 1);
+		--tp-container-background-color-focus: hsla(220, 26%, 25%, 1);
+		--tp-container-background-color-hover: hsla(220, 26%, 20%, 1);
+		--tp-container-foreground-color: hsla(230, 0%, 100%, 1);
+		--tp-groove-foreground-color: hsla(230, 0%, 100%, 1);
+		--tp-input-background-color: hsla(230, 0%, 94%, 1);
+		--tp-input-background-color-active: hsla(0, 0%, 79%, 1);
+		--tp-input-background-color-focus: hsla(0, 0%, 84%, 1);
+		--tp-input-background-color-hover: hsla(0, 0%, 89%, 1);
+		--tp-input-foreground-color: hsla(220, 26%, 14%, 1);
+		--tp-label-foreground-color: hsla(220, 26%, 14%, 1);
+		--tp-monitor-background-color: hsla(230, 0%, 60%, 0.1);
+		--tp-monitor-foreground-color: hsla(230, 0%, 0%, 0.5);
 
-        --bld-br: 30px;
-    }
+		--bld-br: 30px;
+	}
 
-    .dark {
-        --background: 222.2 84% 4.9%;
-        --foreground: 210 40% 98%;
+	.dark {
+		--background: 222.2 84% 4.9%;
+		--foreground: 210 40% 98%;
 
-        --muted: 217.2 32.6% 17.5%;
-        --muted-foreground: 215 20.2% 65.1%;
+		--muted: 217.2 32.6% 17.5%;
+		--muted-foreground: 215 20.2% 65.1%;
 
-        --popover: 222.2 84% 4.9%;
-        --popover-foreground: 210 40% 98%;
+		--popover: 222.2 84% 4.9%;
+		--popover-foreground: 210 40% 98%;
 
-        --card: 222.2 84% 4.9%;
-        --card-foreground: 210 40% 98%;
+		--card: 222.2 84% 4.9%;
+		--card-foreground: 210 40% 98%;
 
-        --border: 217.2 32.6% 17.5%;
-        --input: 217.2 32.6% 17.5%;
+		--border: 217.2 32.6% 17.5%;
+		--input: 217.2 32.6% 17.5%;
 
-        --primary: 210 40% 98%;
-        --primary-foreground: 222.2 47.4% 11.2%;
+		--primary: 210 40% 98%;
+		--primary-foreground: 222.2 47.4% 11.2%;
 
-        --secondary: 217.2 32.6% 17.5%;
-        --secondary-foreground: 210 40% 98%;
+		--secondary: 217.2 32.6% 17.5%;
+		--secondary-foreground: 210 40% 98%;
 
-        --accent: 217.2 32.6% 17.5%;
-        --accent-foreground: 210 40% 98%;
+		--accent: 217.2 32.6% 17.5%;
+		--accent-foreground: 210 40% 98%;
 
-        --destructive: 0 62.8% 30.6%;
-        --destructive-foreground: 210 40% 98%;
+		--destructive: 0 62.8% 30.6%;
+		--destructive-foreground: 210 40% 98%;
 
-        --ring: hsl(212.7, 26.8%, 83.9);
-    }
+		--ring: hsl(212.7, 26.8%, 83.9);
+	}
 }
 
 button {
-    font-family: 'nudica_monobold', monospace;
+	font-family: 'nudica_monobold', monospace;
 }
 
 button:active {
-    transform: translateY(1px);
+	transform: translateY(1px);
 }
 
 @layer base {
-    * {
-        @apply border-border;
-    }
+	* {
+		@apply border-border;
+	}
 
-    body {
-        @apply bg-background text-foreground;
-    }
+	body {
+		@apply bg-background text-foreground;
+	}
 }
