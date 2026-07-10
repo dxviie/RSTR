@@ -1,10 +1,8 @@
 <script lang="ts">
+	// @ts-nocheck — /classic legacy code — kept for nostalgia, intentionally left as-is and not type-checked.
 	import paper from 'paper';
 	import { config } from '$lib/rstr/config.svelte.ts';
-	import {
-		exported,
-		exporting, rstrState
-	} from '../fsm.svelte.js';
+	import { exported, exporting, rstrState } from '../fsm.svelte.js';
 	import { Rstr } from '$lib/rstr/rstr.ts';
 	import RasterActions from '$lib/components/RasterActions.svelte';
 
@@ -67,7 +65,7 @@
 					const imgWidth = img.naturalWidth;
 					const imgHeight = img.naturalHeight;
 					if (canvas && canvasWrapper) {
-						const ratio = (canvasWrapper.clientWidth) / imgWidth;
+						const ratio = canvasWrapper.clientWidth / imgWidth;
 						const canvasWidth = canvasWrapper.clientWidth;
 						const canvasHeight = imgHeight * ratio;
 						canvas.style.width = `${canvasWidth}px`;
@@ -140,7 +138,13 @@
 		<div class="render-info">{renderInfo}</div>
 	{/if}
 	<div class="canvas-wrapper" bind:this={canvasWrapper}>
-		<canvas id="raster-canvas" bind:this={canvas} data-paper-hidpi="on" width="1080px" height="1080px"></canvas>
+		<canvas
+			id="raster-canvas"
+			bind:this={canvas}
+			data-paper-hidpi="on"
+			width="1080px"
+			height="1080px"
+		></canvas>
 	</div>
 
 	<RasterActions {canvas} {rstr} />
@@ -149,60 +153,59 @@
 <!--=======================================================================================-->
 
 <style>
+	.canvas-container {
+		position: relative;
+		display: flex;
+		gap: 0.5rem;
+		flex-direction: column;
+		justify-content: center;
+		align-items: center;
+		width: 60vw;
+	}
 
-    .canvas-container {
-        position: relative;
-        display: flex;
-        gap: .5rem;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        width: 60vw;
-    }
+	@media (max-width: 850px) {
+		.canvas-container {
+			width: 100%;
+			/*    max-width: 90vw;*/
+		}
+	}
 
-    @media (max-width: 850px) {
-        .canvas-container {
-            width: 100%;
-            /*    max-width: 90vw;*/
-        }
-    }
+	.canvas-wrapper {
+		width: 100%;
+		position: relative;
+		overflow: hidden;
+	}
 
-    .canvas-wrapper {
-        width: 100%;
-        position: relative;
-        overflow: hidden;
-    }
+	#raster-canvas {
+		width: 100%;
+		/*height: 100%;*/
+		object-fit: contain;
+		border-color: black;
+		border-style: dashed;
+		border-width: 1px;
+	}
 
-    #raster-canvas {
-        width: 100%;
-        /*height: 100%;*/
-        object-fit: contain;
-        border-color: black;
-        border-style: dashed;
-        border-width: 1px;
-    }
+	.render-info {
+		background-color: rgba(255, 255, 255, 0.8);
+		position: absolute;
+		top: 0;
+		left: 0;
+		opacity: 0.8;
+		font-family: 'Courier New', monospace;
+		font-size: small;
+		font-weight: bold;
+		z-index: 10;
+		color: black;
+		padding: 0 0.5rem;
+		margin: 0.5rem;
+	}
 
-    .render-info {
-        background-color: rgba(255, 255, 255, 0.8);
-        position: absolute;
-        top: 0;
-        left: 0;
-        opacity: 0.8;
-        font-family: "Courier New", monospace;
-        font-size: small;
-        font-weight: bold;
-        z-index: 10;
-        color: black;
-        padding: 0 .5rem;
-        margin: .5rem;
-    }
-
-    @keyframes spin {
-        0% {
-            transform: translate(-50%, -50%) rotate(0deg);
-        }
-        100% {
-            transform: translate(-50%, -50%) rotate(360deg);
-        }
-    }
+	@keyframes spin {
+		0% {
+			transform: translate(-50%, -50%) rotate(0deg);
+		}
+		100% {
+			transform: translate(-50%, -50%) rotate(360deg);
+		}
+	}
 </style>

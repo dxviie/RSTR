@@ -22,16 +22,7 @@
 // harmony set here and the dice picks it up.
 
 export type InkFamily =
-	| 'red'
-	| 'orange'
-	| 'yellow'
-	| 'green'
-	| 'teal'
-	| 'blue'
-	| 'purple'
-	| 'pink'
-	| 'brown'
-	| 'neutral';
+	'red' | 'orange' | 'yellow' | 'green' | 'teal' | 'blue' | 'purple' | 'pink' | 'brown' | 'neutral';
 
 export interface InkColor {
 	/** ink name as sold, prefixed with the brand */
@@ -225,7 +216,13 @@ const pickFromFamily = (family: InkFamily, used: Set<string>, rng: Rng): InkColo
  * layers than the set has families). Returns `#RRGGBB` hex strings.
  */
 export const pickInkScheme = (count: number, rng: Rng): string[] => {
-	const set = HARMONY_SETS[weightedIndex(HARMONY_SETS.map((s) => s.weight), rng)];
+	const set =
+		HARMONY_SETS[
+			weightedIndex(
+				HARMONY_SETS.map((s) => s.weight),
+				rng
+			)
+		];
 	const families = shuffle(set.families, rng);
 	const used = new Set<string>();
 	const colors: string[] = [];

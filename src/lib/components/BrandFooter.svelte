@@ -1,6 +1,5 @@
 <script lang="ts">
-	let { align = 'center' }: { align?: 'center' | 'right' } = $props();
-	const year = new Date().getFullYear();
+	const { align = 'center' }: { align?: 'center' | 'right' } = $props();
 </script>
 
 <div class="brand-footer {align}">

@@ -8,7 +8,7 @@
 	// - the landing variant shows a single "launch the app" call to action;
 	//   every other page gets the studio / prep / classic switcher (+ help)
 	//   with the active page highlighted
-	let {
+	const {
 		variant = 'app',
 		active = null,
 		sub = '',
