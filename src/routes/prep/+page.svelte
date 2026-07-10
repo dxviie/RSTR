@@ -1,5 +1,6 @@
 <script lang="ts">
 	import BrandFooter from '$lib/components/BrandFooter.svelte';
+	import TopBar from '$lib/components/TopBar.svelte';
 	import { buildCalibrationBlock } from '$lib/prep/calibration';
 	import {
 		PAGE_LABELS,
@@ -505,32 +506,7 @@ ${wrapRotation(artworkInner)}
 </svelte:head>
 
 <div class="app">
-	<!-------------------------------------------------------------
-		TOP BAR
-	-------------------------------------------------------------->
-	<header class="topbar">
-		<a class="logo-link" href="https://d17e.dev" title="d17e.dev">
-			<svg
-				class="logo"
-				role="img"
-				aria-label="D17E logo"
-				viewBox="0 0 1046 447"
-				xmlns="http://www.w3.org/2000/svg"
-			>
-				<g transform="matrix(1.2778,0,0,0.628916,-169.768,-154.959)">
-					<path
-						d="M930.998,957.001L930.998,957.183L132.86,957.183L132.86,246.391L930.998,246.391L930.998,246.802L951.958,246.802L951.958,957.001L930.998,957.001ZM399.748,807.315L517.675,807.315L517.675,734.622L477.603,734.622L477.603,400.234L441.538,400.234L441.538,417.68C441.538,444.431 436.099,452.573 422.647,452.573L401.18,452.573L401.18,522.358L441.252,522.358L441.252,734.622L399.748,734.622L399.748,807.315ZM586.656,807.315L627.3,807.315L706.3,475.253L706.3,400.234L566.047,400.234L566.047,472.345L665.655,472.345L586.656,801.499L586.656,807.315ZM208.261,807.315L268.083,807.315C326.76,807.315 354.238,728.806 354.238,627.036L354.238,580.513C354.238,478.742 326.76,400.234 268.083,400.234L208.261,400.234L208.261,807.315ZM245.471,734.622L245.471,472.927L268.083,472.927C306.438,472.927 317.028,516.543 317.028,580.513L317.028,627.036C317.028,691.006 306.438,734.622 268.083,734.622L245.471,734.622ZM750.665,807.315L876.606,807.315L876.606,735.785L787.875,735.785L787.875,632.852L867.733,632.852L867.733,561.903L787.875,561.903L787.875,471.764L876.606,471.764L876.606,400.234L750.665,400.234L750.665,807.315Z"
-						fill="currentColor"
-					/>
-				</g>
-			</svg>
-		</a>
-		<span class="wordmark">RSTR<span class="wordmark-sub">·PREP</span></span>
-		<span class="tagline">decorate SVGs for pen plotting</span>
-		<div class="spacer"></div>
-		<a class="top-link" href="/v2" title="back to the RSTR studio">studio</a>
-		<a class="top-link" href="/about" title="about RSTR">?</a>
-	</header>
+	<TopBar active="prep" sub="PREP" tagline="decorate SVGs for pen plotting" />
 
 	<div class="workspace">
 		<!-------------------------------------------------------------
@@ -810,7 +786,7 @@ ${wrapRotation(artworkInner)}
 		font-display: swap;
 	}
 
-	/* Full-viewport app shell in the d17e.dev brand, matching the v2 studio. */
+	/* Full-viewport app shell in the d17e.dev brand, matching the studio. */
 	.app {
 		--ink: #1a202c;
 		--bg: #fdfaff;
@@ -827,11 +803,6 @@ ${wrapRotation(artworkInner)}
 		color: var(--ink);
 		font-family: 'nudica_monolight', monospace;
 		font-size: 0.8rem;
-	}
-
-	.app a {
-		border: none;
-		color: var(--ink);
 	}
 
 	.app button {
@@ -857,61 +828,8 @@ ${wrapRotation(artworkInner)}
 		accent-color: var(--ink);
 	}
 
-	/* ------------------------------------------------- top bar */
-
-	.topbar {
-		display: flex;
-		align-items: center;
-		gap: 0.6rem;
-		padding: 0.4rem 1rem;
-		border-bottom: 1px solid var(--border);
-		flex-shrink: 0;
-	}
-
-	.logo-link {
-		display: flex;
-		align-items: center;
-	}
-
-	.logo {
-		height: 26px;
-		width: auto;
-		color: var(--ink);
-	}
-
-	.logo-link:hover .logo {
-		opacity: 0.7;
-	}
-
-	.wordmark {
-		font-family: 'nudica_monobold', monospace;
-		font-size: 1.15rem;
-		letter-spacing: 0.08em;
-	}
-
-	.wordmark-sub {
-		color: var(--muted);
-	}
-
-	.tagline {
-		font-family: 'argesta_regular', serif;
-		color: var(--muted);
-		font-size: 0.8rem;
-	}
-
 	.spacer {
 		flex: 1;
-	}
-
-	.top-link {
-		font-family: 'nudica_monobold', monospace;
-		padding: 0.1rem 0.55rem;
-		border: 1px solid var(--border) !important;
-		border-radius: 999px;
-	}
-
-	.top-link:hover {
-		border-color: var(--ink) !important;
 	}
 
 	/* ------------------------------------------------- workspace */
