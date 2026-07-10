@@ -8,7 +8,6 @@
 		made with <span class="heart" role="img" aria-label="love">&hearts;</span> by
 		<a href="https://www.d17e.dev" target="_blank" rel="noopener">D17E</a>
 	</p>
-	<p class="line">&copy; 2022 - {year}</p>
 	<p class="line">KvK - 87650770</p>
 	<p class="line">BTW - NL004463884B92</p>
 </div>
