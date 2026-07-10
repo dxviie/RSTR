@@ -348,13 +348,15 @@ describe('param persistence', () => {
 });
 
 describe('settings presets', () => {
-	it('ships CMY and Classic black as built-ins', () => {
+	it('ships the four built-in presets', () => {
 		const names = builtinPresets().map((preset) => preset.name);
-		expect(names).toEqual(['CMY', 'Classic black']);
-		const classic = builtinPresets()[1].settings;
-		expect(classic.layers).toEqual(defaultClassicLayers());
-		expect(classic.layers).toHaveLength(1);
-		expect(classic.layers[0].channel).toBe('luma-inv');
+		expect(names).toEqual(['CMY classic', 'CMY space', 'Black classic', 'Black thin']);
+		const black = builtinPresets().find((preset) => preset.name === 'Black classic')!.settings;
+		expect(black.layers).toEqual(defaultClassicLayers());
+		expect(black.layers).toHaveLength(1);
+		expect(black.layers[0].channel).toBe('luma-inv');
+		const cmy = builtinPresets().find((preset) => preset.name === 'CMY space')!.settings;
+		expect(cmy.layers).toEqual(defaultCmyLayers());
 	});
 
 	it('round-trips settings through the JSON file format', () => {

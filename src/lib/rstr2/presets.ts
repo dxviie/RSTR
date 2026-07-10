@@ -25,12 +25,96 @@ const FILE_VERSION = 1;
 /** The presets the app ships with. Callers get fresh objects on every call. */
 export const builtinPresets = (): SettingsPreset[] => [
 	{
-		name: 'CMY',
-		settings: { params: defaultParams(), layers: defaultCmyLayers() }
+		name: 'CMY classic',
+		settings: {
+			params: {
+				...defaultParams(),
+				algorithm: 'watershed',
+				resolution: 128,
+				smoothing: 0,
+				tolerance: 0.06,
+				minRegionSize: 1,
+				slicCellSize: 2,
+				slicCompactness: 0,
+				penWidthMm: 0.4,
+				spacingMinMm: 0.05,
+				spacingMaxMm: 4.15,
+				hatchThreshold: 0.1,
+				hatchGamma: 1.8,
+				inkBoost: 1.5,
+				outputWidthMm: 267
+			},
+			layers: defaultCmyLayers()
+		}
 	},
 	{
-		name: 'Classic black',
-		settings: { params: defaultParams(), layers: defaultClassicLayers() }
+		name: 'CMY space',
+		settings: {
+			params: {
+				...defaultParams(),
+				algorithm: 'slic',
+				resolution: 512,
+				smoothing: 0,
+				tolerance: 0.07,
+				minRegionSize: 1,
+				slicCellSize: 8,
+				slicCompactness: 0.1,
+				penWidthMm: 0.5,
+				spacingMinMm: 0.05,
+				spacingMaxMm: 4.15,
+				hatchThreshold: 0.1,
+				hatchGamma: 1.8,
+				inkBoost: 1.7,
+				outputWidthMm: 267
+			},
+			layers: defaultCmyLayers()
+		}
+	},
+	{
+		name: 'Black classic',
+		settings: {
+			params: {
+				...defaultParams(),
+				algorithm: 'watershed',
+				resolution: 256,
+				smoothing: 0,
+				tolerance: 0.1,
+				minRegionSize: 1,
+				slicCellSize: 6,
+				slicCompactness: 0.18,
+				penWidthMm: 0.4,
+				spacingMinMm: 0.05,
+				spacingMaxMm: 3.4,
+				hatchThreshold: 0.2,
+				hatchGamma: 1.5,
+				inkBoost: 1,
+				outputWidthMm: 267
+			},
+			layers: defaultClassicLayers()
+		}
+	},
+	{
+		name: 'Black thin',
+		settings: {
+			params: {
+				...defaultParams(),
+				algorithm: 'slic',
+				resolution: 64,
+				smoothing: 0,
+				tolerance: 0.05,
+				minRegionSize: 1,
+				slicCellSize: 6,
+				slicCompactness: 0,
+				penWidthMm: 0.2,
+				spacingMinMm: 0.05,
+				spacingMaxMm: 3.4,
+				hatchThreshold: 0.15,
+				hatchGamma: 1.5,
+				inkBoost: 1.1,
+				outputWidthMm: 200
+			},
+			layers: defaultClassicLayers()
+		}
 	}
 ];
 
