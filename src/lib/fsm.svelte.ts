@@ -4,7 +4,7 @@ export type RstrAction = {
 	label: string;
 	action: () => boolean;
 	type: RstrActionType;
-}
+};
 
 const initialState = { status: 'config' as RstrState };
 
@@ -62,7 +62,11 @@ const transitions = {
 		return false;
 	},
 	loadingImage: () => {
-		if (rstrState.status === 'config' || rstrState.status === 'done' || rstrState.status === 'error') {
+		if (
+			rstrState.status === 'config' ||
+			rstrState.status === 'done' ||
+			rstrState.status === 'error'
+		) {
 			console.debug('Status update: config -> loading');
 			rstrState.status = 'loading';
 			return true;
