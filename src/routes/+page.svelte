@@ -1,26 +1,85 @@
 <script lang="ts">
 	// RSTR landing page. The first sections speak to everyone (make art from
 	// your images); the plotter details, the open-source story and the
-	// origin live further down. Gallery imagery is served from
-	// media.d17e.dev, same as the d17e.dev project pages.
+	// origin live further down. Plot photography lives in static/gallery as
+	// pre-sized -400w / -800w / -1920w webp renditions of each shot.
 
+	import { onMount } from 'svelte';
 	import BrandFooter from '$lib/components/BrandFooter.svelte';
 	import TopBar from '$lib/components/TopBar.svelte';
 
-	const MEDIA = 'https://media.d17e.dev/images';
+	// TODO: swap for a local photo in static/ once it lands in the repo
+	const PLOTTER_IMAGE =
+		'https://media.d17e.dev/images/6774f12e-dac6-4657-bdbd-7461c731edd8/800w.webp';
 
-	const PLOTTER_IMAGE = `${MEDIA}/6774f12e-dac6-4657-bdbd-7461c731edd8/800w.webp`;
+	const plotSrc = (name: string, width: number) => `/gallery/${name}-${width}w.webp`;
+	const plotSrcset = (name: string) =>
+		[400, 800, 1920].map((w) => `${plotSrc(name, w)} ${w}w`).join(', ');
 
-	const GALLERY_IMAGES = [
-		'ee7a8e7d-e69f-4860-8b95-d18a91f689d5',
-		'd5994253-eae4-4398-808b-d3230f2f52a6',
-		'd5bf9ac1-9f52-47e4-a1ad-7e81dc1bad43',
-		'a0304212-438d-4898-bb79-d1fbc373e423',
-		'f5be8d0d-abc7-46d8-9834-e7d33b2c7d6b',
-		'0a80182a-b22f-4438-bfe1-bb322390ea39',
-		'02e4f632-e956-4588-a9f1-3407eb8489c1',
-		'6ed6bf57-c355-4d0c-9672-622811aa7bb1'
-	].map((id) => `${MEDIA}/${id}/400w.webp`);
+	// gallery order: full pieces up front in every row, detail shots in between
+	const GALLERY_PLOTS = [
+		{
+			name: 'space-1-1',
+			alt: 'plot of the Cosmic Cliffs of the Carina Nebula in layered colored pens'
+		},
+		{
+			name: 'pearl-1',
+			alt: 'Girl with a Pearl Earring rebuilt from blocks of directional hatching'
+		},
+		{ name: 'mona-1', alt: 'figure and its long shadow on a path, in dense multicolor crosshatch' },
+		{ name: 'melkmeisje', alt: "Vermeer's Milkmaid plotted in single-pen black hatching" },
+		{
+			name: 'broken-gradient-2',
+			alt: 'abstract gradient study — a dark monolith over a teal-to-magenta field'
+		},
+		{ name: 'mona-2', alt: 'close-up of the crosshatched pen strokes' },
+		{ name: 'space-2-1', alt: 'plot of a nebula in reds and oranges on a dark starfield' },
+		{ name: 'pearl-2', alt: 'detail of the hatched blocks in the Pearl Earring plot' },
+		{ name: 'melkmeisje-2', alt: 'the Milkmaid plot in progress on the AxiDraw' },
+		{ name: 'space-1-2', alt: 'detail of the Carina Nebula plot — thousands of tiny pen strokes' },
+		{ name: 'broken-gradient-2-2', alt: 'detail of the woven hatch texture in the gradient study' },
+		{ name: 'space-2-2', alt: 'detail of the red nebula plot with sparkling star highlights' }
+	];
+
+	// hero carousel: the brand mark first, then the finished pieces (details
+	// stay in the gallery). Slides crossfade in place, stacked in one frame.
+	const HERO_PLOTS = new Set([
+		'space-1-1',
+		'pearl-1',
+		'mona-1',
+		'melkmeisje',
+		'broken-gradient-2',
+		'space-2-1',
+		'melkmeisje-2'
+	]);
+
+	const HERO_SLIDES = [
+		{
+			src: '/rstr-mark.webp',
+			srcset: undefined,
+			alt: 'RSTR — pixel lettering rebuilt from colorful hatched dots and dashes'
+		},
+		...GALLERY_PLOTS.filter((p) => HERO_PLOTS.has(p.name)).map((p) => ({
+			src: plotSrc(p.name, 800),
+			srcset: plotSrcset(p.name),
+			alt: p.alt
+		}))
+	];
+
+	const HERO_INTERVAL_MS = 4500;
+	let heroCurrent = $state(0);
+	// slides mount one step ahead of the show, so each image is fetched and
+	// decoded before it fades in (and nothing loads that is never shown)
+	let heroMounted = $state(1);
+
+	onMount(() => {
+		if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+		const id = setInterval(() => {
+			heroCurrent = (heroCurrent + 1) % HERO_SLIDES.length;
+			heroMounted = Math.max(heroMounted, Math.min(heroCurrent + 1, HERO_SLIDES.length - 1));
+		}, HERO_INTERVAL_MS);
+		return () => clearInterval(id);
+	});
 
 	const STEPS = [
 		{
@@ -78,11 +137,19 @@
 				</div>
 			</div>
 			<div class="hero-art">
-				<img
-					src="/rstr-mark.webp"
-					alt="RSTR — pixel lettering rebuilt from colorful hatched dots and dashes"
-					loading="eager"
-				/>
+				{#each HERO_SLIDES as slide, index (slide.src)}
+					{#if index <= heroMounted}
+						<img
+							src={slide.src}
+							srcset={slide.srcset}
+							sizes={slide.srcset ? '(max-width: 820px) 92vw, 480px' : undefined}
+							alt={slide.alt}
+							class:current={index === heroCurrent}
+							aria-hidden={index !== heroCurrent}
+							loading={index === 0 ? 'eager' : 'lazy'}
+						/>
+					{/if}
+				{/each}
 			</div>
 		</section>
 
@@ -154,8 +221,14 @@
 				A few of my own: plots from photos, run through RSTR and drawn with real pens on real paper.
 			</p>
 			<div class="gallery">
-				{#each GALLERY_IMAGES as src, index (src)}
-					<img {src} alt="Plotted artwork made with RSTR #{index + 1}" loading="lazy" />
+				{#each GALLERY_PLOTS as plot (plot.name)}
+					<img
+						src={plotSrc(plot.name, 400)}
+						srcset={plotSrcset(plot.name)}
+						sizes="(max-width: 820px) 46vw, 250px"
+						alt={plot.alt}
+						loading="lazy"
+					/>
 				{/each}
 			</div>
 			<p class="gallery-more">
@@ -414,16 +487,33 @@
 		transform: rotate(-5deg);
 	}
 
-	.hero-art img {
+	/* stacked auto-changing carousel: slides sit on top of each other in a
+	   square frame (the shadow lives on the frame so it doesn't pulse while
+	   two slides crossfade) */
+	.hero-art {
+		position: relative;
 		width: 100%;
 		max-width: 480px;
 		margin: 0 auto;
-		display: block;
-		height: auto;
+		aspect-ratio: 1;
 		background: #fffef7;
 		box-shadow:
 			0 2px 6px rgba(96, 115, 159, 0.25),
 			0 12px 32px rgba(96, 115, 159, 0.2);
+	}
+
+	.hero-art img {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		opacity: 0;
+		transition: opacity 0.9s ease;
+	}
+
+	.hero-art img.current {
+		opacity: 1;
 	}
 
 	/* ------------------------------------------------- split section */
