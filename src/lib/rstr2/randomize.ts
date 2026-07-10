@@ -54,7 +54,7 @@ export const RANDOM_CURVES = {
 	slicCompactness: { mean: 0.5, stdDev: 0.25, min: 0, max: 1, step: 0.02 },
 	// Lines. Faint, washed-out rolls come from sparse spacing + starved ink;
 	// the sparse/low ends are pulled in so every layer keeps enough ink to read.
-	penWidthMm: { mean: 0.4, stdDev: 0.2, min: 0.1, max: 1.1, step: 0.05 },
+	penWidthMm: { mean: 0.5, stdDev: 0.2, min: 0.2, max: 1.5, step: 0.05 },
 	spacingMinMm: { mean: 0.55, stdDev: 0.3, min: 0.2, max: 1.5, step: 0.05 },
 	spacingMaxMm: { mean: 3.5, stdDev: 1.4, min: 1.5, max: 6.5, step: 0.05 },
 	hatchThreshold: { mean: 0.08, stdDev: 0.05, min: 0, max: 0.25, step: 0.01 },
