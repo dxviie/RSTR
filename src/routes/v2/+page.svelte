@@ -52,6 +52,7 @@
 		type VideoExportConfig
 	} from '$lib/rstr2/video';
 	import { buildZip, type ZipEntry } from '$lib/rstr2/zip';
+	import { buildExportName } from '$lib/rstr2/exportName';
 
 	//***************************************************************
 	// 														STATE
@@ -99,6 +100,8 @@
 	let layers: LayerConfig[] = $state(loadLayers());
 
 	let inputImage = $state('');
+	// filename of the current image source (for export names); '' when none
+	let inputName = $state('');
 	let imgWidth = $state(0);
 	let imgHeight = $state(0);
 	// Grids hold typed arrays, which Svelte leaves unproxied — plain $state
@@ -186,7 +189,9 @@
 	$effect(() => {
 		if (!inputImage && !videoSrc && !sampleOffered) {
 			sampleOffered = true;
-			inputImage = SAMPLE_IMAGES[Math.floor(Math.random() * SAMPLE_IMAGES.length)];
+			const sample = SAMPLE_IMAGES[Math.floor(Math.random() * SAMPLE_IMAGES.length)];
+			inputImage = sample;
+			inputName = sample;
 		}
 	});
 
@@ -203,6 +208,7 @@
 			// only drop a running video once the image is actually ready
 			closeVideo();
 			inputImage = reader.result as string;
+			inputName = file.name;
 		};
 		reader.readAsDataURL(file);
 	};
@@ -856,7 +862,13 @@
 
 	const exportSettings = () => {
 		const json = serializeSettings(currentSettings());
-		downloadBlob(new Blob([json], { type: 'application/json' }), `rstr-settings-${stamp()}.json`);
+		// name the file after the preset if one is typed or selected, otherwise
+		// fall back to the plain rstr-settings-<stamp>.json shape
+		const preset = presetName.trim() || selectedPreset;
+		downloadBlob(
+			new Blob([json], { type: 'application/json' }),
+			buildExportName(preset, 'settings', 'json', stamp())
+		);
 	};
 
 	const importSettings = (files: FileList | null | undefined) => {
@@ -889,6 +901,11 @@
 
 	const stamp = () => new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 
+	// Fold the current source's name into export file names — video takes
+	// priority while one is loaded, otherwise the image.
+	const exportName = (suffix: string, ext: string): string =>
+		buildExportName(videoName || inputName, suffix, ext, stamp());
+
 	const downloadSvg = () => {
 		if (!imgWidth) return;
 		const pxPerMm = imgWidth / params.outputWidthMm;
@@ -903,12 +920,12 @@
 				};
 			});
 		const svg = buildSvgDocument(exportLayers, imgWidth, imgHeight, params.outputWidthMm);
-		downloadBlob(new Blob([svg], { type: 'image/svg+xml' }), `rstr-${stamp()}.svg`);
+		downloadBlob(new Blob([svg], { type: 'image/svg+xml' }), exportName('', 'svg'));
 	};
 
 	const downloadPng = () => {
 		hatchCanvas?.toBlob((blob) => {
-			if (blob) downloadBlob(blob, `rstr-${stamp()}.png`);
+			if (blob) downloadBlob(blob, exportName('', 'png'));
 		});
 	};
 
@@ -1080,7 +1097,7 @@
 			}
 			if (entries.length > 0) {
 				const zip = buildZip(entries);
-				downloadBlob(new Blob([zip], { type: 'application/zip' }), `rstr-seq-${stamp()}.zip`);
+				downloadBlob(new Blob([zip], { type: 'application/zip' }), exportName('seq', 'zip'));
 			}
 		} finally {
 			exporting.running = false;
