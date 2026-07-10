@@ -6,7 +6,7 @@
 	import { page } from '$app/stores';
 	import type { Snippet } from 'svelte';
 
-	let { children }: { children?: Snippet } = $props();
+	const { children }: { children?: Snippet } = $props();
 
 	const active = $derived(
 		$page.url.pathname.startsWith('/classic')

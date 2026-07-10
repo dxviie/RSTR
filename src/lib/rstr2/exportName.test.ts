@@ -34,9 +34,7 @@ describe('buildExportName', () => {
 	const stamp = '2026-07-10T11-30-00';
 
 	it('folds the source name and suffix in', () => {
-		expect(buildExportName('cat.png', 'seq', 'zip', stamp)).toBe(
-			`rstr-cat-seq-${stamp}.zip`
-		);
+		expect(buildExportName('cat.png', 'seq', 'zip', stamp)).toBe(`rstr-cat-seq-${stamp}.zip`);
 	});
 
 	it('drops an empty suffix', () => {
