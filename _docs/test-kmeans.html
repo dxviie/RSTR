@@ -1,147 +1,149 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-    <title>Parallel K-means Clustering with Paper.js</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/paper.js/0.12.15/paper-full.min.js"></script>
-</head>
-<body>
-    <canvas id="myCanvas" resize></canvas>
-    <script type="text/javascript">
-        // Initialize Paper.js
-        paper.install(window);
-        window.onload = function() {
-            paper.setup('myCanvas');
+	<head>
+		<title>Parallel K-means Clustering with Paper.js</title>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/paper.js/0.12.15/paper-full.min.js"></script>
+	</head>
+	<body>
+		<canvas id="myCanvas" resize></canvas>
+		<script type="text/javascript">
+			// Initialize Paper.js
+			paper.install(window);
+			window.onload = function () {
+				paper.setup('myCanvas');
 
-            const width = 800;
-            const height = 600;
-            const k = 5; // Number of clusters
-            const maxIterations = 10;
-            const numWorkers = navigator.hardwareConcurrency || 4;
+				const width = 800;
+				const height = 600;
+				const k = 5; // Number of clusters
+				const maxIterations = 10;
+				const numWorkers = navigator.hardwareConcurrency || 4;
 
-            // Create SharedArrayBuffer for input image
-            const sharedBuffer = new SharedArrayBuffer(width * height * 4);
-            const inputArray = new Uint8ClampedArray(sharedBuffer);
+				// Create SharedArrayBuffer for input image
+				const sharedBuffer = new SharedArrayBuffer(width * height * 4);
+				const inputArray = new Uint8ClampedArray(sharedBuffer);
 
-            // Create SharedArrayBuffer for cluster assignments
-            const clusterBuffer = new SharedArrayBuffer(width * height * 4);
-            const clusterArray = new Int32Array(clusterBuffer);
+				// Create SharedArrayBuffer for cluster assignments
+				const clusterBuffer = new SharedArrayBuffer(width * height * 4);
+				const clusterArray = new Int32Array(clusterBuffer);
 
-            // Load and process image
-            const img = new Image();
-            img.onload = function() {
-                const canvas = document.createElement('canvas');
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
-                const imageData = ctx.getImageData(0, 0, width, height);
-                inputArray.set(imageData.data);
+				// Load and process image
+				const img = new Image();
+				img.onload = function () {
+					const canvas = document.createElement('canvas');
+					canvas.width = width;
+					canvas.height = height;
+					const ctx = canvas.getContext('2d');
+					ctx.drawImage(img, 0, 0, width, height);
+					const imageData = ctx.getImageData(0, 0, width, height);
+					inputArray.set(imageData.data);
 
-                runKMeansClustering();
-            };
-            img.src = 'path/to/your/image.jpg'; // Replace with your image path
+					runKMeansClustering();
+				};
+				img.src = 'path/to/your/image.jpg'; // Replace with your image path
 
-            function runKMeansClustering() {
-                // Initialize centroids randomly
-                let centroids = Array(k).fill().map(() => [
-                    Math.random() * 255,
-                    Math.random() * 255,
-                    Math.random() * 255
-                ]);
+				function runKMeansClustering() {
+					// Initialize centroids randomly
+					let centroids = Array(k)
+						.fill()
+						.map(() => [Math.random() * 255, Math.random() * 255, Math.random() * 255]);
 
-                // Create workers
-                const workers = [];
-                for (let i = 0; i < numWorkers; i++) {
-                    const worker = new Worker('kmeans-worker.js');
-                    workers.push(worker);
-                }
+					// Create workers
+					const workers = [];
+					for (let i = 0; i < numWorkers; i++) {
+						const worker = new Worker('kmeans-worker.js');
+						workers.push(worker);
+					}
 
-                let iteration = 0;
-                function runIteration() {
-                    if (iteration >= maxIterations) {
-                        createShapes();
-                        return;
-                    }
+					let iteration = 0;
+					function runIteration() {
+						if (iteration >= maxIterations) {
+							createShapes();
+							return;
+						}
 
-                    // Assign pixels to clusters using workers
-                    const rowsPerWorker = Math.floor(height / numWorkers);
-                    let startRow = 0;
-                    let completedWorkers = 0;
+						// Assign pixels to clusters using workers
+						const rowsPerWorker = Math.floor(height / numWorkers);
+						let startRow = 0;
+						let completedWorkers = 0;
 
-                    workers.forEach((worker, index) => {
-                        const endRow = (index === numWorkers - 1) ? height : startRow + rowsPerWorker;
-                        worker.postMessage({
-                            sharedBuffer,
-                            clusterBuffer,
-                            width,
-                            height,
-                            startRow,
-                            endRow,
-                            centroids
-                        });
+						workers.forEach((worker, index) => {
+							const endRow = index === numWorkers - 1 ? height : startRow + rowsPerWorker;
+							worker.postMessage({
+								sharedBuffer,
+								clusterBuffer,
+								width,
+								height,
+								startRow,
+								endRow,
+								centroids
+							});
 
-                        worker.onmessage = () => {
-                            completedWorkers++;
-                            if (completedWorkers === numWorkers) {
-                                updateCentroids();
-                            }
-                        };
+							worker.onmessage = () => {
+								completedWorkers++;
+								if (completedWorkers === numWorkers) {
+									updateCentroids();
+								}
+							};
 
-                        startRow = endRow;
-                    });
-                }
+							startRow = endRow;
+						});
+					}
 
-                function updateCentroids() {
-                    const newCentroids = Array(k).fill().map(() => [0, 0, 0]);
-                    const counts = Array(k).fill(0);
+					function updateCentroids() {
+						const newCentroids = Array(k)
+							.fill()
+							.map(() => [0, 0, 0]);
+						const counts = Array(k).fill(0);
 
-                    for (let i = 0; i < width * height; i++) {
-                        const cluster = clusterArray[i];
-                        const idx = i * 4;
-                        newCentroids[cluster][0] += inputArray[idx];
-                        newCentroids[cluster][1] += inputArray[idx + 1];
-                        newCentroids[cluster][2] += inputArray[idx + 2];
-                        counts[cluster]++;
-                    }
+						for (let i = 0; i < width * height; i++) {
+							const cluster = clusterArray[i];
+							const idx = i * 4;
+							newCentroids[cluster][0] += inputArray[idx];
+							newCentroids[cluster][1] += inputArray[idx + 1];
+							newCentroids[cluster][2] += inputArray[idx + 2];
+							counts[cluster]++;
+						}
 
-                    for (let i = 0; i < k; i++) {
-                        if (counts[i] > 0) {
-                            newCentroids[i][0] /= counts[i];
-                            newCentroids[i][1] /= counts[i];
-                            newCentroids[i][2] /= counts[i];
-                        }
-                    }
+						for (let i = 0; i < k; i++) {
+							if (counts[i] > 0) {
+								newCentroids[i][0] /= counts[i];
+								newCentroids[i][1] /= counts[i];
+								newCentroids[i][2] /= counts[i];
+							}
+						}
 
-                    centroids = newCentroids;
-                    iteration++;
-                    runIteration();
-                }
+						centroids = newCentroids;
+						iteration++;
+						runIteration();
+					}
 
-                function createShapes() {
-                    const shapes = Array(k).fill().map(() => new Path());
-                    shapes.forEach((shape, i) => {
-                        shape.fillColor = new Color(
-                            centroids[i][0] / 255,
-                            centroids[i][1] / 255,
-                            centroids[i][2] / 255,
-                            0.5
-                        );
-                    });
+					function createShapes() {
+						const shapes = Array(k)
+							.fill()
+							.map(() => new Path());
+						shapes.forEach((shape, i) => {
+							shape.fillColor = new Color(
+								centroids[i][0] / 255,
+								centroids[i][1] / 255,
+								centroids[i][2] / 255,
+								0.5
+							);
+						});
 
-                    for (let y = 0; y < height; y++) {
-                        for (let x = 0; x < width; x++) {
-                            const cluster = clusterArray[y * width + x];
-                            shapes[cluster].add(new Point(x, y));
-                        }
-                    }
+						for (let y = 0; y < height; y++) {
+							for (let x = 0; x < width; x++) {
+								const cluster = clusterArray[y * width + x];
+								shapes[cluster].add(new Point(x, y));
+							}
+						}
 
-                    shapes.forEach(shape => shape.simplify());
-                    paper.view.draw();
-                }
+						shapes.forEach((shape) => shape.simplify());
+						paper.view.draw();
+					}
 
-                runIteration();
-            }
-        }
-    </script>
-</body>
+					runIteration();
+				}
+			};
+		</script>
+	</body>
 </html>
