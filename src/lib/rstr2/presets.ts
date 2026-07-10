@@ -42,7 +42,7 @@ export const builtinPresets = (): SettingsPreset[] => [
 				hatchThreshold: 0.1,
 				hatchGamma: 1.8,
 				inkBoost: 1.5,
-				outputWidthMm: 267
+				outputWidthMm: 200
 			},
 			layers: defaultCmyLayers()
 		}
@@ -65,7 +65,7 @@ export const builtinPresets = (): SettingsPreset[] => [
 				hatchThreshold: 0.1,
 				hatchGamma: 1.8,
 				inkBoost: 1.7,
-				outputWidthMm: 267
+				outputWidthMm: 200
 			},
 			layers: defaultCmyLayers()
 		}
@@ -88,7 +88,7 @@ export const builtinPresets = (): SettingsPreset[] => [
 				hatchThreshold: 0.2,
 				hatchGamma: 1.5,
 				inkBoost: 1,
-				outputWidthMm: 267
+				outputWidthMm: 200
 			},
 			layers: defaultClassicLayers()
 		}
