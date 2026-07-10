@@ -2,11 +2,14 @@
 //
 // Randomness is gaussian, not uniform — every parameter gets its own curve so
 // the rolls cluster around values that tend to produce good plots while still
-// reaching into the weird ends of each range now and then. ALL the tuning
-// lives in the curve tables below (RANDOM_CURVES, ALGORITHM_WEIGHTS,
+// reaching into the weird ends of each range now and then. ALL the numeric
+// tuning lives in the curve tables below (RANDOM_CURVES, ALGORITHM_WEIGHTS,
 // CHANNEL_WEIGHTS): tweak mean/stdDev/min/max per parameter by hand here and
-// the UI picks it up. The adjust (image) and export settings are deliberately
-// left alone — those belong to the source image, not to the look.
+// the UI picks it up. Layer colours are not rolled numerically — they come
+// from a curated real-ink palette and its colour harmonies (see inkColors.ts),
+// so a multi-pen stack lands on a deliberate scheme instead of random hues.
+// The adjust (image) and export settings are deliberately left alone — those
+// belong to the source image, not to the look.
 //
 // With "stick to built-in presets" enabled the layer stack (ink colors,
 // channels, pen widths) is taken verbatim from a random built-in preset —
@@ -17,6 +20,7 @@
 import type { Rstr2Params, SegmentationAlgorithm } from './params';
 import { nextLayerId, type LayerChannel, type LayerConfig } from './layers';
 import { builtinPresets, type Rstr2Settings } from './presets';
+import { pickInkScheme } from './inkColors';
 
 export interface GaussianCurve {
 	/** center of the bell */
@@ -57,10 +61,8 @@ export const RANDOM_CURVES = {
 	/** first hatch direction of a layer */
 	angleStart: { mean: 45, stdDev: 70, min: -90, max: 225, step: 5 },
 	/** angleMax = angleStart + spread — 0 keeps a single direction */
-	angleSpread: { mean: 70, stdDev: 55, min: 0, max: 180, step: 5 },
-	// random pen colors (HSL — hue is uniform on purpose, see randomColor)
-	colorSaturation: { mean: 0.85, stdDev: 0.2, min: 0.3, max: 1, step: 0.01 },
-	colorLightness: { mean: 0.48, stdDev: 0.12, min: 0.2, max: 0.7, step: 0.01 }
+	angleSpread: { mean: 70, stdDev: 55, min: 0, max: 180, step: 5 }
+	// (layer colours are picked from the ink palette in inkColors.ts, not a curve)
 } as const satisfies Record<string, GaussianCurve>;
 
 export const ALGORITHM_WEIGHTS: WeightedOption<SegmentationAlgorithm>[] = [
@@ -127,18 +129,6 @@ export const weightedPick = <T>(options: WeightedOption<T>[], rng: Rng): T => {
 	return options[options.length - 1].value;
 };
 
-const hslToHex = (h: number, s: number, l: number): string => {
-	const f = (n: number) => {
-		const k = (n + h / 30) % 12;
-		const a = s * Math.min(l, 1 - l);
-		const value = l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
-		return Math.round(value * 255)
-			.toString(16)
-			.padStart(2, '0');
-	};
-	return `#${f(0)}${f(8)}${f(4)}`.toUpperCase();
-};
-
 // ─── the roll itself ─────────────────────────────────────────────────────────
 
 const randomAngles = (rng: Rng): { angleMin: number; angleMax: number } => {
@@ -147,15 +137,7 @@ const randomAngles = (rng: Rng): { angleMin: number; angleMax: number } => {
 	return { angleMin, angleMax: Math.min(angleMin + spread, 360) };
 };
 
-const randomColor = (rng: Rng): string =>
-	// hue stays uniform — no direction of the color wheel is more plottable
-	hslToHex(
-		rng() * 360,
-		sampleCurve(RANDOM_CURVES.colorSaturation, rng),
-		sampleCurve(RANDOM_CURVES.colorLightness, rng)
-	);
-
-const randomLayer = (rng: Rng, taken: Set<LayerChannel>): LayerConfig => {
+const randomLayer = (rng: Rng, taken: Set<LayerChannel>, color: string): LayerConfig => {
 	// prefer channels the stack doesn't use yet, so multi-layer rolls
 	// separate the image instead of drawing it twice
 	const free = CHANNEL_WEIGHTS.filter((option) => !taken.has(option.value));
@@ -165,7 +147,7 @@ const randomLayer = (rng: Rng, taken: Set<LayerChannel>): LayerConfig => {
 		id: nextLayerId(),
 		name: CHANNEL_NAMES[channel],
 		channel,
-		color: randomColor(rng),
+		color,
 		...randomAngles(rng),
 		// per-layer overrides stay inherited — the roll works the globals
 		penWidthMm: null,
@@ -224,8 +206,11 @@ export const randomizeSettings = (
 		}));
 	} else {
 		const count = sampleCurve(RANDOM_CURVES.layerCount, rng);
+		// pick a whole colour scheme first, then hand one ink to each layer, so
+		// the pens land on a deliberate harmony rather than random hues
+		const colors = pickInkScheme(count, rng);
 		const taken = new Set<LayerChannel>();
-		layers = Array.from({ length: count }, () => randomLayer(rng, taken));
+		layers = Array.from({ length: count }, (_, i) => randomLayer(rng, taken, colors[i]));
 	}
 
 	return { params, layers };
