@@ -341,24 +341,33 @@
 	// dual-range slider for the export window, same setup as the spacing one
 	let frameMinEl: HTMLInputElement | undefined = $state();
 	let frameMaxEl: HTMLInputElement | undefined = $state();
-	let frameDri: DualRangeInput | undefined;
+	// $state so the sync effect below re-runs the moment the instance is created
+	let frameDri: DualRangeInput | undefined = $state();
 
 	$effect(() => {
 		if (!frameMinEl || !frameMaxEl) return;
-		frameDri = new DualRangeInput(frameMinEl, frameMaxEl);
+		const dri = new DualRangeInput(frameMinEl, frameMaxEl);
+		frameDri = dri;
 		return () => {
-			frameDri?.destroy();
+			dri.destroy();
 			frameDri = undefined;
 		};
 	});
 
 	// keep the track fill in sync when the window changes from the number
-	// inputs or the frame count changes with the fps
+	// inputs or the frame count changes with the fps. reading `frameDri` (a
+	// $state) as a dependency means the very first correct `max` — which only
+	// arrives once the video metadata loads, after the slider is built — still
+	// triggers an update() instead of leaving the thumbs mispositioned.
 	$effect(() => {
-		void video.startFrame;
-		void video.maxFrames;
-		void videoTotalFrames;
-		frameDri?.update();
+		const dri = frameDri;
+		// Sum of every bound that should re-sync the fill. This has to be a real
+		// (used) read: a bare `void x` does not register as a dependency in this
+		// Svelte version, which is why the slider stayed broken until the first
+		// interaction — the correct `max` only arrives once the video metadata
+		// loads, after the slider has already been built.
+		const bound = video.startFrame + video.maxFrames + videoTotalFrames;
+		if (dri && Number.isFinite(bound)) dri.update();
 	});
 
 	//***************************************************************
@@ -1336,22 +1345,26 @@
 	// Dual-range slider for the spacing bounds
 	let spacingMinEl: HTMLInputElement | undefined = $state();
 	let spacingMaxEl: HTMLInputElement | undefined = $state();
-	let spacingDri: DualRangeInput | undefined;
+	// $state so the sync effect below re-runs the moment the instance is created
+	let spacingDri: DualRangeInput | undefined = $state();
 
 	$effect(() => {
 		if (!spacingMinEl || !spacingMaxEl) return;
-		spacingDri = new DualRangeInput(spacingMinEl, spacingMaxEl);
+		const dri = new DualRangeInput(spacingMinEl, spacingMaxEl);
+		spacingDri = dri;
 		return () => {
-			spacingDri?.destroy();
+			dri.destroy();
 			spacingDri = undefined;
 		};
 	});
 
 	// keep the track fill in sync when the values change from the number inputs
 	$effect(() => {
-		void params.spacingMinMm;
-		void params.spacingMaxMm;
-		spacingDri?.update();
+		const dri = spacingDri;
+		// real (used) read of both bounds — see the frame slider effect above for
+		// why a bare `void x` is not enough to subscribe the effect here
+		const bound = params.spacingMinMm + params.spacingMaxMm;
+		if (dri && Number.isFinite(bound)) dri.update();
 	});
 </script>
 
@@ -2673,19 +2686,46 @@
 		font-size: 0.68rem;
 	}
 
-	/* neutral theme for @stanko/dual-range-input */
+	/* neutral theme for @stanko/dual-range-input — tuned to match the native
+	   accent-color range inputs used everywhere else (chunky rounded track, a
+	   light-gray gutter and a ~15px ink thumb) so the two read as one control */
 	.app :global(.dual-range-input) {
 		--dri-height: 1.3rem;
-		--dri-thumb-width: 0.85rem;
-		--dri-thumb-height: 0.85rem;
+		--dri-thumb-width: 0.94rem;
+		--dri-thumb-height: 0.94rem;
 		--dri-thumb-color: var(--ink);
 		--dri-thumb-hover-color: var(--ink-soft);
 		--dri-thumb-active-color: var(--ink-soft);
 		--dri-thumb-border-color: transparent;
 		--dri-thumb-border-radius: 999px;
-		--dri-track-height: 0.2rem;
-		--dri-track-color: #ccc;
+		--dri-track-height: 0.5rem;
+		--dri-track-color: #efefef;
 		--dri-track-filled-color: var(--ink);
+	}
+
+	/* 1px gutter outline. box-sizing is border-box in the library CSS, so this
+	   keeps the track at its --dri-track-height. The track is two abutting halves
+	   (one input each); bordering top/bottom throughout but the sides only on the
+	   outer caps avoids a seam where the halves meet in the middle. */
+	.app :global(.dual-range-input input::-webkit-slider-runnable-track) {
+		border-top: 1px solid #b2b2b2;
+		border-bottom: 1px solid #b2b2b2;
+	}
+	.app :global(.dual-range-input input::-moz-range-track) {
+		border-top: 1px solid #b2b2b2;
+		border-bottom: 1px solid #b2b2b2;
+	}
+	.app :global(.dual-range-input input:first-child::-webkit-slider-runnable-track) {
+		border-left: 1px solid #b2b2b2;
+	}
+	.app :global(.dual-range-input input:first-child::-moz-range-track) {
+		border-left: 1px solid #b2b2b2;
+	}
+	.app :global(.dual-range-input input:last-child::-webkit-slider-runnable-track) {
+		border-right: 1px solid #b2b2b2;
+	}
+	.app :global(.dual-range-input input:last-child::-moz-range-track) {
+		border-right: 1px solid #b2b2b2;
 	}
 
 	/* ------------------------------------------------- randomize */
