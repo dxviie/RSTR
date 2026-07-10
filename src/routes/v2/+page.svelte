@@ -86,18 +86,30 @@
 		b: Float32Array;
 	}
 
-	const loadParams = (): Rstr2Params => {
-		if (typeof localStorage === 'undefined') return defaultParams();
-		return parseStoredParams(localStorage.getItem(PARAMS_STORAGE_KEY));
+	// On a fresh session (nothing persisted yet) we open on a random built-in
+	// preset — otherwise a returning session restores exactly what it left.
+	let initialPresetName = '';
+	const loadInitialSettings = (): Rstr2Settings => {
+		if (typeof localStorage === 'undefined') {
+			return { params: defaultParams(), layers: defaultCmyLayers() };
+		}
+		const storedParams = localStorage.getItem(PARAMS_STORAGE_KEY);
+		const storedLayers = localStorage.getItem(LAYER_STORAGE_KEY);
+		if (storedParams === null && storedLayers === null) {
+			const presets = builtinPresets();
+			const choice = presets[Math.floor(Math.random() * presets.length)];
+			initialPresetName = choice.name;
+			return choice.settings;
+		}
+		return {
+			params: parseStoredParams(storedParams),
+			layers: parseStoredLayers(storedLayers) ?? defaultCmyLayers()
+		};
 	};
 
-	const loadLayers = (): LayerConfig[] => {
-		if (typeof localStorage === 'undefined') return defaultCmyLayers();
-		return parseStoredLayers(localStorage.getItem(LAYER_STORAGE_KEY)) ?? defaultCmyLayers();
-	};
-
-	const params: Rstr2Params = $state(loadParams());
-	let layers: LayerConfig[] = $state(loadLayers());
+	const initialSettings = loadInitialSettings();
+	const params: Rstr2Params = $state(initialSettings.params);
+	let layers: LayerConfig[] = $state(initialSettings.layers);
 
 	let inputImage = $state('');
 	// filename of the current image source (for export names); '' when none
@@ -800,7 +812,8 @@
 	};
 
 	let userPresets: SettingsPreset[] = $state(loadUserPresets());
-	let selectedPreset = $state('');
+	// reflects the random built-in chosen on a fresh session (empty otherwise)
+	let selectedPreset = $state(initialPresetName);
 	let presetName = $state('');
 	let settingsFileInput: HTMLInputElement | undefined = $state();
 	let settingsNotice = $state('');

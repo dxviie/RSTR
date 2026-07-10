@@ -110,8 +110,11 @@ describe('randomizeSettings', () => {
 		const presets = builtinPresets();
 		for (let seed = 0; seed < 30; seed++) {
 			const { params, layers } = randomizeSettings(currentSettings(), true, seededRng(seed));
+			// the result must reproduce a real built-in combination, pen width
+			// included — some presets share a layer stack but differ in pen width
 			const match = presets.find(
 				(preset) =>
+					preset.settings.params.penWidthMm === params.penWidthMm &&
 					preset.settings.layers.length === layers.length &&
 					preset.settings.layers.every(
 						(layer, i) =>
@@ -121,8 +124,6 @@ describe('randomizeSettings', () => {
 					)
 			);
 			expect(match).toBeDefined();
-			// the global pen width is part of the physical combination
-			expect(params.penWidthMm).toBe(match!.settings.params.penWidthMm);
 			// spacings and angles still roll
 			expect(layers[0].angleMax).toBeGreaterThanOrEqual(layers[0].angleMin);
 		}
