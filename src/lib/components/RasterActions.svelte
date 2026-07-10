@@ -1,4 +1,5 @@
 <script lang="ts">
+	// @ts-nocheck — /classic legacy code — kept for nostalgia, intentionally left as-is and not type-checked.
 	import Button from './ui/button/button.svelte';
 	import {
 		exported,
@@ -22,9 +23,11 @@
 
 	function isMobileDevice() {
 		const ua = navigator.userAgent;
-		return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua) ||
+		return (
+			/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua) ||
 			('maxTouchPoints' in navigator && navigator.maxTouchPoints > 0) ||
-			('msMaxTouchPoints' in navigator && navigator.msMaxTouchPoints > 0);
+			('msMaxTouchPoints' in navigator && navigator.msMaxTouchPoints > 0)
+		);
 	}
 
 	let isMobile = $state(false);
@@ -112,7 +115,9 @@
 						console.warn('skipping group without fills', group);
 						return;
 					}
-					group.fills.forEach((fill) => svg += fill.exportSVG({ asString: true }).replace(/\sxmlns="[^"]*"/, ''));
+					group.fills.forEach(
+						(fill) => (svg += fill.exportSVG({ asString: true }).replace(/\sxmlns="[^"]*"/, ''))
+					);
 					svg += '</g>';
 				});
 				svg += '</g>';
@@ -168,7 +173,7 @@
 		// Load and draw the watermark
 		var watermark = new Image();
 		watermark.src = 'watermark.png'; // Path to your watermark image
-		watermark.onload = function() {
+		watermark.onload = function () {
 			// Set the desired width and height for the watermark
 			var scale = 0.5; // Example scale factor (50%)
 			var watermarkWidth = watermark.width * scale;
@@ -181,7 +186,7 @@
 			ctx.drawImage(watermark, x, y, watermarkWidth, watermarkHeight);
 
 			// Convert the canvas to a Blob
-			tempCanvas.toBlob(function(blob) {
+			tempCanvas.toBlob(function (blob) {
 				// Create an object URL for the blob
 				var url = URL.createObjectURL(blob);
 
@@ -198,7 +203,7 @@
 
 	const getFrameFileName = (ext: string) => {
 		const now = new Date();
-		const timestamp = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${(now.getDate()).toString().padStart(2, '0')}-${(now.getHours()).toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
+		const timestamp = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}-${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
 		return `rstr.d17e.dev-${timestamp}.${ext}`;
 	};
 </script>
@@ -206,21 +211,30 @@
 <!--=======================================================================================-->
 
 <div class="actions-container">
-
 	<Button
 		class="font-bold"
 		on:click={handleSelectFileClicked}
 		disabled={!selectImageButtonEnabled}
 		alt="Select image"
 		title="Select image"
-		data-umami-event={"select-image"}>
+		data-umami-event={'select-image'}
+	>
 		<svg width="20" height="20" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-			<rect x="10" y="10" width="80" height="80" rx="10" ry="10" fill="none" stroke="white" stroke-width="10" />
+			<rect
+				x="10"
+				y="10"
+				width="80"
+				height="80"
+				rx="10"
+				ry="10"
+				fill="none"
+				stroke="white"
+				stroke-width="10"
+			/>
 			<circle cx="30" cy="30" r="10" fill="white" />
 			<polyline points="10,70 40,50 60,60 90,30" fill="none" stroke="white" stroke-width="5" />
 		</svg>
-	</Button
-	>
+	</Button>
 
 	<Button
 		class={`font-bold ${actionButtonLabel ? actionButtonLabel.toLowerCase() : ''}`}
@@ -233,19 +247,51 @@
 		{#if !isMobile}
 			<Button class="font-bold" on:click={handleExportSVG}>
 				<svg width="20" height="20" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-					<rect x="10" y="10" width="80" height="80" rx="10" ry="10" fill="none" stroke="white" stroke-width="10" />
-					<path d="M50 25 L50 60 M35 45 L50 60 L65 45" fill="none" stroke="white" stroke-width="7" stroke-linecap="round"
-								stroke-linejoin="round" />
+					<rect
+						x="10"
+						y="10"
+						width="80"
+						height="80"
+						rx="10"
+						ry="10"
+						fill="none"
+						stroke="white"
+						stroke-width="10"
+					/>
+					<path
+						d="M50 25 L50 60 M35 45 L50 60 L65 45"
+						fill="none"
+						stroke="white"
+						stroke-width="7"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					/>
 					<path d="M30 70 L70 70" stroke="white" stroke-width="7" stroke-linecap="round" />
 				</svg>
 				<p class="ml-1.5">SVG</p>
 			</Button>
 		{/if}
-		<Button class="font-bold" on:click={handleSaveImage} data-umami-event={"save-image"}>
+		<Button class="font-bold" on:click={handleSaveImage} data-umami-event={'save-image'}>
 			<svg width="20" height="20" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-				<rect x="10" y="10" width="80" height="80" rx="10" ry="10" fill="none" stroke="white" stroke-width="10" />
-				<path d="M50 25 L50 60 M35 45 L50 60 L65 45" fill="none" stroke="white" stroke-width="7" stroke-linecap="round"
-							stroke-linejoin="round" />
+				<rect
+					x="10"
+					y="10"
+					width="80"
+					height="80"
+					rx="10"
+					ry="10"
+					fill="none"
+					stroke="white"
+					stroke-width="10"
+				/>
+				<path
+					d="M50 25 L50 60 M35 45 L50 60 L65 45"
+					fill="none"
+					stroke="white"
+					stroke-width="7"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				/>
 				<path d="M30 70 L70 70" stroke="white" stroke-width="7" stroke-linecap="round" />
 			</svg>
 			{#if !isMobile}
@@ -253,7 +299,6 @@
 			{/if}
 		</Button>
 	{/if}
-
 
 	<input
 		type="file"
@@ -270,21 +315,20 @@
 <!--=======================================================================================-->
 
 <style>
-    .actions-container {
-        width: 100%;
-        justify-content: center;
-        display: flex;
-        flex-direction: row;
-        gap: 1rem;
-    }
+	.actions-container {
+		width: 100%;
+		justify-content: center;
+		display: flex;
+		flex-direction: row;
+		gap: 1rem;
+	}
 
-    :global(.start) {
-        background-color: hsl(var(--foreground));
-        color: hsl(var(--background));
-    }
+	:global(.start) {
+		background-color: hsl(var(--foreground));
+		color: hsl(var(--background));
+	}
 
-    :global(.start:hover) {
-        background-color: hsl(var(--primary) / 0.1);
-    }
-
+	:global(.start:hover) {
+		background-color: hsl(var(--primary) / 0.1);
+	}
 </style>

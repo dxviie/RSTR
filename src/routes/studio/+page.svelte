@@ -1907,7 +1907,7 @@
 								<label title="which image channel drives this layer's ink amount">
 									channel
 									<select bind:value={layer.channel}>
-										{#each Object.entries(CHANNEL_LABELS) as [value, label]}
+										{#each Object.entries(CHANNEL_LABELS) as [value, label] (value)}
 											<option {value}>{label}</option>
 										{/each}
 									</select>
