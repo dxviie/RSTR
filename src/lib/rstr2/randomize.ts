@@ -42,20 +42,24 @@ export interface WeightedOption<T> {
 // ─── the central tuning table ────────────────────────────────────────────────
 
 export const RANDOM_CURVES = {
-	// segmentation
-	resolution: { mean: 110, stdDev: 60, min: 24, max: 320, step: 1 },
-	smoothing: { mean: 1, stdDev: 1.2, min: 0, max: 4, step: 1 },
-	tolerance: { mean: 0.09, stdDev: 0.06, min: 0.01, max: 0.35, step: 0.01 },
-	minRegionSize: { mean: 6, stdDev: 10, min: 1, max: 64, step: 1 },
-	slicCellSize: { mean: 9, stdDev: 6, min: 2, max: 48, step: 1 },
+	// Segmentation. The "unrecognizable" rolls come from the coarse end of
+	// these — too few, too-merged, or over-smoothed regions lose the subject.
+	// Detail (the high end) is safe, so only the coarse bound is pulled in and
+	// the bells are tightened around the known-good defaults in params.ts.
+	resolution: { mean: 256, stdDev: 128, min: 32, max: 512, step: 1 },
+	smoothing: { mean: 1, stdDev: 0.9, min: 0, max: 3, step: 1 },
+	tolerance: { mean: 0.07, stdDev: 0.04, min: 0.01, max: 0.3, step: 0.01 },
+	minRegionSize: { mean: 4, stdDev: 5, min: 1, max: 28, step: 1 },
+	slicCellSize: { mean: 8, stdDev: 4, min: 2, max: 24, step: 1 },
 	slicCompactness: { mean: 0.5, stdDev: 0.25, min: 0, max: 1, step: 0.02 },
-	// lines
-	penWidthMm: { mean: 0.4, stdDev: 0.25, min: 0.1, max: 1.5, step: 0.05 },
-	spacingMinMm: { mean: 0.7, stdDev: 0.4, min: 0.2, max: 2.5, step: 0.05 },
-	spacingMaxMm: { mean: 4, stdDev: 2, min: 1, max: 9, step: 0.05 },
-	hatchThreshold: { mean: 0.1, stdDev: 0.07, min: 0, max: 0.4, step: 0.01 },
-	hatchGamma: { mean: 1.8, stdDev: 0.5, min: 0.7, max: 3.2, step: 0.05 },
-	inkBoost: { mean: 1.1, stdDev: 0.4, min: 0.4, max: 2.5, step: 0.05 },
+	// Lines. Faint, washed-out rolls come from sparse spacing + starved ink;
+	// the sparse/low ends are pulled in so every layer keeps enough ink to read.
+	penWidthMm: { mean: 0.4, stdDev: 0.2, min: 0.1, max: 1.1, step: 0.05 },
+	spacingMinMm: { mean: 0.55, stdDev: 0.3, min: 0.2, max: 1.5, step: 0.05 },
+	spacingMaxMm: { mean: 3.5, stdDev: 1.4, min: 1.5, max: 6.5, step: 0.05 },
+	hatchThreshold: { mean: 0.08, stdDev: 0.05, min: 0, max: 0.25, step: 0.01 },
+	hatchGamma: { mean: 1.7, stdDev: 0.45, min: 0.8, max: 2.8, step: 0.05 },
+	inkBoost: { mean: 1.15, stdDev: 0.35, min: 0.7, max: 2.2, step: 0.05 },
 	// layers
 	layerCount: { mean: 3, stdDev: 1, min: 1, max: 5, step: 1 },
 	/** first hatch direction of a layer */
