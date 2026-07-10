@@ -176,14 +176,31 @@
 
 	const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
+	// Settings (params + layers) persist only once the user actually engages with
+	// the config — a manual edit, a preset pick, or an import. The random preset
+	// we open on (and any dice roll) stays ephemeral until then, so a plain
+	// refresh re-rolls instead of pinning the first random start. markSettingsEdited
+	// flips this on; see the config panes' input/change handler and the mutators.
+	let persistSettings = $state(false);
+	const markSettingsEdited = () => (persistSettings = true);
+	const noteSettingsEdit = (event: Event) => {
+		const target = event.target as HTMLElement | null;
+		// file pickers (image/video/import) and the dice controls aren't config edits
+		if (target instanceof HTMLInputElement && target.type === 'file') return;
+		if (target?.closest?.('.randomize-row')) return;
+		markSettingsEdited();
+	};
+
 	// persist settings (JSON.stringify also registers deep dependencies)
 	$effect(() => {
 		const json = JSON.stringify(params);
-		if (typeof localStorage !== 'undefined') localStorage.setItem(PARAMS_STORAGE_KEY, json);
+		if (persistSettings && typeof localStorage !== 'undefined')
+			localStorage.setItem(PARAMS_STORAGE_KEY, json);
 	});
 	$effect(() => {
 		const json = JSON.stringify(layers);
-		if (typeof localStorage !== 'undefined') localStorage.setItem(LAYER_STORAGE_KEY, json);
+		if (persistSettings && typeof localStorage !== 'undefined')
+			localStorage.setItem(LAYER_STORAGE_KEY, json);
 	});
 	$effect(() => {
 		const json = JSON.stringify(video);
@@ -768,10 +785,12 @@
 
 	const addLayer = () => {
 		layers.push(createLayer());
+		markSettingsEdited();
 	};
 
 	const removeLayer = (id: string) => {
 		layers = layers.filter((layer) => layer.id !== id);
+		markSettingsEdited();
 	};
 
 	const moveLayer = (id: string, delta: number) => {
@@ -780,6 +799,7 @@
 		if (index < 0 || target < 0 || target >= layers.length) return;
 		const [layer] = layers.splice(index, 1);
 		layers.splice(target, 0, layer);
+		markSettingsEdited();
 	};
 
 	const OVERRIDE_FIELDS = [
@@ -856,7 +876,10 @@
 		const preset =
 			BUILTIN_PRESETS.find((entry) => entry.name === selectedPreset) ??
 			userPresets.find((entry) => entry.name === selectedPreset);
-		if (preset) applySettings(preset.settings);
+		if (preset) {
+			applySettings(preset.settings);
+			markSettingsEdited();
+		}
 	};
 
 	const savePreset = () => {
@@ -872,6 +895,7 @@
 		else userPresets.push(preset);
 		selectedPreset = name;
 		presetName = '';
+		markSettingsEdited();
 		notice(index >= 0 ? `updated preset "${name}"` : `saved preset "${name}"`);
 	};
 
@@ -904,6 +928,7 @@
 			}
 			applySettings(settings);
 			selectedPreset = '';
+			markSettingsEdited();
 			notice(`imported ${file.name}`);
 		});
 	};
@@ -1419,7 +1444,7 @@
 		<!-------------------------------------------------------------
 			LEFT PANE — image + adjust, segmentation, lines
 		-------------------------------------------------------------->
-		<aside class="pane left">
+		<aside class="pane left" oninput={noteSettingsEdit} onchange={noteSettingsEdit}>
 			<section class="panel-group">
 				<div class="group-title">image</div>
 				<div class="image-picker">
@@ -1759,7 +1784,7 @@
 		<!-------------------------------------------------------------
 			RIGHT PANE — layers + export
 		-------------------------------------------------------------->
-		<aside class="pane right">
+		<aside class="pane right" oninput={noteSettingsEdit} onchange={noteSettingsEdit}>
 			<section class="panel-group">
 				<div class="group-title">presets</div>
 				<div class="randomize-row">
