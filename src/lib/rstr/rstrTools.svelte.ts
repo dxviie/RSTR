@@ -1,3 +1,4 @@
+// @ts-nocheck — /classic legacy code — kept for nostalgia, intentionally left as-is and not type-checked.
 function findValidNeighbors(blocks, block) {
 	let neighbors = [];
 	let x = block.gridX;

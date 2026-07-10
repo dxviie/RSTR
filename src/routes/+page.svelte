@@ -185,8 +185,8 @@
 				<a href="https://genuary24.d17e.dev/?prompt=5" target="_blank" rel="noopener"
 					><em>“In the style of Vera Molnár (1924–2023)”</em></a
 				>
-				— and never really stopped. It grew from a single experiment into the studio it is today;
-				the <a href="/classic">original version</a> still lives on if you're feeling nostalgic.
+				— and never really stopped. It grew from a single experiment into the studio it is today; the
+				<a href="/classic">original version</a> still lives on if you're feeling nostalgic.
 			</p>
 			<p>
 				It's made by David Vandenbogaerde — <a
