@@ -15,10 +15,11 @@
 				? 'help'
 				: null
 	);
+	const sub = $derived(active ? active.toUpperCase() : '');
 </script>
 
 <div class="site">
-	<TopBar {active} tagline="raster images to plottable svg" />
+	<TopBar {active} {sub} tagline="raster images to plottable svg" />
 	<main>
 		{@render children?.()}
 	</main>
