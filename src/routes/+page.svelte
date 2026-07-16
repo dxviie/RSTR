@@ -70,13 +70,15 @@
 		'melkmeisje-2'
 	]);
 
-	const HERO_SLIDES = [
-		...GALLERY_PLOTS.filter((p) => HERO_PLOTS.has(p.name)).map((p) => ({
+	// deterministic order for SSR/hydration; onMount reshuffles on the client so
+	// the carousel opens on a different piece each page load.
+	let heroSlides = $state(
+		GALLERY_PLOTS.filter((p) => HERO_PLOTS.has(p.name)).map((p) => ({
 			src: plotSrc(p.name, 800),
 			srcset: plotSrcset(p.name),
 			alt: p.alt
 		}))
-	];
+	);
 
 	const HERO_INTERVAL_MS = 4500;
 	let heroCurrent = $state(0);
@@ -85,10 +87,18 @@
 	let heroMounted = $state(1);
 
 	onMount(() => {
+		// randomize the running order for this load (client only)
+		const shuffled = heroSlides.slice();
+		for (let i = shuffled.length - 1; i > 0; i--) {
+			const j = Math.floor(Math.random() * (i + 1));
+			[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+		}
+		heroSlides = shuffled;
+
 		if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 		const id = setInterval(() => {
-			heroCurrent = (heroCurrent + 1) % HERO_SLIDES.length;
-			heroMounted = Math.max(heroMounted, Math.min(heroCurrent + 1, HERO_SLIDES.length - 1));
+			heroCurrent = (heroCurrent + 1) % heroSlides.length;
+			heroMounted = Math.max(heroMounted, Math.min(heroCurrent + 1, heroSlides.length - 1));
 		}, HERO_INTERVAL_MS);
 		return () => clearInterval(id);
 	});
@@ -154,9 +164,9 @@
 				};
 				pre.src = plotSrc(name, 400);
 			}
-			timer = setTimeout(swap, 2600 + Math.random() * 4200);
+			timer = setTimeout(swap, 1300 + Math.random() * 2400);
 		};
-		let timer = setTimeout(swap, 2600 + Math.random() * 4200);
+		let timer = setTimeout(swap, 1300 + Math.random() * 2400);
 
 		return () => {
 			clearTimeout(timer);
@@ -204,7 +214,7 @@
 				<div class="hatch-strip" aria-hidden="true">
 					<span class="c"></span><span class="m"></span><span class="y"></span>
 				</div>
-				<h1>turn your favorite pics into a unique artwork</h1>
+				<h1>turn your favorite photos into art</h1>
 				<p class="lede">
 					RSTR redraws any picture as hatched line art.<br/>
 					Made in your browser, ready to print, share, or hand to a pen plotter.
@@ -221,7 +231,7 @@
 			</div>
 			<figure class="hero-figure">
 				<div class="hero-art">
-					{#each HERO_SLIDES as slide, index (slide.src)}
+					{#each heroSlides as slide, index (slide.src)}
 						{#if index <= heroMounted}
 							<img
 								src={slide.src}
@@ -818,7 +828,8 @@
 	}
 
 	.community {
-		margin-top: 2.5rem;
+		max-width: 46rem;
+		margin: 2.5rem auto 0;
 		border: 1px dashed var(--muted);
 		border-radius: 8px;
 		padding: 1.5rem;
