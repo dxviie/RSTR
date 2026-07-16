@@ -134,21 +134,24 @@
 					<a class="btn ghost" href="https://github.com/dxviie/RSTR">view on GitHub</a>
 				</div>
 			</div>
-			<div class="hero-art">
-				{#each HERO_SLIDES as slide, index (slide.src)}
-					{#if index <= heroMounted}
-						<img
-							src={slide.src}
-							srcset={slide.srcset}
-							sizes={slide.srcset ? '(max-width: 820px) 92vw, 480px' : undefined}
-							alt={slide.alt}
-							class:current={index === heroCurrent}
-							aria-hidden={index !== heroCurrent}
-							loading={index === 0 ? 'eager' : 'lazy'}
-						/>
-					{/if}
-				{/each}
-			</div>
+			<figure class="hero-figure">
+				<div class="hero-art">
+					{#each HERO_SLIDES as slide, index (slide.src)}
+						{#if index <= heroMounted}
+							<img
+								src={slide.src}
+								srcset={slide.srcset}
+								sizes={slide.srcset ? '(max-width: 820px) 92vw, 480px' : undefined}
+								alt={slide.alt}
+								class:current={index === heroCurrent}
+								aria-hidden={index !== heroCurrent}
+								loading={index === 0 ? 'eager' : 'lazy'}
+							/>
+						{/if}
+					{/each}
+				</div>
+				<figcaption class="hero-caption">#madewithrstr</figcaption>
+			</figure>
 		</section>
 
 		<!-- how it works -->
@@ -180,11 +183,10 @@
 				<p>
 					RSTR reimagines hatching for the robot age: it splits your image into regions of similar
 					tone and fills each one with lines — denser where the image is dark, sparser where it's
-					light. The result is an image rebuilt entirely from pen strokes. And even if you never
-					touch a plotter, the look is unmistakable.
+					light. The result is an image rebuilt entirely from pen strokes.
 				</p>
 				<p class="aside">
-					Curious about the machines? Have a look at the
+					Curious about plotter art? Have a look at the
 					<a href="https://d17e.dev/projects/plotter-art/" target="_blank" rel="noopener"
 						>plotter art project</a
 					> on d17e.dev.
@@ -495,6 +497,18 @@
 	/* stacked auto-changing carousel: slides sit on top of each other in a
 	   square frame (the shadow lives on the frame so it doesn't pulse while
 	   two slides crossfade) */
+	.hero-figure {
+		margin: 0;
+	}
+
+	.hero-caption {
+		font-family: 'nudica_monobold', monospace;
+		font-size: 0.8rem;
+		color: var(--muted);
+		text-align: center;
+		margin-top: 0.6rem;
+	}
+
 	.hero-art {
 		position: relative;
 		width: 100%;
