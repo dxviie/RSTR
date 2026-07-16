@@ -50,26 +50,26 @@
 }
 
 @layer utilities {
-	/* d17e.dev house fonts */
+	/* UI type: IBM Plex Mono + IBM Plex Serif (SIL Open Font License 1.1) */
 	@font-face {
-		font-family: 'nudica_monobold';
-		src: url('/fonts/nudicamono-bold-webfont.woff') format('woff');
+		font-family: 'mono-bold';
+		src: url('/fonts/ibm-plex-mono-bold.woff2') format('woff2');
 		font-weight: normal;
 		font-style: normal;
 		font-display: swap;
 	}
 
 	@font-face {
-		font-family: 'nudica_monolight';
-		src: url('/fonts/nudicamono-light-webfont.woff') format('woff');
+		font-family: 'mono-light';
+		src: url('/fonts/ibm-plex-mono-light.woff2') format('woff2');
 		font-weight: normal;
 		font-style: normal;
 		font-display: swap;
 	}
 
 	@font-face {
-		font-family: 'argesta_regular';
-		src: url('/fonts/argestatext-regular-webfont.woff') format('woff');
+		font-family: 'serif-text';
+		src: url('/fonts/ibm-plex-serif-regular.woff2') format('woff2');
 		font-weight: normal;
 		font-style: normal;
 		font-display: swap;
@@ -172,7 +172,7 @@
 
 @layer utilities {
 	button {
-		font-family: 'nudica_monobold', monospace;
+		font-family: 'mono-bold', monospace;
 	}
 
 	button:active {
