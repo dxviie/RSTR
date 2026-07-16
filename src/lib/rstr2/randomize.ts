@@ -7,7 +7,8 @@
 // CHANNEL_WEIGHTS): tweak mean/stdDev/min/max per parameter by hand here and
 // the UI picks it up. Layer colours are not rolled numerically — they come
 // from a curated real-ink palette and its colour harmonies (see inkColors.ts),
-// so a multi-pen stack lands on a deliberate scheme instead of random hues.
+// so a multi-pen stack lands on a deliberate scheme instead of random hues,
+// and 75% of rolls reserve one layer for a vibrant Diamine Forever accent ink.
 // The adjust (image) and export settings are deliberately left alone — those
 // belong to the source image, not to the look.
 //
