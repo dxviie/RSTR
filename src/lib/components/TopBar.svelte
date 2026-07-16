@@ -48,7 +48,7 @@
 	{/if}
 	<div class="spacer"></div>
 	{#if variant === 'landing'}
-		<a class="top-cta" href="/studio">launch the app</a>
+		<a class="top-cta" href="/studio">launch RSTR</a>
 	{:else}
 		<nav class="top-nav" aria-label="RSTR tools">
 			<a class="top-link" class:active={active === 'studio'} href="/studio">studio</a>
