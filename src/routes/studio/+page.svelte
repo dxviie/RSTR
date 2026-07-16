@@ -981,7 +981,18 @@
 	// export copies — the on-screen render stays clean.
 	const WATERMARK_TEXT = 'rstr.d17e.dev <3';
 
+	// Owner's kill switch, deliberately not surfaced in the UI. In the console:
+	//   localStorage.setItem('rstr:v2:watermark', 'off')   -> plain exports
+	//   localStorage.removeItem('rstr:v2:watermark')       -> mark comes back
+	// Checked per export, so flicking it needs no reload. Client code is
+	// readable by anyone, so this hides the switch from casual users — it
+	// doesn't protect it.
+	const WATERMARK_STORAGE_KEY = 'rstr:v2:watermark';
+	const watermarkEnabled = (): boolean =>
+		typeof localStorage === 'undefined' || localStorage.getItem(WATERMARK_STORAGE_KEY) !== 'off';
+
 	const drawWatermark = async (ctx: CanvasRenderingContext2D, w: number, h: number) => {
+		if (!watermarkEnabled()) return;
 		const fontSize = Math.max(11, Math.round(Math.min(w, h) * 0.018));
 		try {
 			await document.fonts.load(`${fontSize}px nudica_monobold`);

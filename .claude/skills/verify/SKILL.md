@@ -47,6 +47,6 @@ const context = await browser.newContext({ acceptDownloads: true });
 - To drive the **video pipeline** headlessly: generate a short webm in-page
   (canvas `captureStream()` + `MediaRecorder`, return it base64) and feed it
   via `page.setInputFiles('input[accept="image/*,video/*"]', {name, mimeType,
-  buffer})`. Wait for `.timeline` to appear, tick the `.seq-formats` boxes,
+buffer})`. Wait for `.timeline` to appear, tick the `.seq-formats` boxes,
   then click the button with title `*"download the sequence"*` and unzip the
   download (stored, no compression).
