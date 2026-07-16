@@ -5,6 +5,7 @@
 	// pre-sized -400w / -800w / -1920w webp renditions of each shot.
 
 	import { onMount } from 'svelte';
+	import { fade } from 'svelte/transition';
 	import BrandFooter from '$lib/components/BrandFooter.svelte';
 	import TopBar from '$lib/components/TopBar.svelte';
 
@@ -14,25 +15,38 @@
 	const plotSrcset = (name: string) =>
 		[400, 800, 1920].map((w) => `${plotSrc(name, w)} ${w}w`).join(', ');
 
-	// gallery order: full pieces up front in every row, detail shots in between
+	// gallery order: full pieces and detail shots interleaved. The grid only
+	// shows a window of these at a time (see GALLERY_* below) and cycles the
+	// rest in over time, so the first-paint order also seeds that window.
 	const GALLERY_PLOTS = [
 		{
 			name: 'space-1-1',
 			alt: 'plot of the Cosmic Cliffs of the Carina Nebula in layered colored pens'
 		},
 		{
+			name: 'lia-1',
+			alt: 'a child standing in a field of red poppies, rebuilt in dense multicolor hatching'
+		},
+		{
 			name: 'pearl-1',
 			alt: 'Girl with a Pearl Earring rebuilt from blocks of directional hatching'
 		},
+		{ name: 'street-1', alt: 'a canal bridge and townscape plotted in layered colour hatching' },
 		{ name: 'mona-1', alt: 'figure and its long shadow on a path, in dense multicolor crosshatch' },
+		{ name: 'path-1', alt: 'two figures by a mountain lake, rebuilt from fine pen hatching' },
 		{ name: 'melkmeisje', alt: "Vermeer's Milkmaid plotted in single-pen black hatching" },
+		{ name: 'webb-1', alt: 'a nebula plotted in bands of purple, gold and red with bright stars' },
 		{
 			name: 'broken-gradient-2',
 			alt: 'abstract gradient study — a dark monolith over a teal-to-magenta field'
 		},
+		{ name: 'metro-1', alt: 'a child in a red hat on the metro, in warm hatched colour' },
 		{ name: 'mona-2', alt: 'close-up of the crosshatched pen strokes' },
+		{ name: 'lines-1', alt: 'an abstract portrait plotted in dense single-pen directional lines' },
 		{ name: 'space-2-1', alt: 'plot of a nebula in reds and oranges on a dark starfield' },
+		{ name: 'street-2', alt: 'detail of the townscape plot — blue sky over hatched rooftops' },
 		{ name: 'pearl-2', alt: 'detail of the hatched blocks in the Pearl Earring plot' },
+		{ name: 'hatch-1', alt: 'close-up of vivid magenta, blue and yellow pen strokes' },
 		{ name: 'melkmeisje-2', alt: 'the Milkmaid plot in progress on the AxiDraw' },
 		{ name: 'space-1-2', alt: 'detail of the Carina Nebula plot — thousands of tiny pen strokes' },
 		{ name: 'broken-gradient-2-2', alt: 'detail of the woven hatch texture in the gradient study' },
@@ -43,10 +57,15 @@
 	// stay in the gallery). Slides crossfade in place, stacked in one frame.
 	const HERO_PLOTS = new Set([
 		'space-1-1',
+		'lia-1',
 		'pearl-1',
+		'street-1',
 		'mona-1',
+		'path-1',
 		'melkmeisje',
-		'broken-gradient-2',
+		'webb-1',
+		'metro-1',
+		'lines-1',
 		'space-2-1',
 		'melkmeisje-2'
 	]);
@@ -72,6 +91,77 @@
 			heroMounted = Math.max(heroMounted, Math.min(heroCurrent + 1, HERO_SLIDES.length - 1));
 		}, HERO_INTERVAL_MS);
 		return () => clearInterval(id);
+	});
+
+	// #madewithrstr gallery: only a window of the plots is on screen at once
+	// (fewer on mobile), and every so often one visible tile crossfades to a
+	// plot that was off-screen. Swaps fire on independent, jittered timers so
+	// they never all change at once — the wall feels alive, not synchronized.
+	const GALLERY_DESKTOP = 8;
+	const GALLERY_MOBILE = 6;
+
+	// deterministic first-paint fill so SSR and hydration agree; the client
+	// narrows it to the viewport and starts cycling in onMount.
+	let gallerySlots = $state(Array.from({ length: GALLERY_DESKTOP }, (_, i) => i));
+
+	const hiddenPlots = (slots: number[]) => {
+		const shown = new Set(slots);
+		return GALLERY_PLOTS.map((_, i) => i).filter((i) => !shown.has(i));
+	};
+
+	onMount(() => {
+		const mobile = window.matchMedia('(max-width: 820px)');
+		const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+		// match the visible count to the viewport, keeping the tiles we already
+		// show and topping up (or trimming) from the off-screen pool.
+		const resize = () => {
+			const target = mobile.matches ? GALLERY_MOBILE : GALLERY_DESKTOP;
+			if (target === gallerySlots.length) return;
+			if (target < gallerySlots.length) {
+				gallerySlots = gallerySlots.slice(0, target);
+			} else {
+				const pool = hiddenPlots(gallerySlots);
+				const extra: number[] = [];
+				while (gallerySlots.length + extra.length < target && pool.length) {
+					extra.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+				}
+				gallerySlots = [...gallerySlots, ...extra];
+			}
+		};
+		resize();
+		mobile.addEventListener('change', resize);
+
+		if (reduce.matches) {
+			return () => mobile.removeEventListener('change', resize);
+		}
+
+		// fetch the rendition the tile will use before swapping, so the new
+		// image is decoded and the crossfade never flashes an empty frame.
+		const swap = () => {
+			const pool = hiddenPlots(gallerySlots);
+			if (pool.length) {
+				const slot = Math.floor(Math.random() * gallerySlots.length);
+				const pick = pool[Math.floor(Math.random() * pool.length)];
+				const name = GALLERY_PLOTS[pick].name;
+				const pre = new Image();
+				pre.sizes = '(max-width: 820px) 46vw, 250px';
+				pre.srcset = plotSrcset(name);
+				pre.onload = pre.onerror = () => {
+					const next = gallerySlots.slice();
+					next[slot] = pick;
+					gallerySlots = next;
+				};
+				pre.src = plotSrc(name, 400);
+			}
+			timer = setTimeout(swap, 2600 + Math.random() * 4200);
+		};
+		let timer = setTimeout(swap, 2600 + Math.random() * 4200);
+
+		return () => {
+			clearTimeout(timer);
+			mobile.removeEventListener('change', resize);
+		};
 	});
 
 	const STEPS = [
@@ -114,7 +204,7 @@
 				<div class="hatch-strip" aria-hidden="true">
 					<span class="c"></span><span class="m"></span><span class="y"></span>
 				</div>
-				<h1>turn your best memories into bespoke art</h1>
+				<h1>turn your favorite pics into a unique artwork</h1>
 				<p class="lede">
 					RSTR redraws any picture as hatched line art.<br/>
 					Made in your browser, ready to print, share, or hand to a pen plotter.
@@ -221,15 +311,19 @@
 				A few of my own: plots from photos, run through RSTR and drawn with real pens on real paper.
 			</p>
 			<div class="gallery">
-				{#each GALLERY_PLOTS as plot (plot.name)}
+				{#each gallerySlots as plotIndex, slot (slot)}
 					<div class="gallery-item">
-						<img
-							src={plotSrc(plot.name, 400)}
-							srcset={plotSrcset(plot.name)}
-							sizes="(max-width: 820px) 46vw, 250px"
-							alt={plot.alt}
-							loading="lazy"
-						/>
+						{#key plotIndex}
+							<img
+								in:fade={{ duration: 500 }}
+								out:fade={{ duration: 500 }}
+								src={plotSrc(GALLERY_PLOTS[plotIndex].name, 400)}
+								srcset={plotSrcset(GALLERY_PLOTS[plotIndex].name)}
+								sizes="(max-width: 820px) 46vw, 250px"
+								alt={GALLERY_PLOTS[plotIndex].alt}
+								loading="lazy"
+							/>
+						{/key}
 					</div>
 				{/each}
 			</div>
@@ -692,6 +786,7 @@
 	}
 
 	.gallery-item {
+		position: relative;
 		aspect-ratio: 1;
 		overflow: hidden;
 		background: #fffef7;
@@ -699,6 +794,8 @@
 	}
 
 	.gallery-item img {
+		position: absolute;
+		inset: 0;
 		display: block;
 		width: 100%;
 		height: 100%;
