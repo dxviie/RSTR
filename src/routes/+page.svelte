@@ -8,9 +8,7 @@
 	import BrandFooter from '$lib/components/BrandFooter.svelte';
 	import TopBar from '$lib/components/TopBar.svelte';
 
-	// TODO: swap for a local photo in static/ once it lands in the repo
-	const PLOTTER_IMAGE =
-		'https://media.d17e.dev/images/6774f12e-dac6-4657-bdbd-7461c731edd8/800w.webp';
+	const PLOTTER_IMAGE = '/plotter.png';
 
 	const plotSrc = (name: string, width: number) => `/gallery/${name}-${width}w.webp`;
 	const plotSrcset = (name: string) =>
@@ -194,7 +192,12 @@
 			</div>
 			<figure class="split-art">
 				<img src={PLOTTER_IMAGE} alt="An AxiDraw SE/A3 pen plotter" loading="lazy" />
-				<figcaption>the robot friend: an AxiDraw SE/A3</figcaption>
+				<figcaption>
+					the robot friend: an
+					<a href="https://shop.evilmadscientist.com/908" target="_blank" rel="noopener"
+						>AxiDraw SE/A3</a
+					>
+				</figcaption>
 			</figure>
 		</section>
 
@@ -555,6 +558,14 @@
 		color: var(--muted);
 		text-align: center;
 		margin-top: 0.5rem;
+	}
+
+	.split-art figcaption a {
+		border-bottom: 1px dashed var(--muted);
+	}
+
+	.split-art figcaption a:hover {
+		border-color: var(--ink);
 	}
 
 	/* ------------------------------------------------- steps */
