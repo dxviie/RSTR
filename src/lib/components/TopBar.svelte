@@ -209,7 +209,8 @@
 
 	/* mobile: drop the tagline, tighten the row so the switcher always fits */
 	@media (max-width: 720px) {
-		.tagline {
+		.tagline,
+		.wordmark-sub {
 			display: none;
 		}
 	}
