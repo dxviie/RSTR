@@ -21,7 +21,7 @@
 import type { Rstr2Params, SegmentationAlgorithm } from './params';
 import { nextLayerId, type LayerChannel, type LayerConfig } from './layers';
 import { builtinPresets, type Rstr2Settings } from './presets';
-import { pickInkScheme } from './inkColors';
+import { pickInkScheme, type InkColor } from './inkColors';
 
 export interface GaussianCurve {
 	/** center of the bell */
@@ -89,18 +89,6 @@ export const CHANNEL_WEIGHTS: WeightedOption<LayerChannel>[] = [
 	{ value: 'luma', weight: 1 }
 ];
 
-const CHANNEL_NAMES: Record<LayerChannel, string> = {
-	c: 'Cyan',
-	m: 'Magenta',
-	y: 'Yellow',
-	k: 'Key',
-	r: 'Red',
-	g: 'Green',
-	b: 'Blue',
-	luma: 'Luma',
-	'luma-inv': 'Ink'
-};
-
 // ─── sampling primitives ─────────────────────────────────────────────────────
 
 export type Rng = () => number;
@@ -142,7 +130,7 @@ const randomAngles = (rng: Rng): { angleMin: number; angleMax: number } => {
 	return { angleMin, angleMax: Math.min(angleMin + spread, 360) };
 };
 
-const randomLayer = (rng: Rng, taken: Set<LayerChannel>, color: string): LayerConfig => {
+const randomLayer = (rng: Rng, taken: Set<LayerChannel>, ink: InkColor): LayerConfig => {
 	// prefer channels the stack doesn't use yet, so multi-layer rolls
 	// separate the image instead of drawing it twice
 	const free = CHANNEL_WEIGHTS.filter((option) => !taken.has(option.value));
@@ -150,9 +138,10 @@ const randomLayer = (rng: Rng, taken: Set<LayerChannel>, color: string): LayerCo
 	taken.add(channel);
 	return {
 		id: nextLayerId(),
-		name: CHANNEL_NAMES[channel],
+		// the layer is named after the pen that draws it, not the channel it reads
+		name: ink.name,
 		channel,
-		color,
+		color: ink.hex,
 		...randomAngles(rng),
 		// per-layer overrides stay inherited — the roll works the globals
 		penWidthMm: null,
@@ -213,9 +202,9 @@ export const randomizeSettings = (
 		const count = sampleCurve(RANDOM_CURVES.layerCount, rng);
 		// pick a whole colour scheme first, then hand one ink to each layer, so
 		// the pens land on a deliberate harmony rather than random hues
-		const colors = pickInkScheme(count, rng);
+		const inks = pickInkScheme(count, rng);
 		const taken = new Set<LayerChannel>();
-		layers = Array.from({ length: count }, (_, i) => randomLayer(rng, taken, colors[i]));
+		layers = Array.from({ length: count }, (_, i) => randomLayer(rng, taken, inks[i]));
 	}
 
 	return { params, layers };
