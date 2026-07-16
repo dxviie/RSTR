@@ -37,6 +37,7 @@
 	let calibX: number | null = $state(null);
 	let calibY: number | null = $state(null);
 	let calibRotated = $state(false);
+	let calibCompact = $state(false);
 
 	// output page + layers
 	let pageSize: PageId = $state('A3');
@@ -266,12 +267,15 @@
 				penCount: pens,
 				forExport: false,
 				rotated: calibRotated,
+				compact: calibCompact,
 				x: calibX,
 				y: calibY
 			});
 			html += calib.svg;
+			// invisible drag surface — the visible outline is drawn (in yellow)
+			// by the calibration block itself
 			html += `<rect x="${calib.bx}" y="${calib.by}" width="${calib.bw}" height="${calib.bh}"
-        fill="transparent" stroke="#93a1bd" stroke-width="0.3" stroke-dasharray="1.5 1.5"
+        fill="transparent" stroke="none"
         style="cursor:move" data-drag="calib"/>`;
 		}
 
@@ -370,6 +374,7 @@
 			penCount: pens,
 			forExport: false,
 			rotated: calibRotated,
+			compact: calibCompact,
 			x: calibX,
 			y: calibY
 		});
@@ -471,6 +476,7 @@ ${wrapRotation(artworkInner)}
 			penCount: pens,
 			forExport: true,
 			rotated: calibRotated,
+			compact: calibCompact,
 			x: calibX,
 			y: calibY
 		}).svg
@@ -583,6 +589,14 @@ ${wrapRotation(artworkInner)}
 					<input type="checkbox" bind:checked={layPage} />
 					<span class="layer-dot" style="background: #FF2AA6"></span>
 					page boundary
+				</label>
+				<label
+					class="toggle-row"
+					title="strip the calibration block down to the cal-half and cal-pen layers, packed into the smallest possible rectangle"
+				>
+					<input type="checkbox" bind:checked={calibCompact} />
+					<span class="layer-dot compact-dot"></span>
+					compact calibration
 				</label>
 				<label
 					class="toggle-row reversed-toggle"
@@ -1021,6 +1035,13 @@ ${wrapRotation(artworkInner)}
 		height: 8px;
 		border-radius: 50%;
 		flex-shrink: 0;
+	}
+
+	/* hollow ring in the calibration yellow — “calibration, slimmed down” */
+	.compact-dot {
+		background: none;
+		border: 2px solid #ffb000;
+		box-sizing: border-box;
 	}
 
 	.reversed-toggle {
