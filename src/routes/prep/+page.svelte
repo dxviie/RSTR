@@ -591,7 +591,7 @@ ${wrapRotation(artworkInner)}
 					page boundary
 				</label>
 				<label
-					class="toggle-row"
+					class="toggle-row extras-start"
 					title="strip the calibration block down to the cal-half and cal-pen layers, packed into the smallest possible rectangle"
 				>
 					<input type="checkbox" bind:checked={calibCompact} />
@@ -599,7 +599,7 @@ ${wrapRotation(artworkInner)}
 					compact calibration
 				</label>
 				<label
-					class="toggle-row reversed-toggle"
+					class="toggle-row"
 					title="duplicate every artwork layer as a '-reversed' layer with the same lines running in the opposite direction — each line gets plotted twice, once in each direction, for denser ink"
 				>
 					<input type="checkbox" bind:checked={addReversed} />
@@ -1044,7 +1044,8 @@ ${wrapRotation(artworkInner)}
 		box-sizing: border-box;
 	}
 
-	.reversed-toggle {
+	/* dashed divider between the layer toggles and the extra options */
+	.extras-start {
 		border-top: 1px dashed var(--border);
 		padding-top: 0.45rem;
 		margin-top: 0.15rem;
