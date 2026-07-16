@@ -215,8 +215,7 @@
 			</p>
 			<p>
 				The tool itself is in the open, too: the source code is on
-				<a href="https://github.com/dxviie/RSTR" target="_blank" rel="noopener">GitHub</a>, with a
-				full open-source release under the GPL license on the way.
+				<a href="https://github.com/dxviie/RSTR" target="_blank" rel="noopener">GitHub</a>, licensed under the GPL.
 			</p>
 		</section>
 
@@ -272,8 +271,7 @@
 					href="https://www.d17e.dev"
 					target="_blank"
 					rel="noopener">d17e</a
-				> for short — a software engineer and budding artist in Amsterdam, plotting away in the robot
-				age.
+				> for short — a software engineer and budding artist living in Amsterdam 🇳🇱.
 			</p>
 			<div class="cta-row center">
 				<a class="btn primary" href="/studio">launch RSTR</a>
