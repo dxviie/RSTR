@@ -967,12 +967,75 @@
 					segments: result?.regions.map((region) => region.hatchSegments ?? []) ?? []
 				};
 			});
-		const svg = buildSvgDocument(exportLayers, imgWidth, imgHeight, params.outputWidthMm);
+		const svg = buildSvgDocument(exportLayers, imgWidth, imgHeight, params.outputWidthMm, {
+			params,
+			layers
+		});
 		downloadBlob(new Blob([svg], { type: 'image/svg+xml' }), exportName('', 'svg'));
 	};
 
-	const downloadPng = () => {
-		hatchCanvas?.toBlob((blob) => {
+	// Raster exports carry the same small brand mark as /classic, but drawn
+	// as live text in the house mono font instead of a bitmap, so it stays
+	// crisp at any canvas resolution. The text sits on a paper-white plate in
+	// the corner so it stays legible over dark renders. The mark only goes on
+	// export copies — the on-screen render stays clean.
+	// U+2665 like the classic mark (and the footer's &hearts;) — the trailing
+	// variation selector pins text presentation so no platform swaps in the
+	// color-emoji heart
+	const WATERMARK_TEXT = 'rstr.d17e.dev ♥︎';
+
+	// Owner's kill switch, deliberately not surfaced in the UI. In the console:
+	//   localStorage.setItem('rstr:v2:watermark', 'off')   -> plain exports
+	//   localStorage.removeItem('rstr:v2:watermark')       -> mark comes back
+	// Checked per export, so flicking it needs no reload. Client code is
+	// readable by anyone, so this hides the switch from casual users — it
+	// doesn't protect it.
+	const WATERMARK_STORAGE_KEY = 'rstr:v2:watermark';
+	const watermarkEnabled = (): boolean =>
+		typeof localStorage === 'undefined' || localStorage.getItem(WATERMARK_STORAGE_KEY) !== 'off';
+
+	const drawWatermark = async (ctx: CanvasRenderingContext2D, w: number, h: number) => {
+		if (!watermarkEnabled()) return;
+		const fontSize = Math.max(11, Math.round(Math.min(w, h) * 0.018));
+		try {
+			await document.fonts.load(`${fontSize}px nudica_monobold`);
+		} catch {
+			// font unavailable — the monospace fallback below still renders
+		}
+		ctx.save();
+		// the sequence renderer leaves the context in multiply/0.85 ink
+		// simulation mode — the plate must paint over the art, not blend
+		ctx.globalCompositeOperation = 'source-over';
+		ctx.globalAlpha = 1;
+		ctx.font = `${fontSize}px nudica_monobold, monospace`;
+		ctx.textAlign = 'right';
+		ctx.textBaseline = 'alphabetic';
+		const pad = Math.round(fontSize * 0.5);
+		const metrics = ctx.measureText(WATERMARK_TEXT);
+		const ascent = metrics.actualBoundingBoxAscent || fontSize * 0.8;
+		ctx.fillStyle = '#FFFEF7'; // plate in the render's warm paper white
+		ctx.fillRect(
+			w - metrics.width - 2 * pad,
+			h - ascent - 2 * pad,
+			metrics.width + 2 * pad,
+			ascent + 2 * pad
+		);
+		ctx.fillStyle = 'rgba(26, 32, 44, 0.6)'; // house ink, kept subtle
+		ctx.fillText(WATERMARK_TEXT, w - pad, h - pad);
+		ctx.restore();
+	};
+
+	const downloadPng = async () => {
+		const source = hatchCanvas;
+		if (!source) return;
+		const canvas = document.createElement('canvas');
+		canvas.width = source.width;
+		canvas.height = source.height;
+		const ctx = canvas.getContext('2d');
+		if (!ctx) return;
+		ctx.drawImage(source, 0, 0);
+		await drawWatermark(ctx, canvas.width, canvas.height);
+		canvas.toBlob((blob) => {
 			if (blob) downloadBlob(blob, exportName('', 'png'));
 		});
 	};
@@ -1053,7 +1116,7 @@
 	};
 
 	/** render export layers to a raster blob, mirroring the preview style */
-	const renderRasterBlob = (
+	const renderRasterBlob = async (
 		exportLayers: ExportLayer[],
 		w: number,
 		h: number
@@ -1062,7 +1125,7 @@
 		canvas.width = Math.max(1, Math.round(w * video.rasterScale));
 		canvas.height = Math.max(1, Math.round(h * video.rasterScale));
 		const ctx = canvas.getContext('2d');
-		if (!ctx) return Promise.resolve(null);
+		if (!ctx) return null;
 		ctx.scale(canvas.width / w, canvas.height / h);
 		ctx.fillStyle = '#FFFEF7'; // warm paper white
 		ctx.fillRect(0, 0, w, h);
@@ -1081,6 +1144,9 @@
 			}
 			ctx.stroke();
 		}
+		// the context is still scaled to the source coordinate space, so the
+		// watermark lands proportionally regardless of the raster scale
+		await drawWatermark(ctx, w, h);
 		const mime =
 			video.rasterFormat === 'png'
 				? 'image/png'
@@ -1125,7 +1191,8 @@
 						exportLayers,
 						grabCanvas.width,
 						grabCanvas.height,
-						params.outputWidthMm
+						params.outputWidthMm,
+						{ params, layers }
 					);
 					const data = encoder.encode(svg);
 					entries.push({ name: `${both ? 'svg/' : ''}${name}.svg`, data });

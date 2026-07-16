@@ -17,7 +17,7 @@ import {
 	parseStoredPresets,
 	serializeSettings
 } from './presets';
-import { buildSvgDocument } from './svgExport';
+import { buildSvgDocument, settingsComment } from './svgExport';
 import {
 	defaultVideoConfig,
 	exportFrameRange,
@@ -418,6 +418,70 @@ describe('buildSvgDocument', () => {
 		expect(svg).toContain('id="hatch-magenta"');
 		expect(svg).toContain('<path d="M0 0L10 10" />');
 		expect(svg).toContain(`stroke="${cyan.color}"`);
+		// no settings passed -> no comment block
+		expect(svg.startsWith('<svg')).toBe(true);
+	});
+
+	it('embeds the settings comment above the svg element when given', () => {
+		const [cyan] = defaultCmyLayers();
+		const svg = buildSvgDocument(
+			[{ layer: cyan, penWidthPx: 2, segments: [[0, 0, 10, 10]] }],
+			1000,
+			500,
+			200,
+			{ params: defaultParams(), layers: defaultCmyLayers() }
+		);
+		expect(svg.startsWith('<!--')).toBe(true);
+		expect(svg).toContain('https://rstr.d17e.dev');
+		expect(svg.indexOf('-->')).toBeLessThan(svg.indexOf('<svg'));
+	});
+});
+
+describe('settingsComment', () => {
+	it('lists the whole configuration in a human-readable block', () => {
+		const comment = settingsComment({
+			params: { ...defaultParams(), algorithm: 'slic' },
+			layers: defaultCmyLayers()
+		});
+		expect(comment.startsWith('<!--\n')).toBe(true);
+		expect(comment.endsWith('-->\n')).toBe(true);
+		expect(comment).toContain('https://rstr.d17e.dev');
+		for (const label of [
+			'brightness',
+			'algorithm',
+			'superpixel size',
+			'min region size',
+			'ink threshold',
+			'output width'
+		]) {
+			expect(comment).toContain(label);
+		}
+		expect(comment).toContain('slic');
+		expect(comment).toContain('layer 1: Cyan');
+		expect(comment).toContain('Cyan (1-R)');
+		expect(comment).toContain('#00BFE8');
+		expect(comment).toContain('15 to 105 deg');
+	});
+
+	it('hides slic tuning for other algorithms and shows layer state', () => {
+		const layers = defaultCmyLayers();
+		layers[1].enabled = false;
+		layers[1].penWidthMm = 0.8;
+		const comment = settingsComment({ params: defaultParams(), layers });
+		expect(comment).not.toContain('superpixel size');
+		expect(comment).toContain('layer 2: Magenta (disabled)');
+		expect(comment).toContain('0.8 mm');
+		// inherited overrides stay silent
+		expect(comment).not.toContain('spacing min');
+	});
+
+	it('keeps user strings from breaking the xml comment', () => {
+		const layers = defaultCmyLayers();
+		layers[0].name = 'pen --> injection -- attempt';
+		const comment = settingsComment({ params: defaultParams(), layers });
+		const body = comment.slice('<!--'.length, comment.lastIndexOf('-->'));
+		expect(body).not.toContain('--');
+		expect(comment.endsWith('-->\n')).toBe(true);
 	});
 });
 
