@@ -7,16 +7,24 @@
 //   - Octopus Fluids Write & Draw https://www.octopus-fluids.de/en/write-draw-inks
 //   - Rohrer & Klingner Zeichentusche https://www.rohrer-klingner.de/en/calligraphy-ink/
 //   - Rohrer & Klingner Sketch INK    https://www.rohrer-klingner.de/en/sketchink-2/
+//   - Diamine Forever (pigment)  https://www.diamineinks.co.uk/collections/diamine-50ml-forever-ink
 // The manufacturers don't publish hex values (their own charts are offset
 // prints, "therefore not totally precise"), so each `hex` is a hand-tuned
 // approximation of the bottled colour — good enough to preview and export
-// with, tweak by eye.
+// with, tweak by eye. (The Diamine hexes were sampled from the dense end of
+// the official swatch photos, then rounded by eye.)
 //
 // Colours are grouped into hue `family`s, and HARMONY_SETS lists the family
 // combinations that reliably look good together (complementary pairs, triads,
 // analogous runs, neutral-anchored duotones). A roll picks ONE harmony set for
 // the whole stack, then draws a distinct ink per layer from its families — so a
 // multi-pen plot is guaranteed a deliberate scheme instead of a random clash.
+//
+// The vivid Diamine Forever shades are the accent shelf: tagged `accent`, they
+// sit out of the regular family draw, and ACCENT_RATE (75%) of rolls instead
+// reserve one layer for one of them — drawn from the roll's harmony families —
+// so most stacks get exactly one deliberate vibrant pop. The muted Forever
+// shades (Raven, Blue Indigo, …) join the regular pool like any other ink.
 //
 // This is the tuning table for colour: add inks, retune a hex, or add/weight a
 // harmony set here and the dice picks it up.
@@ -32,6 +40,12 @@ export interface InkColor {
 	family: InkFamily;
 	/** false for near-white inks: real on dark paper, but invisible in the roll */
 	plottable?: boolean;
+	/**
+	 * true for the vibrant accent shelf: excluded from the regular family draw,
+	 * these only enter a roll through its dedicated accent layer (see
+	 * ACCENT_RATE / pickInkScheme)
+	 */
+	accent?: boolean;
 }
 
 // ─── the inks ────────────────────────────────────────────────────────────────
@@ -133,7 +147,27 @@ export const INK_COLORS: InkColor[] = [
 	{ name: 'R&K Sketch 42700 Lotte', hex: '#161616', family: 'neutral' },
 	{ name: 'R&K Sketch 42710 Thea', hex: '#7C776C', family: 'neutral' },
 	{ name: 'R&K Sketch 42730 Frieda', hex: '#1E3C5A', family: 'blue' },
-	{ name: 'R&K Sketch 42750 June', hex: '#7C2A3E', family: 'red' }
+	{ name: 'R&K Sketch 42750 June', hex: '#7C2A3E', family: 'red' },
+
+	// Diamine Forever (50 ml) — waterproof & lightfast pigment inks. The vivid
+	// shades are the `accent` shelf that gives most rolls their pop layer.
+	{ name: 'Diamine Forever Cherry Red', hex: '#C6414F', family: 'red', accent: true },
+	{ name: 'Diamine Forever Coral Blaze', hex: '#F95F4C', family: 'red', accent: true },
+	{ name: 'Diamine Forever Tiger Lily', hex: '#E64C2B', family: 'orange', accent: true },
+	{ name: 'Diamine Forever Honey Pot', hex: '#EC8C07', family: 'orange', accent: true },
+	{ name: 'Diamine Forever Solar Yellow', hex: '#FBCA08', family: 'yellow', accent: true },
+	{ name: 'Diamine Forever Hyper Green', hex: '#6CA209', family: 'green', accent: true },
+	{ name: 'Diamine Forever Amazonia', hex: '#0B6935', family: 'green', accent: true },
+	{ name: 'Diamine Forever Aqua Surf', hex: '#239495', family: 'teal', accent: true },
+	{ name: 'Diamine Forever Skyline', hex: '#0571AC', family: 'blue', accent: true },
+	{ name: 'Diamine Forever Passion Flower', hex: '#8661AB', family: 'purple', accent: true },
+	{ name: 'Diamine Forever Hot Magenta', hex: '#CF2364', family: 'pink', accent: true },
+	// muted Forever shades — regular palette members, not accents
+	{ name: 'Diamine Forever Blue Indigo', hex: '#2A4E70', family: 'blue' },
+	{ name: 'Diamine Forever Smoky Mauve', hex: '#7B6167', family: 'purple' },
+	{ name: 'Diamine Forever Butterscotch', hex: '#A05915', family: 'brown' },
+	{ name: 'Diamine Forever Red Ochre', hex: '#8A4236', family: 'brown' },
+	{ name: 'Diamine Forever Raven', hex: '#22211C', family: 'neutral' }
 ];
 
 // ─── colour harmonies ────────────────────────────────────────────────────────
@@ -198,9 +232,21 @@ const weightedIndex = (weights: number[], rng: Rng): number => {
 	return weights.length - 1;
 };
 
-/** the plottable inks in a family (near-white inks are skipped) */
+/**
+ * How often a roll reserves one layer for a vibrant accent ink — the Diamine
+ * Forever shelf exists for this: 75% of rolls get exactly one such pop layer.
+ */
+export const ACCENT_RATE = 0.75;
+
+/** the vibrant accent-shelf inks (see `InkColor.accent`) */
+export const accentInks = (): InkColor[] =>
+	INK_COLORS.filter((ink) => ink.accent === true && ink.plottable !== false);
+
+/** the plottable inks in a family (near-whites and the accent shelf are skipped) */
 export const familyInks = (family: InkFamily): InkColor[] =>
-	INK_COLORS.filter((ink) => ink.family === family && ink.plottable !== false);
+	INK_COLORS.filter(
+		(ink) => ink.family === family && ink.plottable !== false && ink.accent !== true
+	);
 
 /** an unused plottable ink from `family`, or null if the family is exhausted */
 const pickFromFamily = (family: InkFamily, used: Set<string>, rng: Rng): InkColor | null => {
@@ -213,7 +259,9 @@ const pickFromFamily = (family: InkFamily, used: Set<string>, rng: Rng): InkColo
  * Pick `count` distinct ink colours that form a deliberate scheme. One harmony
  * set is chosen for the whole stack; each layer draws from a different family
  * in that set (wrapping to a second shade of a family when a plot has more
- * layers than the set has families). Returns `#RRGGBB` hex strings.
+ * layers than the set has families). ACCENT_RATE of rolls also reserve one
+ * layer for a vibrant accent-shelf ink drawn from the set's families, so most
+ * stacks get exactly one pop of colour. Returns `#RRGGBB` hex strings.
  */
 export const pickInkScheme = (count: number, rng: Rng): string[] => {
 	const set =
@@ -225,9 +273,24 @@ export const pickInkScheme = (count: number, rng: Rng): string[] => {
 		];
 	const families = shuffle(set.families, rng);
 	const used = new Set<string>();
-	const colors: string[] = [];
+	const colors: (string | null)[] = Array.from({ length: count }, () => null);
+
+	// the vibrant accent layer — an accent ink from the set's own families keeps
+	// the scheme deliberate; only a set with no accent-covered family (none
+	// today) falls back to the whole shelf
+	if (count > 0 && rng() < ACCENT_RATE) {
+		const shelf = accentInks();
+		const inSet = shelf.filter((ink) => set.families.includes(ink.family));
+		const pool = inSet.length > 0 ? inSet : shelf;
+		if (pool.length > 0) {
+			const accent = pool[Math.floor(rng() * pool.length)];
+			colors[Math.floor(rng() * count)] = accent.hex;
+			used.add(accent.hex);
+		}
+	}
 
 	for (let i = 0; i < count; i++) {
+		if (colors[i] !== null) continue;
 		// prefer this layer's family; fall back to any set family with a free
 		// shade, then (only if the whole set is drained) allow any ink at all
 		let ink =
@@ -239,7 +302,7 @@ export const pickInkScheme = (count: number, rng: Rng): string[] => {
 			ink = (free.length > 0 ? free : INK_COLORS)[0];
 		}
 		used.add(ink.hex);
-		colors.push(ink.hex);
+		colors[i] = ink.hex;
 	}
-	return colors;
+	return colors as string[];
 };
