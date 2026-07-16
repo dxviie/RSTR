@@ -37,6 +37,7 @@
 	let calibX: number | null = $state(null);
 	let calibY: number | null = $state(null);
 	let calibRotated = $state(false);
+	let calibCompact = $state(false);
 
 	// output page + layers
 	let pageSize: PageId = $state('A3');
@@ -266,12 +267,15 @@
 				penCount: pens,
 				forExport: false,
 				rotated: calibRotated,
+				compact: calibCompact,
 				x: calibX,
 				y: calibY
 			});
 			html += calib.svg;
+			// invisible drag surface — the visible outline is drawn (in yellow)
+			// by the calibration block itself
 			html += `<rect x="${calib.bx}" y="${calib.by}" width="${calib.bw}" height="${calib.bh}"
-        fill="transparent" stroke="#93a1bd" stroke-width="0.3" stroke-dasharray="1.5 1.5"
+        fill="transparent" stroke="none"
         style="cursor:move" data-drag="calib"/>`;
 		}
 
@@ -370,6 +374,7 @@
 			penCount: pens,
 			forExport: false,
 			rotated: calibRotated,
+			compact: calibCompact,
 			x: calibX,
 			y: calibY
 		});
@@ -471,6 +476,7 @@ ${wrapRotation(artworkInner)}
 			penCount: pens,
 			forExport: true,
 			rotated: calibRotated,
+			compact: calibCompact,
 			x: calibX,
 			y: calibY
 		}).svg
@@ -585,7 +591,15 @@ ${wrapRotation(artworkInner)}
 					page boundary
 				</label>
 				<label
-					class="toggle-row reversed-toggle"
+					class="toggle-row extras-start"
+					title="strip the calibration block down to the cal-half and cal-pen layers, packed into the smallest possible rectangle"
+				>
+					<input type="checkbox" bind:checked={calibCompact} />
+					<span class="layer-dot compact-dot"></span>
+					compact calibration
+				</label>
+				<label
+					class="toggle-row"
 					title="duplicate every artwork layer as a '-reversed' layer with the same lines running in the opposite direction — each line gets plotted twice, once in each direction, for denser ink"
 				>
 					<input type="checkbox" bind:checked={addReversed} />
@@ -1023,7 +1037,15 @@ ${wrapRotation(artworkInner)}
 		flex-shrink: 0;
 	}
 
-	.reversed-toggle {
+	/* hollow ring in the calibration yellow — “calibration, slimmed down” */
+	.compact-dot {
+		background: none;
+		border: 2px solid #ffb000;
+		box-sizing: border-box;
+	}
+
+	/* dashed divider between the layer toggles and the extra options */
+	.extras-start {
 		border-top: 1px dashed var(--border);
 		padding-top: 0.45rem;
 		margin-top: 0.15rem;
