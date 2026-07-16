@@ -721,6 +721,7 @@ ${wrapRotation(artworkInner)}
 		<main
 			class="stage"
 			class:drag-active={dragActive}
+			style={`--stage-aspect: ${(page[1] + PAD * 2) / (page[0] + PAD * 2)}`}
 			bind:clientWidth={stageW}
 			bind:clientHeight={stageH}
 			ondragover={(event) => {
@@ -1179,5 +1180,71 @@ ${wrapRotation(artworkInner)}
 
 	.legend-hint {
 		font-family: 'argesta_regular', serif;
+	}
+
+	/* ------------------------------------------------- responsive */
+
+	@media (max-width: 900px) {
+		.workspace {
+			flex-direction: column;
+			overflow-y: auto;
+		}
+
+		/* The preview stays pinned at the top while the control pane scrolls
+		   over it on a translucent, blurred backdrop (same overlay trick as
+		   the studio and v1 pages) — the effect of every tweak stays visible. */
+		.stage {
+			position: sticky;
+			top: 0;
+			order: 1;
+			/* the base rule's flex: 1 means flex-basis: 0%, which would
+			   collapse the height in the column layout */
+			flex: none;
+			/* Follow the page's aspect so the preview always spans the full
+			   width. Clamped so portrait pages still leave the controls
+			   peeking in (they scroll over the sticky stage anyway) and wide
+			   pages keep a usable drop target. The 1.5rem compensates the
+			   preview-wrap's own padding. */
+			height: clamp(25vh, calc((100vw - 1.5rem) * var(--stage-aspect, 0.75) + 1.5rem), 80vh);
+			height: clamp(25svh, calc((100vw - 1.5rem) * var(--stage-aspect, 0.75) + 1.5rem), 80svh);
+			/* exact fit where container units are supported — 100cqw is the
+			   workspace's content width, scrollbars already excluded */
+			height: clamp(25svh, calc((100cqw - 1.5rem) * var(--stage-aspect, 0.75) + 1.5rem), 80svh);
+			z-index: 0;
+		}
+
+		.pane {
+			width: auto;
+			overflow-y: visible;
+			position: relative;
+			z-index: 1;
+			background: rgba(253, 250, 255, 0.82);
+			-webkit-backdrop-filter: blur(6px);
+			backdrop-filter: blur(6px);
+		}
+
+		.pane.left {
+			border-right: none;
+			border-top: 1px solid var(--border);
+			order: 2;
+		}
+
+		/* let the preview shimmer through the cards too */
+		.drop-zone,
+		.file-info {
+			background: rgba(255, 255, 255, 0.55);
+		}
+
+		/* Mobile browsers zoom the whole page when a focused control renders
+		   under 16px — keep every text-editable control at 16px on small
+		   screens (also easier to hit), and widen the value columns to fit. */
+		.slider-row input[type='number'],
+		.select-row select {
+			font-size: 16px;
+		}
+
+		.slider-row {
+			grid-template-columns: 5.4rem 1fr 4.4rem;
+		}
 	}
 </style>
