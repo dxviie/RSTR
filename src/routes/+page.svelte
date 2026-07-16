@@ -276,7 +276,7 @@
 	</main>
 
 	<footer class="footer">
-		<BrandFooter align="right" />
+		<BrandFooter/>
 	</footer>
 </div>
 
