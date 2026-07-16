@@ -272,7 +272,7 @@
 
 	/* Target the main Tweakpane container */
 	:global(#tweakpane-container .tp-dfwv) {
-		font-family: 'nudica_monobold', monospace;
+		font-family: 'mono-bold', monospace;
 		font-size: 0.875rem;
 		line-height: 1.25rem;
 		font-weight: 700;
@@ -284,13 +284,13 @@
 
 	/* Target input elements */
 	:global(#tweakpane-container .tp-txtv_i) {
-		font-family: 'nudica_monobold', monospace;
+		font-family: 'mono-bold', monospace;
 		font-size: 12px;
 	}
 
 	/* Target labels */
 	:global(#tweakpane-container .tp-lblv_l) {
-		font-family: 'argesta_regular', serif;
+		font-family: 'serif-text', serif;
 		font-size: 0.95rem !important;
 		font-weight: 100;
 	}
@@ -303,7 +303,7 @@
 
 	/* Target folder titles */
 	:global(#tweakpane-container .tp-fldv_t) {
-		font-family: 'nudica_monobold', monospace;
+		font-family: 'mono-bold', monospace;
 		font-size: 0.875rem !important; /* Slightly larger for titles */
 		font-weight: bold;
 		text-align: center;
@@ -311,7 +311,7 @@
 
 	/* Target Tweakpane buttons */
 	:global(#tweakpane-container .tp-btnv_b) {
-		font-family: 'nudica_monobold', monospace;
+		font-family: 'mono-bold', monospace;
 		/* Add any other button-specific styles you want */
 		font-weight: bold;
 		/* You might also want to adjust padding or other properties */
@@ -320,7 +320,7 @@
 
 	/* If you want to style the button text specifically */
 	:global(#tweakpane-container .tp-btnv_t) {
-		font-family: 'nudica_monobold', monospace;
+		font-family: 'mono-bold', monospace;
 		font-size: 1rem;
 		line-height: 1.5;
 		height: 2rem;

@@ -126,7 +126,7 @@
 	}
 
 	.wordmark {
-		font-family: 'nudica_monobold', monospace;
+		font-family: 'mono-bold', monospace;
 		font-size: 1.15rem;
 		letter-spacing: 0.08em;
 	}
@@ -140,7 +140,7 @@
 	}
 
 	.tagline {
-		font-family: 'argesta_regular', serif;
+		font-family: 'serif-text', serif;
 		color: var(--tb-muted);
 		font-size: 0.8rem;
 	}
@@ -156,7 +156,7 @@
 	}
 
 	.topbar .top-link {
-		font-family: 'nudica_monobold', monospace;
+		font-family: 'mono-bold', monospace;
 		font-size: 0.75rem;
 		padding: 0.15rem 0.6rem;
 		border: 1px solid var(--tb-border);
@@ -179,7 +179,7 @@
 	}
 
 	.topbar .top-cta {
-		font-family: 'nudica_monobold', monospace;
+		font-family: 'mono-bold', monospace;
 		font-size: 0.75rem;
 		padding: 0.25rem 0.8rem;
 		border: 1px solid var(--tb-ink);

@@ -24,7 +24,7 @@
 	}
 
 	:global(button) {
-		font-family: 'nudica_monobold', monospace;
+		font-family: 'mono-bold', monospace;
 		font-size: medium !important;
 		transition: all 0.1s ease;
 	}
@@ -39,16 +39,16 @@
 	}
 
 	:global(body) {
-		font-family: 'nudica_monolight', monospace;
+		font-family: 'mono-light', monospace;
 		font-size: medium;
 	}
 
 	:global(.title) {
-		font-family: 'nudica_monobold', monospace;
+		font-family: 'mono-bold', monospace;
 	}
 
 	:global(.description) {
-		font-family: 'argesta_regular', serif;
+		font-family: 'serif-text', serif;
 	}
 
 	:global(a) {
