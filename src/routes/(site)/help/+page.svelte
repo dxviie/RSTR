@@ -20,6 +20,48 @@
 		app has a tooltip — hover (or long-press) it for a hint in place. This page is the longer version.
 	</p>
 
+	<figure class="shot">
+		<a href="/help/studio-sections.webp" target="_blank" rel="noopener">
+			<img
+				src="/help/studio-sections.webp"
+				alt="the RSTR studio on desktop, its sections outlined and numbered — 1 source & adjustments, 2 video and 3 segmentation on the left, 4 presets, 5 layers and 6 stats on the right, the render in the middle"
+				width="2000"
+				height="1250"
+			/>
+		</a>
+	</figure>
+	<ol class="map">
+		<li style="--c: #e63946">
+			<span class="map-dot">1</span>
+			<span><strong>image</strong> — load a picture or video and tune it before tracing.</span>
+		</li>
+		<li style="--c: #8338ec">
+			<span class="map-dot">2</span>
+			<span
+				><strong>video</strong> — frame rate and export window, shown while a video is loaded.</span
+			>
+		</li>
+		<li style="--c: #3a86ff">
+			<span class="map-dot">3</span>
+			<span><strong>segmentation</strong> — how the image is carved into tonal regions.</span>
+		</li>
+		<li style="--c: #fb8500">
+			<span class="map-dot">4</span>
+			<span><strong>presets</strong> — randomize everything, or save and share complete looks.</span
+			>
+		</li>
+		<li style="--c: #06a77d">
+			<span class="map-dot">5</span>
+			<span
+				><strong>layers</strong> — one pen per layer: color, channel, hatch angles, overrides.</span
+			>
+		</li>
+		<li style="--c: #ff2aa6">
+			<span class="map-dot">6</span>
+			<span><strong>stats</strong> — render numbers and the estimated plot time.</span>
+		</li>
+	</ol>
+
 	<section>
 		<h2>image</h2>
 		<dl>
@@ -190,6 +232,17 @@
 
 	<section>
 		<h2>prep — <a href="/prep">/prep</a></h2>
+		<figure class="shot">
+			<a href="/help/prep.webp" target="_blank" rel="noopener">
+				<img
+					src="/help/prep.webp"
+					alt="the prep tool on desktop — a studio export placed on an A3 page, with the paper outline, calibration block and page boundary around it"
+					width="2000"
+					height="1250"
+					loading="lazy"
+				/>
+			</a>
+		</figure>
 		<p class="section-note">
 			The plot prep tool takes an exported SVG and dresses it for the machine.
 		</p>
@@ -223,6 +276,17 @@
 
 	<section>
 		<h2>classic — <a href="/classic">/classic</a></h2>
+		<figure class="shot">
+			<a href="/help/classic.webp" target="_blank" rel="noopener">
+				<img
+					src="/help/classic.webp"
+					alt="the classic app on desktop — a finished multi-color line render next to its resolution, grouping and fill controls"
+					width="2000"
+					height="1468"
+					loading="lazy"
+				/>
+			</a>
+		</figure>
 		<p class="section-note">
 			The original RSTR, kept around for nostalgia (and because it still makes nice plots). One
 			image, one pen, the algorithm that started it all.
@@ -264,6 +328,65 @@
 		line-height: 1.65;
 		color: var(--ink-soft, #2d3748);
 		margin: 0 0 1.5rem;
+	}
+
+	/* ------------------------------------------- screenshots & legend */
+
+	.shot {
+		margin: 0 0 1rem;
+	}
+
+	.shot img {
+		display: block;
+		width: 100%;
+		height: auto;
+		border: 1px solid var(--border-c);
+		border-radius: 10px;
+		box-shadow: 0 2px 10px rgba(96, 115, 159, 0.14);
+	}
+
+	section .shot {
+		margin: 0.25rem 0 1rem;
+	}
+
+	.map {
+		list-style: none;
+		margin: 0 0 1rem;
+		padding: 0;
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 0.55rem 1.75rem;
+	}
+
+	.map li {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.6rem;
+		font-family: 'argesta_regular', serif;
+		font-size: 0.92rem;
+		line-height: 1.5;
+		color: var(--ink-soft, #2d3748);
+	}
+
+	.map-dot {
+		flex-shrink: 0;
+		width: 1.35rem;
+		height: 1.35rem;
+		margin-top: 0.1rem;
+		border-radius: 50%;
+		background: var(--c);
+		color: #fff;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		font-family: 'nudica_monobold', monospace;
+		font-size: 0.75rem;
+	}
+
+	.map strong {
+		font-family: 'nudica_monobold', monospace;
+		font-weight: normal;
+		font-size: 0.8rem;
 	}
 
 	section {
@@ -310,6 +433,10 @@
 	}
 
 	@media (max-width: 640px) {
+		.map {
+			grid-template-columns: 1fr;
+		}
+
 		dl {
 			grid-template-columns: 1fr;
 			gap: 0.15rem;
