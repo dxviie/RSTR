@@ -83,12 +83,12 @@
 
 	const STEPS = [
 		{
-			title: 'drop an image',
-			text: 'Any photo or picture works. It never leaves your browser — all the processing happens right on your machine.'
+			title: 'drop an image or video',
+			text: 'Any photo or video works. It never leaves your browser. All the processing happens right on your machine.'
 		},
 		{
 			title: 'shape the lines',
-			text: 'RSTR splits your image into regions and redraws them as lines. Play with colors, angles, spacing and density — or roll the dice until something clicks.'
+			text: 'RSTR splits your image into regions and redraws them as lines. Play with colors, angles, spacing and density. Or roll the dice until something clicks.'
 		},
 		{
 			title: 'take it home',
@@ -97,22 +97,22 @@
 	];
 
 	const USPS = [
-		'free — no account, no uploads, nothing leaves your device',
-		'endless looks from a single image',
-		'yours to keep, even commercially'
+		'free & open source',
+		'nothing leaves your device',
+		'everything you make is yours to keep'
 	];
 </script>
 
 <svelte:head>
-	<title>RSTR — turn your images into unique art</title>
+	<title>RSTR — turn your favorite pictures into bespoke art</title>
 	<meta
 		name="description"
-		content="RSTR turns your images into unique hatched line art — print it, share it, or plot it with a pen plotter. Free and instant, right in your browser."
+		content="RSTR turns your favorite pictures into unique hatched line art. Print it, share it, or plot it with a pen plotter. Free and instant, right in your browser."
 	/>
 </svelte:head>
 
 <div class="landing">
-	<TopBar variant="landing" tagline="turn your images into unique art" />
+	<TopBar variant="landing" tagline="turn your favorite pictures into bespoke art" />
 
 	<main>
 		<!-- hero + USP -->
@@ -121,9 +121,9 @@
 				<div class="hatch-strip" aria-hidden="true">
 					<span class="c"></span><span class="m"></span><span class="y"></span>
 				</div>
-				<h1>turn your images<br />into unique art.</h1>
+				<h1>turn your best memories into bespoke art</h1>
 				<p class="lede">
-					RSTR redraws any picture as striking, hatched line art — a one-of-a-kind piece every time.
+					RSTR redraws any picture as hatched line art.<br/>
 					Made in your browser, ready to print, share, or hand to a pen plotter.
 				</p>
 				<ul class="usp-list">
@@ -133,7 +133,7 @@
 				</ul>
 				<div class="cta-row">
 					<a class="btn primary" href="/studio">launch RSTR</a>
-					<a class="btn ghost" href="#how">how it works ↓</a>
+					<a class="btn ghost" href="https://github.com/dxviie/RSTR">view on GitHub</a>
 				</div>
 			</div>
 			<div class="hero-art">
