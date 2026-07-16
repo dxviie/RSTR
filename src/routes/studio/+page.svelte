@@ -974,36 +974,56 @@
 		downloadBlob(new Blob([svg], { type: 'image/svg+xml' }), exportName('', 'svg'));
 	};
 
-	// PNG exports carry the same small brand mark as /classic, but drawn as
-	// live text in the house mono font instead of a bitmap, so it stays crisp
-	// at any canvas resolution. The mark goes on a copy — the on-screen render
-	// stays clean.
-	const watermarkPng = async (source: HTMLCanvasElement): Promise<Blob | null> => {
-		const canvas = document.createElement('canvas');
-		canvas.width = source.width;
-		canvas.height = source.height;
-		const ctx = canvas.getContext('2d');
-		if (!ctx) return null;
-		ctx.drawImage(source, 0, 0);
-		const fontSize = Math.max(11, Math.round(Math.min(canvas.width, canvas.height) * 0.018));
+	// Raster exports carry the same small brand mark as /classic, but drawn
+	// as live text in the house mono font instead of a bitmap, so it stays
+	// crisp at any canvas resolution. The text sits on a paper-white plate in
+	// the corner so it stays legible over dark renders. The mark only goes on
+	// export copies — the on-screen render stays clean.
+	const WATERMARK_TEXT = 'rstr.d17e.dev <3';
+
+	const drawWatermark = async (ctx: CanvasRenderingContext2D, w: number, h: number) => {
+		const fontSize = Math.max(11, Math.round(Math.min(w, h) * 0.018));
 		try {
 			await document.fonts.load(`${fontSize}px nudica_monobold`);
 		} catch {
 			// font unavailable — the monospace fallback below still renders
 		}
-		const pad = Math.round(fontSize * 0.8);
+		ctx.save();
+		// the sequence renderer leaves the context in multiply/0.85 ink
+		// simulation mode — the plate must paint over the art, not blend
+		ctx.globalCompositeOperation = 'source-over';
+		ctx.globalAlpha = 1;
 		ctx.font = `${fontSize}px nudica_monobold, monospace`;
 		ctx.textAlign = 'right';
 		ctx.textBaseline = 'alphabetic';
+		const pad = Math.round(fontSize * 0.5);
+		const metrics = ctx.measureText(WATERMARK_TEXT);
+		const ascent = metrics.actualBoundingBoxAscent || fontSize * 0.8;
+		ctx.fillStyle = '#FFFEF7'; // plate in the render's warm paper white
+		ctx.fillRect(
+			w - metrics.width - 2 * pad,
+			h - ascent - 2 * pad,
+			metrics.width + 2 * pad,
+			ascent + 2 * pad
+		);
 		ctx.fillStyle = 'rgba(26, 32, 44, 0.6)'; // house ink, kept subtle
-		ctx.fillText('rstr.d17e.dev', canvas.width - pad, canvas.height - pad);
-		return new Promise((resolve) => canvas.toBlob(resolve));
+		ctx.fillText(WATERMARK_TEXT, w - pad, h - pad);
+		ctx.restore();
 	};
 
 	const downloadPng = async () => {
-		if (!hatchCanvas) return;
-		const blob = await watermarkPng(hatchCanvas);
-		if (blob) downloadBlob(blob, exportName('', 'png'));
+		const source = hatchCanvas;
+		if (!source) return;
+		const canvas = document.createElement('canvas');
+		canvas.width = source.width;
+		canvas.height = source.height;
+		const ctx = canvas.getContext('2d');
+		if (!ctx) return;
+		ctx.drawImage(source, 0, 0);
+		await drawWatermark(ctx, canvas.width, canvas.height);
+		canvas.toBlob((blob) => {
+			if (blob) downloadBlob(blob, exportName('', 'png'));
+		});
 	};
 
 	//***************************************************************
@@ -1082,7 +1102,7 @@
 	};
 
 	/** render export layers to a raster blob, mirroring the preview style */
-	const renderRasterBlob = (
+	const renderRasterBlob = async (
 		exportLayers: ExportLayer[],
 		w: number,
 		h: number
@@ -1091,7 +1111,7 @@
 		canvas.width = Math.max(1, Math.round(w * video.rasterScale));
 		canvas.height = Math.max(1, Math.round(h * video.rasterScale));
 		const ctx = canvas.getContext('2d');
-		if (!ctx) return Promise.resolve(null);
+		if (!ctx) return null;
 		ctx.scale(canvas.width / w, canvas.height / h);
 		ctx.fillStyle = '#FFFEF7'; // warm paper white
 		ctx.fillRect(0, 0, w, h);
@@ -1110,6 +1130,9 @@
 			}
 			ctx.stroke();
 		}
+		// the context is still scaled to the source coordinate space, so the
+		// watermark lands proportionally regardless of the raster scale
+		await drawWatermark(ctx, w, h);
 		const mime =
 			video.rasterFormat === 'png'
 				? 'image/png'
