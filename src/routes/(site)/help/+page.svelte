@@ -299,7 +299,7 @@
 		</figure>
 		<p class="section-note">
 			The original RSTR, kept around for nostalgia (and because it still makes nice plots). One
-			image, one pen, the algorithm that started it all.
+			image, one layer, multiple pens. The algorithm that started it all.
 		</p>
 	</section>
 
