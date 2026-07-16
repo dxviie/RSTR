@@ -52,11 +52,6 @@
 	]);
 
 	const HERO_SLIDES = [
-		{
-			src: '/rstr-mark.webp',
-			srcset: undefined,
-			alt: 'RSTR — pixel lettering rebuilt from colorful hatched dots and dashes'
-		},
 		...GALLERY_PLOTS.filter((p) => HERO_PLOTS.has(p.name)).map((p) => ({
 			src: plotSrc(p.name, 800),
 			srcset: plotSrcset(p.name),
@@ -210,7 +205,7 @@
 			</div>
 			<h2>everything you make is yours</h2>
 			<p>
-				Whatever you create with RSTR belongs to you — personal projects, gifts, client work, prints
+				Whatever you create with RSTR belongs to you: personal projects, gifts, client work, prints or plots
 				you sell. Commercial use included, no strings attached. All processing happens in your browser.
 			</p>
 			<p>
@@ -227,13 +222,15 @@
 			</p>
 			<div class="gallery">
 				{#each GALLERY_PLOTS as plot (plot.name)}
-					<img
-						src={plotSrc(plot.name, 400)}
-						srcset={plotSrcset(plot.name)}
-						sizes="(max-width: 820px) 46vw, 250px"
-						alt={plot.alt}
-						loading="lazy"
-					/>
+					<div class="gallery-item">
+						<img
+							src={plotSrc(plot.name, 400)}
+							srcset={plotSrcset(plot.name)}
+							sizes="(max-width: 820px) 46vw, 250px"
+							alt={plot.alt}
+							loading="lazy"
+						/>
+					</div>
 				{/each}
 			</div>
 			<p class="gallery-more">
@@ -515,6 +512,7 @@
 		margin: 0 auto;
 		aspect-ratio: 1;
 		background: #fffef7;
+		overflow: hidden;
 		box-shadow:
 			0 2px 6px rgba(96, 115, 159, 0.25),
 			0 12px 32px rgba(96, 115, 159, 0.2);
@@ -527,11 +525,32 @@
 		height: 100%;
 		object-fit: cover;
 		opacity: 0;
+		/* held zoomed in even at rest so the photographed paper/desk margins
+		   around each plot stay cropped out of the frame */
+		transform: scale(1.14);
 		transition: opacity 0.9s ease;
 	}
 
+	/* slow Ken Burns: each slide starts further in and eases back out to the
+	   1.14 rest zoom — never far enough to bring the borders back in */
 	.hero-art img.current {
 		opacity: 1;
+		animation: hero-zoom 6s ease-out both;
+	}
+
+	@keyframes hero-zoom {
+		from {
+			transform: scale(1.26);
+		}
+		to {
+			transform: scale(1.14);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.hero-art img.current {
+			animation: none;
+		}
 	}
 
 	/* ------------------------------------------------- split section */
@@ -672,17 +691,27 @@
 		margin-top: 1.5rem;
 	}
 
-	.gallery img {
-		width: 100%;
+	.gallery-item {
 		aspect-ratio: 1;
-		object-fit: cover;
+		overflow: hidden;
 		background: #fffef7;
 		box-shadow: 0 2px 8px rgba(96, 115, 159, 0.2);
-		transition: transform 0.15s ease;
 	}
 
-	.gallery img:hover {
-		transform: scale(1.02);
+	.gallery-item img {
+		display: block;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		/* zoomed in by default so the photographed paper/desk margins stay
+		   cropped; eases out slightly on hover, but never far enough to
+		   bring them back in */
+		transform: scale(1.16);
+		transition: transform 0.5s ease;
+	}
+
+	.gallery-item:hover img {
+		transform: scale(1.11);
 	}
 
 	.gallery-more {
