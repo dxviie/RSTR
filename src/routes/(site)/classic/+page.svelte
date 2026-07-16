@@ -95,10 +95,10 @@
 	}
 
 	:global(.title) {
-		font-family: 'nudica_monobold', monospace;
+		font-family: 'mono-bold', monospace;
 	}
 
 	:global(.description) {
-		font-family: 'argesta_regular', serif;
+		font-family: 'serif-text', serif;
 	}
 </style>

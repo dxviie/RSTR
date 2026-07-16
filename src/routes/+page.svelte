@@ -303,7 +303,7 @@
 		min-height: 100dvh;
 		background: var(--bg);
 		color: var(--ink);
-		font-family: 'nudica_monolight', monospace;
+		font-family: 'mono-light', monospace;
 	}
 
 	.landing a {
@@ -320,13 +320,13 @@
 	h1,
 	h2,
 	h3 {
-		font-family: 'nudica_monobold', monospace;
+		font-family: 'mono-bold', monospace;
 		letter-spacing: 0.02em;
 		margin: 0;
 	}
 
 	p {
-		font-family: 'argesta_regular', serif;
+		font-family: 'serif-text', serif;
 		line-height: 1.65;
 	}
 
@@ -375,7 +375,7 @@
 	}
 
 	.btn {
-		font-family: 'nudica_monobold', monospace;
+		font-family: 'mono-bold', monospace;
 		font-size: 0.85rem;
 		padding: 0.6rem 1.4rem;
 		border-radius: 999px;
@@ -464,7 +464,7 @@
 	}
 
 	.usp-list li {
-		font-family: 'argesta_regular', serif;
+		font-family: 'serif-text', serif;
 		font-size: 0.92rem;
 		color: var(--ink-soft);
 		padding-left: 1.4rem;
@@ -501,7 +501,7 @@
 	}
 
 	.hero-caption {
-		font-family: 'nudica_monobold', monospace;
+		font-family: 'mono-bold', monospace;
 		font-size: 0.8rem;
 		color: var(--muted);
 		text-align: center;
@@ -566,7 +566,7 @@
 	}
 
 	.split-art figcaption {
-		font-family: 'argesta_regular', serif;
+		font-family: 'serif-text', serif;
 		font-size: 0.75rem;
 		color: var(--muted);
 		text-align: center;
@@ -608,7 +608,7 @@
 	}
 
 	.step-number {
-		font-family: 'nudica_monobold', monospace;
+		font-family: 'mono-bold', monospace;
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
@@ -711,7 +711,7 @@
 	}
 
 	.community strong {
-		font-family: 'nudica_monobold', monospace;
+		font-family: 'mono-bold', monospace;
 		font-size: 0.9em;
 	}
 
