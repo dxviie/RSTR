@@ -159,8 +159,10 @@
 			<ol class="steps">
 				{#each STEPS as step, index (step.title)}
 					<li>
-						<span class="step-number">{index + 1}</span>
-						<h3>{step.title}</h3>
+						<div class="step-head">
+							<span class="step-number">{index + 1}</span>
+							<h3>{step.title}</h3>
+						</div>
 						<p>{step.text}</p>
 					</li>
 				{/each}
@@ -571,7 +573,14 @@
 		border: 1px solid var(--border);
 		border-radius: 8px;
 		background: #fff;
-		padding: 1.5rem;
+		padding: 1.25rem;
+	}
+
+	.step-head {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		margin-bottom: 0.6rem;
 	}
 
 	.step-number {
@@ -579,11 +588,11 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		width: 2rem;
-		height: 2rem;
+		width: 1.75rem;
+		height: 1.75rem;
+		flex-shrink: 0;
 		border-radius: 999px;
 		background: var(--muted-light);
-		margin-bottom: 0.9rem;
 	}
 
 	.steps li:nth-child(1) .step-number {
@@ -600,7 +609,7 @@
 
 	.steps h3 {
 		font-size: 0.95rem;
-		margin-bottom: 0.5rem;
+		margin: 0;
 	}
 
 	.steps p {
