@@ -967,14 +967,43 @@
 					segments: result?.regions.map((region) => region.hatchSegments ?? []) ?? []
 				};
 			});
-		const svg = buildSvgDocument(exportLayers, imgWidth, imgHeight, params.outputWidthMm);
+		const svg = buildSvgDocument(exportLayers, imgWidth, imgHeight, params.outputWidthMm, {
+			params,
+			layers
+		});
 		downloadBlob(new Blob([svg], { type: 'image/svg+xml' }), exportName('', 'svg'));
 	};
 
-	const downloadPng = () => {
-		hatchCanvas?.toBlob((blob) => {
-			if (blob) downloadBlob(blob, exportName('', 'png'));
-		});
+	// PNG exports carry the same small brand mark as /classic, but drawn as
+	// live text in the house mono font instead of a bitmap, so it stays crisp
+	// at any canvas resolution. The mark goes on a copy — the on-screen render
+	// stays clean.
+	const watermarkPng = async (source: HTMLCanvasElement): Promise<Blob | null> => {
+		const canvas = document.createElement('canvas');
+		canvas.width = source.width;
+		canvas.height = source.height;
+		const ctx = canvas.getContext('2d');
+		if (!ctx) return null;
+		ctx.drawImage(source, 0, 0);
+		const fontSize = Math.max(11, Math.round(Math.min(canvas.width, canvas.height) * 0.018));
+		try {
+			await document.fonts.load(`${fontSize}px nudica_monobold`);
+		} catch {
+			// font unavailable — the monospace fallback below still renders
+		}
+		const pad = Math.round(fontSize * 0.8);
+		ctx.font = `${fontSize}px nudica_monobold, monospace`;
+		ctx.textAlign = 'right';
+		ctx.textBaseline = 'alphabetic';
+		ctx.fillStyle = 'rgba(26, 32, 44, 0.6)'; // house ink, kept subtle
+		ctx.fillText('rstr.d17e.dev', canvas.width - pad, canvas.height - pad);
+		return new Promise((resolve) => canvas.toBlob(resolve));
+	};
+
+	const downloadPng = async () => {
+		if (!hatchCanvas) return;
+		const blob = await watermarkPng(hatchCanvas);
+		if (blob) downloadBlob(blob, exportName('', 'png'));
 	};
 
 	//***************************************************************
@@ -1125,7 +1154,8 @@
 						exportLayers,
 						grabCanvas.width,
 						grabCanvas.height,
-						params.outputWidthMm
+						params.outputWidthMm,
+						{ params, layers }
 					);
 					const data = encoder.encode(svg);
 					entries.push({ name: `${both ? 'svg/' : ''}${name}.svg`, data });
