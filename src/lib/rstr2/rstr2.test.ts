@@ -208,6 +208,129 @@ describe('hatchPolygon', () => {
 	});
 });
 
+// Regression guard for plot streaking: hatch lines must form a single evenly
+// spaced grid — within one region AND across separately hatched regions of
+// the same angle and spacing. Per-region scanline anchors used to give every
+// region a random phase, doubling lines or leaving bald strips along region
+// seams (visible as streaks on paper). See hatchPolygon's lattice comment.
+describe('hatchPolygon spacing invariants', () => {
+	// deterministic PRNG (mulberry32) so failures are reproducible
+	const rng = (seed: number) => {
+		let a = seed >>> 0;
+		return () => {
+			a |= 0;
+			a = (a + 0x6d2b79f5) | 0;
+			let t = Math.imul(a ^ (a >>> 15), 1 | a);
+			t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+			return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+		};
+	};
+
+	/** distinct perpendicular offsets of a segment list, sorted ascending */
+	const scanlineOffsets = (segments: number[], angleDeg: number): number[] => {
+		const a = (angleDeg * Math.PI) / 180;
+		const px = -Math.sin(a);
+		const py = Math.cos(a);
+		const offsets: number[] = [];
+		for (let k = 0; k < segments.length; k += 4) {
+			const p1 = segments[k] * px + segments[k + 1] * py;
+			const p2 = segments[k + 2] * px + segments[k + 3] * py;
+			// both endpoints of a hatch segment lie on the same scanline
+			expect(Math.abs(p1 - p2)).toBeLessThan(1e-6);
+			if (offsets.every((o) => Math.abs(o - p1) > 1e-6)) offsets.push(p1);
+		}
+		return offsets.sort((a, b) => a - b);
+	};
+
+	/** every delta must be an exact multiple of the spacing (>= 1x) */
+	const expectOnEvenGrid = (offsets: number[], spacing: number) => {
+		for (let i = 1; i < offsets.length; i++) {
+			const multiple = (offsets[i] - offsets[i - 1]) / spacing;
+			expect(Math.abs(multiple - Math.round(multiple))).toBeLessThan(1e-6);
+			expect(Math.round(multiple)).toBeGreaterThanOrEqual(1);
+		}
+	};
+
+	it('keeps lines evenly spaced inside organic pipeline-traced regions', () => {
+		const rand = rng(1234);
+		const W = 64;
+		const H = 48;
+		let checked = 0;
+		for (let trial = 0; trial < 6; trial++) {
+			const values = new Float32Array(W * H);
+			for (let i = 0; i < values.length; i++) values[i] = rand();
+			const seg = segmentGrid(values, W, H, {
+				algorithm: trial % 2 === 0 ? 'watershed' : 'posterize',
+				tolerance: 0.25,
+				minRegionSize: 4,
+				smoothing: 2
+			});
+			const geoms = buildRegionGeometries(seg.labels, seg.regionCount, W, H, 15.625, 15.625);
+			for (const geometry of geoms) {
+				if (geometry.size < 8) continue;
+				const angle = rand() * 360;
+				const spacing = 3 + rand() * 20;
+				const segments = hatchPolygon(geometry.loops, angle, spacing, 3);
+				if (segments.length === 0) continue;
+				checked++;
+				expectOnEvenGrid(scanlineOffsets(segments, angle), spacing);
+			}
+		}
+		expect(checked).toBeGreaterThan(50);
+	});
+
+	it('hatches regions split from one visual area without a seam artifact', () => {
+		// One flat-tone area arriving as two abutting label regions (the
+		// normal segmentation outcome for soft image noise). Hatch parallel
+		// to the shared seam at x=200: the combined result must be ONE even
+		// grid — the seam gap exactly one spacing, never 0.5x or 1.5x.
+		const spacing = 10;
+		const angle = 90;
+		const left = [new Float64Array([0, 0, 200, 0, 200, 100, 0, 100])];
+		const leftOffsets = scanlineOffsets(hatchPolygon(left, angle, spacing, 3), angle);
+		// the right region's own extent must not shift its lines: sweep it
+		for (const farEdge of [401, 403.7, 405, 407.21, 409]) {
+			const right = [new Float64Array([200, 0, farEdge, 0, farEdge, 100, 200, 100])];
+			const rightOffsets = scanlineOffsets(hatchPolygon(right, angle, spacing, 3), angle);
+			const combined = [...leftOffsets, ...rightOffsets].sort((a, b) => a - b);
+			expectOnEvenGrid(combined, spacing);
+		}
+	});
+
+	it('shares one scanline lattice across disjoint same-tone regions at any angle', () => {
+		const rand = rng(99);
+		for (const angle of [0, 37, 90, 145.5, 233]) {
+			const spacing = 4 + rand() * 12;
+			const allOffsets: number[] = [];
+			for (let i = 0; i < 8; i++) {
+				// random rectangles scattered over the canvas
+				const x = rand() * 900;
+				const y = rand() * 900;
+				const w = 30 + rand() * 200;
+				const h = 30 + rand() * 200;
+				const rect = [new Float64Array([x, y, x + w, y, x + w, y + h, x, y + h])];
+				allOffsets.push(...scanlineOffsets(hatchPolygon(rect, angle, spacing, 2), angle));
+			}
+			const distinct = allOffsets.sort((a, b) => a - b);
+			expectOnEvenGrid(
+				distinct.filter((o, i) => i === 0 || o - distinct[i - 1] > 1e-6),
+				spacing
+			);
+		}
+	});
+
+	it('draws a midline through regions thinner than the spacing', () => {
+		// an inked sliver must never disappear from the plot entirely
+		const sliver = [new Float64Array([100, 0, 108, 0, 108, 300, 100, 300])]; // 8px wide
+		const segments = hatchPolygon(sliver, 90, 20, 3);
+		expect(segments.length / 4).toBe(1);
+		// vertical hatch: the line sits on the sliver's midline, full height
+		expect(segments[0]).toBeCloseTo(104);
+		expect(segments[2]).toBeCloseTo(104);
+		expect(Math.abs(segments[3] - segments[1])).toBeGreaterThan(290);
+	});
+});
+
 describe('spacingForInk', () => {
 	const options = { curve: 'coverage' as const, gamma: 1, inkBoost: 1 };
 
