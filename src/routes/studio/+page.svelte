@@ -998,7 +998,7 @@
 		if (!watermarkEnabled()) return;
 		const fontSize = Math.max(11, Math.round(Math.min(w, h) * 0.018));
 		try {
-			await document.fonts.load(`${fontSize}px nudica_monobold`);
+			await document.fonts.load(`${fontSize}px mono-bold`);
 		} catch {
 			// font unavailable — the monospace fallback below still renders
 		}
@@ -1007,7 +1007,7 @@
 		// simulation mode — the plate must paint over the art, not blend
 		ctx.globalCompositeOperation = 'source-over';
 		ctx.globalAlpha = 1;
-		ctx.font = `${fontSize}px nudica_monobold, monospace`;
+		ctx.font = `${fontSize}px mono-bold, monospace`;
 		ctx.textAlign = 'right';
 		ctx.textBaseline = 'alphabetic';
 		const pad = Math.round(fontSize * 0.5);
@@ -2344,24 +2344,24 @@
 
 <style>
 	@font-face {
-		font-family: 'nudica_monobold';
-		src: url('/fonts/nudicamono-bold-webfont.woff') format('woff');
+		font-family: 'mono-bold';
+		src: url('/fonts/ibm-plex-mono-bold.woff2') format('woff2');
 		font-weight: normal;
 		font-style: normal;
 		font-display: swap;
 	}
 
 	@font-face {
-		font-family: 'nudica_monolight';
-		src: url('/fonts/nudicamono-light-webfont.woff') format('woff');
+		font-family: 'mono-light';
+		src: url('/fonts/ibm-plex-mono-light.woff2') format('woff2');
 		font-weight: normal;
 		font-style: normal;
 		font-display: swap;
 	}
 
 	@font-face {
-		font-family: 'argesta_regular';
-		src: url('/fonts/argestatext-regular-webfont.woff') format('woff');
+		font-family: 'serif-text';
+		src: url('/fonts/ibm-plex-serif-regular.woff2') format('woff2');
 		font-weight: normal;
 		font-style: normal;
 		font-display: swap;
@@ -2386,13 +2386,13 @@
 		flex-direction: column;
 		background: var(--bg);
 		color: var(--ink);
-		font-family: 'nudica_monolight', monospace;
+		font-family: 'mono-light', monospace;
 		font-size: 0.8rem;
 	}
 
 	/* neutralize the root layout's global button styling inside the app */
 	.app button {
-		font-family: 'nudica_monobold', monospace !important;
+		font-family: 'mono-bold', monospace !important;
 		font-size: 0.75rem !important;
 		transition: all 0.1s ease;
 	}
@@ -2460,7 +2460,7 @@
 	}
 
 	.group-title {
-		font-family: 'nudica_monobold', monospace;
+		font-family: 'mono-bold', monospace;
 		font-size: 0.72rem;
 		text-transform: uppercase;
 		letter-spacing: 0.08em;
@@ -2513,13 +2513,13 @@
 	}
 
 	.hint-title {
-		font-family: 'nudica_monobold', monospace;
+		font-family: 'mono-bold', monospace;
 		font-size: 1.3rem;
 		margin: 0;
 	}
 
 	.hint-sub {
-		font-family: 'argesta_regular', serif;
+		font-family: 'serif-text', serif;
 		font-size: 0.85rem;
 		margin: 0.4rem 0 0;
 	}
@@ -2584,7 +2584,7 @@
 	}
 
 	.browse-sub {
-		font-family: 'argesta_regular', serif;
+		font-family: 'serif-text', serif;
 		font-size: 0.66rem;
 		color: var(--muted);
 		font-weight: normal;
@@ -2645,7 +2645,7 @@
 		border-radius: 4px;
 		background: #fff;
 		color: var(--ink);
-		font-family: 'nudica_monolight', monospace;
+		font-family: 'mono-light', monospace;
 		font-size: 0.68rem;
 	}
 
@@ -2706,7 +2706,7 @@
 		border-radius: 4px;
 		background: #fff;
 		color: var(--ink);
-		font-family: 'nudica_monolight', monospace;
+		font-family: 'mono-light', monospace;
 		font-size: 0.68rem;
 	}
 
@@ -2817,7 +2817,7 @@
 		border-radius: 4px;
 		background: #fff;
 		color: var(--ink);
-		font-family: 'nudica_monolight', monospace;
+		font-family: 'mono-light', monospace;
 		font-size: 0.72rem;
 	}
 
@@ -2858,7 +2858,7 @@
 	}
 
 	.settings-notice {
-		font-family: 'argesta_regular', serif;
+		font-family: 'serif-text', serif;
 		font-size: 0.68rem;
 		color: var(--muted);
 		text-align: center;
@@ -2928,11 +2928,11 @@
 		border-radius: 999px;
 		padding: 0 0.4rem;
 		font-size: 0.6rem;
-		font-family: 'nudica_monobold', monospace;
+		font-family: 'mono-bold', monospace;
 	}
 
 	.override-hint {
-		font-family: 'argesta_regular', serif;
+		font-family: 'serif-text', serif;
 		font-size: 0.62rem;
 		color: var(--muted);
 		margin: 0.3rem 0 0;
@@ -2980,7 +2980,7 @@
 		border-radius: 4px;
 		background: #fff;
 		color: var(--ink);
-		font-family: 'nudica_monolight', monospace;
+		font-family: 'mono-light', monospace;
 		font-size: 0.72rem;
 	}
 
@@ -3101,7 +3101,7 @@
 	.stat-value {
 		margin-left: auto;
 		color: var(--ink);
-		font-family: 'nudica_monobold', monospace;
+		font-family: 'mono-bold', monospace;
 		white-space: nowrap;
 	}
 
@@ -3142,7 +3142,7 @@
 	}
 
 	.plotter-hint {
-		font-family: 'argesta_regular', serif;
+		font-family: 'serif-text', serif;
 		font-size: 0.62rem;
 		color: var(--muted);
 		margin: 0.3rem 0;
@@ -3166,7 +3166,7 @@
 		border-radius: 4px;
 		background: #fff;
 		color: var(--ink);
-		font-family: 'nudica_monolight', monospace;
+		font-family: 'mono-light', monospace;
 		font-size: 0.68rem;
 	}
 
@@ -3219,7 +3219,7 @@
 	}
 
 	.video-name {
-		font-family: 'argesta_regular', serif;
+		font-family: 'serif-text', serif;
 		font-size: 0.66rem;
 		color: var(--muted);
 		white-space: nowrap;
@@ -3228,7 +3228,7 @@
 	}
 
 	.video-summary {
-		font-family: 'argesta_regular', serif;
+		font-family: 'serif-text', serif;
 		font-size: 0.68rem;
 		color: var(--muted);
 	}
@@ -3286,7 +3286,7 @@
 	}
 
 	.timeline-readout {
-		font-family: 'nudica_monobold', monospace;
+		font-family: 'mono-bold', monospace;
 		font-size: 0.65rem;
 		color: var(--ink);
 		white-space: nowrap;
@@ -3361,7 +3361,7 @@
 	}
 
 	.seq-progress-text {
-		font-family: 'nudica_monobold', monospace;
+		font-family: 'mono-bold', monospace;
 		font-size: 0.62rem;
 		color: var(--muted);
 		white-space: nowrap;

@@ -344,13 +344,13 @@
 	}
 
 	h1 {
-		font-family: 'nudica_monobold', monospace;
+		font-family: 'mono-bold', monospace;
 		font-size: 1.8rem;
 		margin: 0 0 1rem;
 	}
 
 	.intro {
-		font-family: 'argesta_regular', serif;
+		font-family: 'serif-text', serif;
 		line-height: 1.65;
 		color: var(--ink-soft, #2d3748);
 		margin: 0 0 1.5rem;
@@ -388,7 +388,7 @@
 		display: flex;
 		align-items: flex-start;
 		gap: 0.6rem;
-		font-family: 'argesta_regular', serif;
+		font-family: 'serif-text', serif;
 		font-size: 0.92rem;
 		line-height: 1.5;
 		color: var(--ink-soft, #2d3748);
@@ -405,12 +405,12 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		font-family: 'nudica_monobold', monospace;
+		font-family: 'mono-bold', monospace;
 		font-size: 0.75rem;
 	}
 
 	.map strong {
-		font-family: 'nudica_monobold', monospace;
+		font-family: 'mono-bold', monospace;
 		font-weight: normal;
 		font-size: 0.8rem;
 	}
@@ -421,13 +421,13 @@
 	}
 
 	h2 {
-		font-family: 'nudica_monobold', monospace;
+		font-family: 'mono-bold', monospace;
 		font-size: 1.05rem;
 		margin: 0 0 0.75rem;
 	}
 
 	.section-note {
-		font-family: 'argesta_regular', serif;
+		font-family: 'serif-text', serif;
 		line-height: 1.6;
 		color: var(--muted-c);
 		margin: 0 0 0.75rem;
@@ -441,14 +441,14 @@
 	}
 
 	dt {
-		font-family: 'nudica_monobold', monospace;
+		font-family: 'mono-bold', monospace;
 		font-size: 0.8rem;
 		padding-top: 0.1rem;
 	}
 
 	dd {
 		margin: 0;
-		font-family: 'argesta_regular', serif;
+		font-family: 'serif-text', serif;
 		font-size: 0.92rem;
 		line-height: 1.55;
 		color: var(--ink-soft, #2d3748);

@@ -152,7 +152,7 @@ RSTR stands on a lot of other people's work:
 - **SLIC superpixels** (Achanta et al.) and **Meyer's watershed flooding** — the segmentation algorithms.
 - The **[AxiDraw](https://shop.evilmadscientist.com/908)** by Evil Mad Scientist / Bantam Tools — the pen plotter RSTR targets.
 - **Fountain- and drawing-ink makers** whose real colors seed the randomizer's palette: [De Atramentis](https://www.de-atramentis.com/en/Artist-ink-/), [Octopus Fluids](https://www.octopus-fluids.de/en/write-draw-inks), [Rohrer & Klingner](https://www.rohrer-klingner.de/en/en_home/) and [Diamine](https://www.diamineinks.co.uk/collections/diamine-50ml-forever-ink).
-- The **Nudica** and **Argesta** typefaces used throughout the interface.
+- **[IBM Plex Mono](https://www.ibm.com/plex/) and IBM Plex Serif** ([SIL Open Font License 1.1](https://openfontlicense.org)) — the interface typefaces.
 - Reference reading that informed the approach lives in `_docs/` (including Kang et al.'s *Coherent Line Drawing* and painterly-rendering / weighted-stippling work).
 
 RSTR began as a sketch for the [Genuary '24](https://genuary24.d17e.dev/?prompt=5) prompt *"In the style of Vera Molnár"* and grew from there. Made by **David Vandenbogaerde** ([d17e.dev](https://www.d17e.dev)), a software engineer and artist in Amsterdam.

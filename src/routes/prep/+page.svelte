@@ -778,24 +778,24 @@ ${wrapRotation(artworkInner)}
 
 <style>
 	@font-face {
-		font-family: 'nudica_monobold';
-		src: url('/fonts/nudicamono-bold-webfont.woff') format('woff');
+		font-family: 'mono-bold';
+		src: url('/fonts/ibm-plex-mono-bold.woff2') format('woff2');
 		font-weight: normal;
 		font-style: normal;
 		font-display: swap;
 	}
 
 	@font-face {
-		font-family: 'nudica_monolight';
-		src: url('/fonts/nudicamono-light-webfont.woff') format('woff');
+		font-family: 'mono-light';
+		src: url('/fonts/ibm-plex-mono-light.woff2') format('woff2');
 		font-weight: normal;
 		font-style: normal;
 		font-display: swap;
 	}
 
 	@font-face {
-		font-family: 'argesta_regular';
-		src: url('/fonts/argestatext-regular-webfont.woff') format('woff');
+		font-family: 'serif-text';
+		src: url('/fonts/ibm-plex-serif-regular.woff2') format('woff2');
 		font-weight: normal;
 		font-style: normal;
 		font-display: swap;
@@ -816,12 +816,12 @@ ${wrapRotation(artworkInner)}
 		flex-direction: column;
 		background: var(--bg);
 		color: var(--ink);
-		font-family: 'nudica_monolight', monospace;
+		font-family: 'mono-light', monospace;
 		font-size: 0.8rem;
 	}
 
 	.app button {
-		font-family: 'nudica_monobold', monospace !important;
+		font-family: 'mono-bold', monospace !important;
 		font-size: 0.75rem !important;
 		transition: all 0.1s ease;
 	}
@@ -882,7 +882,7 @@ ${wrapRotation(artworkInner)}
 	}
 
 	.group-title {
-		font-family: 'nudica_monobold', monospace;
+		font-family: 'mono-bold', monospace;
 		font-size: 0.72rem;
 		text-transform: uppercase;
 		letter-spacing: 0.08em;
@@ -909,7 +909,7 @@ ${wrapRotation(artworkInner)}
 	}
 
 	.drop-sub {
-		font-family: 'argesta_regular', serif;
+		font-family: 'serif-text', serif;
 		font-size: 0.66rem;
 		color: var(--muted);
 		font-weight: normal;
@@ -993,7 +993,7 @@ ${wrapRotation(artworkInner)}
 		border-radius: 4px;
 		background: #fff;
 		color: var(--ink);
-		font-family: 'nudica_monolight', monospace;
+		font-family: 'mono-light', monospace;
 		font-size: 0.68rem;
 	}
 
@@ -1018,7 +1018,7 @@ ${wrapRotation(artworkInner)}
 		border-radius: 4px;
 		background: #fff;
 		color: var(--ink);
-		font-family: 'nudica_monolight', monospace;
+		font-family: 'mono-light', monospace;
 		font-size: 0.7rem;
 	}
 
@@ -1179,7 +1179,7 @@ ${wrapRotation(artworkInner)}
 	}
 
 	.legend-hint {
-		font-family: 'argesta_regular', serif;
+		font-family: 'serif-text', serif;
 	}
 
 	/* ------------------------------------------------- responsive */
