@@ -132,7 +132,7 @@
 					{/each}
 				</ul>
 				<div class="cta-row">
-					<a class="btn primary" href="/studio">launch the app</a>
+					<a class="btn primary" href="/studio">launch RSTR</a>
 					<a class="btn ghost" href="#how">how it works ↓</a>
 				</div>
 			</div>
@@ -270,7 +270,7 @@
 				age.
 			</p>
 			<div class="cta-row center">
-				<a class="btn primary" href="/studio">launch the app</a>
+				<a class="btn primary" href="/studio">launch RSTR</a>
 			</div>
 		</section>
 	</main>
