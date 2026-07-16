@@ -119,6 +119,28 @@ describe('buildCalibrationBlock', () => {
 		expect(block.bh).toBeGreaterThan(0);
 	});
 
+	it('compact mode keeps only the pen + half layers in a smaller box', () => {
+		const opts = {
+			pageW: 420,
+			pageH: 297,
+			penCount: 3,
+			forExport: true,
+			rotated: false,
+			x: null,
+			y: null
+		};
+		const full = buildCalibrationBlock(opts);
+		const compact = buildCalibrationBlock({ ...opts, compact: true });
+		expect(compact.svg).toContain('inkscape:label="cal-pen-1"');
+		expect(compact.svg).toContain('inkscape:label="cal-pen-3"');
+		expect(compact.svg).toContain('inkscape:label="cal-half"');
+		expect(compact.svg).not.toContain('cal-circle');
+		expect(compact.svg).not.toContain('cal-rulers');
+		expect(compact.svg).not.toContain('CALIBRATION');
+		expect(compact.bw).toBeLessThan(full.bw);
+		expect(compact.bh).toBeLessThan(full.bh);
+	});
+
 	it('defaults to the top-right corner and swaps its box when rotated', () => {
 		const flat = buildCalibrationBlock({
 			pageW: 420,
