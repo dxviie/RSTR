@@ -267,11 +267,13 @@
 				<a href="/classic">original version</a> still lives on if you're feeling nostalgic.
 			</p>
 			<p>
-				It's made by David Vandenbogaerde — <a
+				It's made by me, David Vandenbogaerde (or <a
 					href="https://www.d17e.dev"
 					target="_blank"
 					rel="noopener">d17e</a
-				> for short — a software engineer and budding artist living in Amsterdam 🇳🇱.
+				> for short), a software engineer and artist living in Amsterdam 🇳🇱.
+				Ever since I owned a plotter, I've been experimenting with novel ways to turn images into plotter art.<br />
+				Which is why RSTR exists. I hope you like it.
 			</p>
 			<div class="cta-row center">
 				<a class="btn primary" href="/studio">launch RSTR</a>
