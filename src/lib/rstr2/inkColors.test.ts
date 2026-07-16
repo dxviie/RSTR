@@ -80,14 +80,12 @@ describe('pickInkScheme', () => {
 	});
 
 	it('only picks plottable inks and never a near-white', () => {
-		const plottable = new Set(
-			INK_COLORS.filter((ink) => ink.plottable !== false).map((ink) => ink.hex)
-		);
+		const plottable = new Set(INK_COLORS.filter((ink) => ink.plottable !== false));
 		for (let count = 1; count <= 5; count++) {
 			for (let seed = 0; seed < 30; seed++) {
-				for (const hex of pickInkScheme(count, seededRng(seed))) {
-					expect(hex).toMatch(/^#[0-9A-F]{6}$/);
-					expect(plottable.has(hex)).toBe(true);
+				for (const ink of pickInkScheme(count, seededRng(seed))) {
+					expect(ink.hex).toMatch(/^#[0-9A-F]{6}$/);
+					expect(plottable.has(ink)).toBe(true);
 				}
 			}
 		}
@@ -97,29 +95,29 @@ describe('pickInkScheme', () => {
 		const plottableCount = INK_COLORS.filter((ink) => ink.plottable !== false).length;
 		for (let count = 1; count <= 5; count++) {
 			for (let seed = 0; seed < 30; seed++) {
-				const colors = pickInkScheme(count, seededRng(seed));
+				const inks = pickInkScheme(count, seededRng(seed));
 				const expected = Math.min(count, plottableCount);
-				expect(new Set(colors).size).toBe(expected);
+				expect(new Set(inks.map((ink) => ink.hex)).size).toBe(expected);
 			}
 		}
 	});
 
 	it('reserves a vibrant accent layer in ~ACCENT_RATE of rolls', () => {
-		const shelf = new Set(accentInks().map((ink) => ink.hex));
+		const shelf = new Set(accentInks());
 		const rolls = 2000;
 		let hits = 0;
 		for (let seed = 0; seed < rolls; seed++) {
-			if (pickInkScheme(3, seededRng(seed)).some((hex) => shelf.has(hex))) hits++;
+			if (pickInkScheme(3, seededRng(seed)).some((ink) => shelf.has(ink))) hits++;
 		}
 		expect(hits / rolls).toBeGreaterThan(ACCENT_RATE - 0.05);
 		expect(hits / rolls).toBeLessThan(ACCENT_RATE + 0.05);
 	});
 
 	it('never stacks more than one accent ink in a roll', () => {
-		const shelf = new Set(accentInks().map((ink) => ink.hex));
+		const shelf = new Set(accentInks());
 		for (let count = 1; count <= 5; count++) {
 			for (let seed = 0; seed < 200; seed++) {
-				const accents = pickInkScheme(count, seededRng(seed)).filter((hex) => shelf.has(hex));
+				const accents = pickInkScheme(count, seededRng(seed)).filter((ink) => shelf.has(ink));
 				expect(accents.length).toBeLessThanOrEqual(1);
 			}
 		}

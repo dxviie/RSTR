@@ -256,14 +256,15 @@ const pickFromFamily = (family: InkFamily, used: Set<string>, rng: Rng): InkColo
 };
 
 /**
- * Pick `count` distinct ink colours that form a deliberate scheme. One harmony
- * set is chosen for the whole stack; each layer draws from a different family
- * in that set (wrapping to a second shade of a family when a plot has more
- * layers than the set has families). ACCENT_RATE of rolls also reserve one
- * layer for a vibrant accent-shelf ink drawn from the set's families, so most
- * stacks get exactly one pop of colour. Returns `#RRGGBB` hex strings.
+ * Pick `count` distinct inks that form a deliberate scheme. One harmony set is
+ * chosen for the whole stack; each layer draws from a different family in that
+ * set (wrapping to a second shade of a family when a plot has more layers than
+ * the set has families). ACCENT_RATE of rolls also reserve one layer for a
+ * vibrant accent-shelf ink drawn from the set's families, so most stacks get
+ * exactly one pop of colour. Returns the chosen inks in layer order — the
+ * caller takes `hex` for the colour and `name` for the layer label.
  */
-export const pickInkScheme = (count: number, rng: Rng): string[] => {
+export const pickInkScheme = (count: number, rng: Rng): InkColor[] => {
 	const set =
 		HARMONY_SETS[
 			weightedIndex(
@@ -273,7 +274,7 @@ export const pickInkScheme = (count: number, rng: Rng): string[] => {
 		];
 	const families = shuffle(set.families, rng);
 	const used = new Set<string>();
-	const colors: (string | null)[] = Array.from({ length: count }, () => null);
+	const picks: (InkColor | null)[] = Array.from({ length: count }, () => null);
 
 	// the vibrant accent layer — an accent ink from the set's own families keeps
 	// the scheme deliberate; only a set with no accent-covered family (none
@@ -284,13 +285,13 @@ export const pickInkScheme = (count: number, rng: Rng): string[] => {
 		const pool = inSet.length > 0 ? inSet : shelf;
 		if (pool.length > 0) {
 			const accent = pool[Math.floor(rng() * pool.length)];
-			colors[Math.floor(rng() * count)] = accent.hex;
+			picks[Math.floor(rng() * count)] = accent;
 			used.add(accent.hex);
 		}
 	}
 
 	for (let i = 0; i < count; i++) {
-		if (colors[i] !== null) continue;
+		if (picks[i] !== null) continue;
 		// prefer this layer's family; fall back to any set family with a free
 		// shade, then (only if the whole set is drained) allow any ink at all
 		let ink =
@@ -302,7 +303,7 @@ export const pickInkScheme = (count: number, rng: Rng): string[] => {
 			ink = (free.length > 0 ? free : INK_COLORS)[0];
 		}
 		used.add(ink.hex);
-		colors[i] = ink.hex;
+		picks[i] = ink;
 	}
-	return colors as string[];
+	return picks as InkColor[];
 };
