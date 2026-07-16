@@ -211,8 +211,7 @@
 			<h2>everything you make is yours</h2>
 			<p>
 				Whatever you create with RSTR belongs to you — personal projects, gifts, client work, prints
-				you sell. Commercial use included, no attribution required, no strings attached. And since
-				your images are processed entirely in your browser, nobody else ever sees them.
+				you sell. Commercial use included, no strings attached. All processing happens in your browser.
 			</p>
 			<p>
 				The tool itself is in the open, too: the source code is on
