@@ -53,9 +53,12 @@
 	let paperOutlineH = $state(297);
 	let penCount = $state(3);
 
-	// stage
-	let stageW = $state(0);
-	let stageH = $state(0);
+	// stage — the preview is sized to the wrap (the stage minus the footer),
+	// and the footer height feeds the mobile clamp so the sticky preview clears
+	// the top bar instead of tucking under it
+	let wrapW = $state(0);
+	let wrapH = $state(0);
+	let footerH = $state(0);
 	let previewSvgEl: SVGSVGElement | undefined = $state();
 	let fileInput: HTMLInputElement | undefined = $state();
 	let dragActive = $state(false);
@@ -73,8 +76,8 @@
 		const [pageW, pageH] = page;
 		const vpW = pageW + PAD * 2;
 		const vpH = pageH + PAD * 2;
-		const cw = stageW || 900;
-		const ch = stageH || 600;
+		const cw = wrapW || 900;
+		const ch = wrapH || 600;
 		return Math.min((cw - 32) / vpW, (ch - 32) / vpH);
 	});
 
@@ -721,9 +724,7 @@ ${wrapRotation(artworkInner)}
 		<main
 			class="stage"
 			class:drag-active={dragActive}
-			style={`--stage-aspect: ${(page[1] + PAD * 2) / (page[0] + PAD * 2)}`}
-			bind:clientWidth={stageW}
-			bind:clientHeight={stageH}
+			style={`--stage-aspect: ${(page[1] + PAD * 2) / (page[0] + PAD * 2)}; --footer-h: ${footerH}px`}
 			ondragover={(event) => {
 				event.preventDefault();
 				dragActive = true;
@@ -731,7 +732,7 @@ ${wrapRotation(artworkInner)}
 			ondragleave={() => (dragActive = false)}
 			ondrop={onDrop}
 		>
-			<div class="preview-wrap">
+			<div class="preview-wrap" bind:clientWidth={wrapW} bind:clientHeight={wrapH}>
 				<div class="svg-wrap">
 					<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 					<!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -755,7 +756,7 @@ ${wrapRotation(artworkInner)}
 					{/if}
 				</div>
 			</div>
-			<div class="stage-footer">
+			<div class="stage-footer" bind:clientHeight={footerH}>
 				<span><span class="legend-dot" style="background: #00BFE8"></span>paper outline</span>
 				<span><span class="legend-dot" style="background: #FFB000"></span>calibration</span>
 				<span><span class="legend-dot" style="background: #FF2AA6"></span>page boundary</span>
@@ -1204,12 +1205,26 @@ ${wrapRotation(artworkInner)}
 			   width. Clamped so portrait pages still leave the controls
 			   peeking in (they scroll over the sticky stage anyway) and wide
 			   pages keep a usable drop target. The 1.5rem compensates the
-			   preview-wrap's own padding. */
-			height: clamp(25vh, calc((100vw - 1.5rem) * var(--stage-aspect, 0.75) + 1.5rem), 80vh);
-			height: clamp(25svh, calc((100vw - 1.5rem) * var(--stage-aspect, 0.75) + 1.5rem), 80svh);
+			   preview-wrap's own padding; --footer-h reserves the legend row so
+			   the preview fills the width without overflowing up under the top
+			   bar. */
+			height: clamp(
+				25vh,
+				calc((100vw - 1.5rem) * var(--stage-aspect, 0.75) + 1.5rem + var(--footer-h, 0px)),
+				80vh
+			);
+			height: clamp(
+				25svh,
+				calc((100vw - 1.5rem) * var(--stage-aspect, 0.75) + 1.5rem + var(--footer-h, 0px)),
+				80svh
+			);
 			/* exact fit where container units are supported — 100cqw is the
 			   workspace's content width, scrollbars already excluded */
-			height: clamp(25svh, calc((100cqw - 1.5rem) * var(--stage-aspect, 0.75) + 1.5rem), 80svh);
+			height: clamp(
+				25svh,
+				calc((100cqw - 1.5rem) * var(--stage-aspect, 0.75) + 1.5rem + var(--footer-h, 0px)),
+				80svh
+			);
 			z-index: 0;
 		}
 
