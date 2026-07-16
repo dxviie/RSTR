@@ -979,7 +979,10 @@
 	// crisp at any canvas resolution. The text sits on a paper-white plate in
 	// the corner so it stays legible over dark renders. The mark only goes on
 	// export copies — the on-screen render stays clean.
-	const WATERMARK_TEXT = 'rstr.d17e.dev <3';
+	// U+2665 like the classic mark (and the footer's &hearts;) — the trailing
+	// variation selector pins text presentation so no platform swaps in the
+	// color-emoji heart
+	const WATERMARK_TEXT = 'rstr.d17e.dev ♥︎';
 
 	// Owner's kill switch, deliberately not surfaced in the UI. In the console:
 	//   localStorage.setItem('rstr:v2:watermark', 'off')   -> plain exports
