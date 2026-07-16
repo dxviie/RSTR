@@ -315,6 +315,22 @@
 				Your settings are remembered in this browser from the moment you first edit them — until
 				then, every visit rolls a fresh random preset.
 			</dd>
+			<dt>real ink colors</dt>
+			<dd>
+				The palettes behind the randomize button are sampled from real fountain-pen inks, so a
+				random roll always lands on colors you can actually plot with. They're based on the ranges
+				from
+				<a href="https://www.de-atramentis.com/en/Artist-ink-/" target="_blank" rel="noopener"
+					>De Atramentis</a
+				>,
+				<a href="https://www.octopus-fluids.de/en/write-draw-inks" target="_blank" rel="noopener"
+					>Octopus Fluids</a
+				>
+				and
+				<a href="https://www.rohrer-klingner.de/en/en_home/" target="_blank" rel="noopener"
+					>Rohrer &amp; Klingner</a
+				>.
+			</dd>
 		</dl>
 	</section>
 </div>
