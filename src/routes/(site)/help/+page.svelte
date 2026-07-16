@@ -24,7 +24,7 @@
 		<a href="/help/studio-sections.webp" target="_blank" rel="noopener">
 			<img
 				src="/help/studio-sections.webp"
-				alt="the RSTR studio on desktop, its sections outlined and numbered — 1 source & adjustments, 2 video and 3 segmentation on the left, 4 presets, 5 layers and 6 stats on the right, the render in the middle"
+				alt="the RSTR studio on desktop, its sections outlined and numbered — 1 source & adjustments, 2 video, 3 segmentation and 4 lines on the left, 5 presets, 6 layers, 7 export and 8 stats on the right, the render in the middle"
 				width="2000"
 				height="1250"
 			/>
@@ -45,19 +45,29 @@
 			<span class="map-dot">3</span>
 			<span><strong>segmentation</strong> — how the image is carved into tonal regions.</span>
 		</li>
-		<li style="--c: #fb8500">
+		<li style="--c: #00b4d8">
 			<span class="map-dot">4</span>
+			<span><strong>lines</strong> — pen width and how ink turns into line spacing.</span>
+		</li>
+		<li style="--c: #fb8500">
+			<span class="map-dot">5</span>
 			<span><strong>presets</strong> — randomize everything, or save and share complete looks.</span
 			>
 		</li>
 		<li style="--c: #06a77d">
-			<span class="map-dot">5</span>
+			<span class="map-dot">6</span>
 			<span
 				><strong>layers</strong> — one pen per layer: color, channel, hatch angles, overrides.</span
 			>
 		</li>
+		<li style="--c: #8b4513">
+			<span class="map-dot">7</span>
+			<span
+				><strong>export</strong> — output width and the SVG, PNG and frame-sequence downloads.</span
+			>
+		</li>
 		<li style="--c: #ff2aa6">
-			<span class="map-dot">6</span>
+			<span class="map-dot">8</span>
 			<span><strong>stats</strong> — render numbers and the estimated plot time.</span>
 		</li>
 	</ol>
