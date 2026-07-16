@@ -1479,7 +1479,7 @@
 </svelte:head>
 
 <div class="app">
-	<TopBar active="studio" tagline="raster images to plottable svg" />
+	<TopBar active="studio" sub="STUDIO" tagline="raster images to plottable svg" />
 
 	<div class="workspace">
 		<!-------------------------------------------------------------
