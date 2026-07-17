@@ -200,12 +200,12 @@
 	<title>RSTR — turn your favorite pictures into bespoke art</title>
 	<meta
 		name="description"
-		content="RSTR turns your favorite pictures into unique hatched line art. Print it, share it, or plot it with a pen plotter. Free and instant, right in your browser."
+		content="RSTR turns your best memories into unique hatched line art. Print it, share it, or plot it with a pen plotter. Free and instant, right in your browser."
 	/>
 </svelte:head>
 
 <div class="landing">
-	<TopBar variant="landing" tagline="turn your favorite pictures into bespoke art" />
+	<TopBar variant="landing" tagline="turn your best memories into plotter art" />
 
 	<main>
 		<!-- hero + USP -->
@@ -214,7 +214,7 @@
 				<div class="hatch-strip" aria-hidden="true">
 					<span class="c"></span><span class="m"></span><span class="y"></span>
 				</div>
-				<h1>turn your favorite photos into art</h1>
+				<h1>turn your best memories into plotter art</h1>
 				<p class="lede">
 					RSTR redraws any picture as hatched line art.<br/>
 					Made in your browser, ready to print, share, or hand to a pen plotter.
@@ -249,36 +249,21 @@
 			</figure>
 		</section>
 
-		<!-- how it works -->
-		<section class="steps-section" id="how">
-			<h2>how it works</h2>
-			<ol class="steps">
-				{#each STEPS as step, index (step.title)}
-					<li>
-						<div class="step-head">
-							<span class="step-number">{index + 1}</span>
-							<h3>{step.title}</h3>
-						</div>
-						<p>{step.text}</p>
-					</li>
-				{/each}
-			</ol>
-		</section>
-
 		<!-- why lines -->
 		<section class="split">
 			<div class="split-copy">
-				<h2>why lines?</h2>
+				<h2>what's a plotter?</h2>
 				<p>
-					A pen plotter can't color in shapes the way software does. If you want a colored square,
+				    A pen plotter is a machine that draws by moving a real pen across paper along vector paths.
+					It can't color in shapes the way software does. If you want a colored square,
 					you have to draw a bunch of lines neatly next to each other — or with some spacing in
 					between to create different shades. That technique is called
-					<em>hatching</em>, and it's probably as old as drawing itself.
+					<a href="https://en.wikipedia.org/wiki/Hatching" target="_blank" rel="noopener"><em>hatching</em></a>, and it's probably as old as drawing itself.
 				</p>
 				<p>
-					RSTR reimagines hatching for the robot age: it splits your image into regions of similar
+					RSTR reimagines hatching for pen plotters: it splits your image into regions of similar
 					tone and fills each one with lines — denser where the image is dark, sparser where it's
-					light. The result is an image rebuilt entirely from pen strokes.
+					light. The result is an image rebuilt entirely from straight lines.
 				</p>
 				<p class="aside">
 					Curious about plotter art? Have a look at the
@@ -297,6 +282,27 @@
 				</figcaption>
 			</figure>
 		</section>
+
+		<!-- how it works -->
+		<section class="steps-section" id="how">
+			<h2>how it works</h2>
+			<ol class="steps">
+				{#each STEPS as step, index (step.title)}
+					<li>
+						<div class="step-head">
+							<span class="step-number">{index + 1}</span>
+							<h3>{step.title}</h3>
+						</div>
+						<p>{step.text}</p>
+					</li>
+				{/each}
+			</ol>
+			<p>
+			Don't own a plotter? No problem! I can plot your design for you.
+			</p>
+		</section>
+
+
 
 		<!-- ownership + open source -->
 		<section class="yours">
