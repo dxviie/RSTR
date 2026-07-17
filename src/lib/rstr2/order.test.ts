@@ -159,7 +159,8 @@ describe('orderHiddenFields', () => {
 			lineCount: 12345,
 			sourceName: '/bbrasa-imp.png',
 			presetName: '',
-			designHash: 'abc123def456'
+			designHash: 'abc123def456',
+			uploaded: false
 		});
 		expect(fields.price).toBe(String(quote.totalEur));
 		expect(fields.tier).toBe('A4');
@@ -172,6 +173,23 @@ describe('orderHiddenFields', () => {
 		expect(fields.design).toBe('abc123def456');
 		expect(fields.v).toBe('1');
 		expect('preset' in fields).toBe(false);
+		// no confirmed upload -> no upload field, the form keeps its attach step
+		expect('upload' in fields).toBe(false);
+	});
+
+	it("marks a design that reached the plot queue with upload: 'ok'", () => {
+		const { params, layers } = presetSettings('CMY classic');
+		const check = checkOrder(params, layers, 0.75);
+		const quote = quoteOrder(check, 45 * 60)!;
+		const fields = orderHiddenFields(check, quote, {
+			plotSeconds: 45 * 60,
+			lineCount: 12345,
+			sourceName: '/bbrasa-imp.png',
+			presetName: '',
+			designHash: 'abc123def456',
+			uploaded: true
+		});
+		expect(fields.upload).toBe('ok');
 	});
 });
 

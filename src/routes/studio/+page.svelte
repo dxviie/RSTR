@@ -73,6 +73,7 @@
 		ORDER_AUTOCLOSE_MS,
 		ORDER_EMBED_TIMEOUT_MS
 	} from '$lib/rstr2/orderForm';
+	import { uploadOrderSvg } from '$lib/rstr2/orderUpload';
 
 	//***************************************************************
 	// 														STATE
@@ -1115,6 +1116,9 @@
 	let orderEmbedState: 'loading' | 'ready' | 'blocked' = $state('loading');
 	// the exact file name the order download used, echoed in the form modal
 	let orderFileName = $state('');
+	// silent upload into the plot queue: in flight / confirmed landed
+	let orderUploading = $state(false);
+	let orderUploaded = $state(false);
 	let orderTimer = 0;
 
 	const ORDER_FROM_EUR = PRICING.tiers.A6.base + PRICING.shippingEur;
@@ -1146,23 +1150,32 @@
 		orderFallback = '';
 	};
 
-	// Download the exact file the customer will attach, fingerprint it, and
-	// swap the dialog over to the embedded order form. When the embed shows no
-	// sign of life within the timeout — content blockers are the usual reason —
-	// the dialog offers the same form as a plain link instead.
+	// Download the customer's copy, fingerprint the SVG, send it into the plot
+	// queue, and swap the dialog over to the embedded order form. The upload is
+	// best-effort: when it fails the form keeps its manual attach step (and the
+	// download already happened). When the embed itself shows no sign of life
+	// within the timeout — content blockers are the usual reason — the dialog
+	// offers the same form as a plain link instead.
 	const confirmOrder = async () => {
 		const check = orderCheck;
 		const quote = orderQuote;
 		const svg = buildSvgText();
-		if (!check || !quote || !svg) return;
+		if (!check || !quote || !svg || orderUploading) return;
 		orderFileName = exportName('', 'svg');
 		downloadBlob(new Blob([svg], { type: 'image/svg+xml' }), orderFileName);
+		const designHash = await designFingerprint(svg);
+		orderUploading = true;
+		orderUploaded = await uploadOrderSvg(svg, designHash, orderFileName);
+		orderUploading = false;
+		// the customer may have closed the dialog while the upload ran
+		if (orderDialog !== 'summary') return;
 		const fields = orderHiddenFields(check, quote, {
 			plotSeconds: plotEstimate?.seconds ?? 0,
 			lineCount: status.lines,
 			sourceName: videoName || inputName,
 			presetName: selectedPreset,
-			designHash: await designFingerprint(svg)
+			designHash,
+			uploaded: orderUploaded
 		});
 		orderEmbedSrc = orderEmbedUrl(fields);
 		orderFallback = orderFormUrl(fields);
@@ -2574,11 +2587,13 @@
 					{/if}
 					<p class="order-note">
 						ordering sends only the plot file (.svg) — the lines to draw — never your image. the
-						file downloads to your device now; attach it in the order form.
+						file downloads to your device and goes straight into my plot queue.
 					</p>
 					<div class="order-actions">
 						<button onclick={closeOrderDialog}>not now</button>
-						<button class="order-confirm" onclick={confirmOrder}>⚡ download & order</button>
+						<button class="order-confirm" onclick={confirmOrder} disabled={orderUploading}
+							>{orderUploading ? 'sending your file…' : '⚡ download & order'}</button
+						>
 					</div>
 				{:else if orderDialog === 'form'}
 					<div class="order-form-head">
@@ -2587,10 +2602,17 @@
 							>✕</button
 						>
 					</div>
-					<p class="order-note">
-						your plot file <b>{orderFileName}</b> just downloaded — attach it where the form asks for
-						your .svg.
-					</p>
+					{#if orderUploaded}
+						<p class="order-note">
+							your plot file <b>{orderFileName}</b> went straight into my plot queue — nothing to attach.
+							a copy downloaded to your device for your records.
+						</p>
+					{:else}
+						<p class="order-note">
+							your plot file <b>{orderFileName}</b> just downloaded — attach it where the form asks for
+							your .svg.
+						</p>
+					{/if}
 					{#if orderEmbedState === 'blocked'}
 						<p class="order-note">
 							the form isn't loading in here — usually a strict ad/content blocker being careful. no
@@ -3563,6 +3585,11 @@
 		border-radius: 8px;
 		cursor: pointer;
 		color: var(--ink);
+	}
+
+	.order-actions button:disabled {
+		opacity: 0.6;
+		cursor: default;
 	}
 
 	.order-actions .order-confirm {
