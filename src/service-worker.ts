@@ -12,9 +12,17 @@ const CACHE = `rstr-${version}`;
 // sample/test images are big and only used in dev — no point precaching them
 const SKIP_PRECACHE = ['/test-rstr.png', '/bbrasa-imp.png', '/knest-imp.png', '/rstr-og.png'];
 
+// Precache the app shell, not the marketing weight: the landing gallery is
+// ~22 MB across its responsive variants and only a subset ever shows — the
+// runtime network-first handler below still caches those on demand. And
+// '_'-prefixed files (_headers & co) are host control files that Pages-style
+// hosts don't serve; one failed fetch would abort the whole install.
+const precache = (file: string): boolean =>
+	!SKIP_PRECACHE.includes(file) && !file.startsWith('/gallery/') && !file.startsWith('/_');
+
 const ASSETS = [
 	...build, // the app itself
-	...files.filter((file) => !SKIP_PRECACHE.includes(file)) // everything in `static`
+	...files.filter(precache) // the app shell part of `static`
 ];
 
 sw.addEventListener('install', (event) => {

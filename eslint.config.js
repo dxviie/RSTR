@@ -39,7 +39,6 @@ export default [
 			'build/',
 			'.svelte-kit/',
 			'dist/',
-			'_docs/',
 			// The /classic page and the code behind it are kept as a nostalgic
 			// snapshot of RSTR's early days. That code is intentionally frozen —
 			// we don't lint it, we just keep it running.
