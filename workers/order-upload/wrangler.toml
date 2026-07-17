@@ -1,0 +1,22 @@
+# rstr-order-upload — the studio's silent order-file drop.
+#
+# Deploy (from this directory, needs a one-time `npx wrangler login`):
+#   npx wrangler deploy
+# The printed URL must match ORDER_UPLOAD_ENDPOINT in
+# src/lib/rstr2/orderUpload.ts — adjust that constant if it differs.
+#
+# The R2 bucket already exists (created 2026-07-17). Uploads land under
+# orders/<design-hash>.svg, where <design-hash> equals the `design` hidden
+# field on the Tally order submission.
+
+name = "rstr-order-upload"
+main = "src/index.js"
+compatibility_date = "2026-07-01"
+workers_dev = true
+
+[[r2_buckets]]
+binding = "FILES"
+bucket_name = "rstr-order-files"
+
+[observability]
+enabled = true

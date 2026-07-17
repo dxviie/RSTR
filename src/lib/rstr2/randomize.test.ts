@@ -3,6 +3,7 @@ import { RANDOM_CURVES, randomizeSettings, sampleCurve, weightedPick, type Rng }
 import { defaultParams } from './params';
 import { builtinPresets } from './presets';
 import { defaultCmyLayers, sanitizeLayers } from './layers';
+import { INK_COLORS } from './inkColors';
 
 /** deterministic rng (mulberry32) so the dice can be tested */
 const seededRng = (seed: number): Rng => {
@@ -89,6 +90,7 @@ describe('randomizeSettings', () => {
 	});
 
 	it('produces a valid layer stack', () => {
+		const inkNameByHex = new Map(INK_COLORS.map((ink) => [ink.hex, ink.name]));
 		for (let seed = 0; seed < 30; seed++) {
 			const { layers } = randomizeSettings(currentSettings(), false, seededRng(seed));
 			expect(layers.length).toBeGreaterThanOrEqual(RANDOM_CURVES.layerCount.min);
@@ -99,6 +101,8 @@ describe('randomizeSettings', () => {
 				expect(layer.color).toMatch(/^#[0-9A-F]{6}$/);
 				expect(layer.angleMax).toBeGreaterThanOrEqual(layer.angleMin);
 				expect(layer.enabled).toBe(true);
+				// layers are named after the pen's ink, not the channel they read
+				expect(layer.name).toBe(inkNameByHex.get(layer.color));
 			}
 			// no duplicate channels while there is room to avoid them
 			const channels = layers.map((layer) => layer.channel);
