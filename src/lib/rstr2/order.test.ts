@@ -124,8 +124,9 @@ describe('quoteOrder', () => {
 	});
 
 	it('bills plot time beyond the included window', () => {
-		const quote = quoteOrder(supportedCheck(), 90 * 60); // 60 billable min
-		expect(quote!.timeFeeEur).toBe(Math.round(60 * PRICING.plotMinEur));
+		const billableMin = 42; // arbitrary overtime, derived from the constants
+		const quote = quoteOrder(supportedCheck(), (PRICING.includedPlotMin + billableMin) * 60);
+		expect(quote!.timeFeeEur).toBe(Math.round(billableMin * PRICING.plotMinEur));
 	});
 
 	it('caps the time fee', () => {
