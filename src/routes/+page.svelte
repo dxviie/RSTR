@@ -809,6 +809,10 @@
 
 	/* ------------------------------------------------- steps */
 
+	.steps-section {
+		display: grid;
+	}
+
 	.steps {
 		display: grid;
 		grid-template-columns: repeat(3, 1fr);
@@ -869,7 +873,7 @@
 	}
 
 	.plot-service {
-		max-width: 50rem;
+		max-width: 46rem;
 		justify-self: center;
 		margin-top: 2rem;
 		border: 1px dashed var(--muted);
