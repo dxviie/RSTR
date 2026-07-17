@@ -1,0 +1,75 @@
+name: Cleanup stale deployments
+
+# Removes old GitHub deployment records (e.g. the ones the Vercel integration
+# left behind). GitHub has no UI for this — records can only be deleted via
+# the API, which is what this workflow does with the built-in GITHUB_TOKEN.
+#
+# Run it from the Actions tab (workflow_dispatch only, never automatic):
+#   1. dry_run = true  -> lists what would be deleted, touches nothing
+#   2. dry_run = false -> marks each deployment inactive, then deletes it
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Only clean this environment (e.g. Production or Preview). Leave empty for all.'
+        required: false
+        default: ''
+      dry_run:
+        description: 'Set to "false" to actually delete. Anything else only lists.'
+        required: false
+        default: 'true'
+
+permissions:
+  deployments: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: List / delete deployments
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          ENVIRONMENT: ${{ inputs.environment }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+
+          query="repos/${REPO}/deployments?per_page=100"
+          if [ -n "$ENVIRONMENT" ]; then
+            query="${query}&environment=$(jq -rn --arg e "$ENVIRONMENT" '$e|@uri')"
+          fi
+
+          deployments=$(gh api --paginate "$query" \
+            --jq '.[] | [.id, .environment, .created_at, .ref] | @tsv')
+
+          if [ -z "$deployments" ]; then
+            echo "No deployments found. Nothing to do."
+            exit 0
+          fi
+
+          count=$(printf '%s\n' "$deployments" | wc -l)
+          echo "Found $count deployment(s):"
+          printf '%s\n' "$deployments" |
+            awk -F'\t' '{printf "  id=%s  env=%s  created=%s  ref=%s\n", $1, $2, $3, $4}'
+
+          if [ "$DRY_RUN" != "false" ]; then
+            echo ""
+            echo "DRY RUN — nothing deleted. Re-run with dry_run=false to delete these."
+            exit 0
+          fi
+
+          deleted=0
+          while IFS=$'\t' read -r id env created ref; do
+            [ -z "$id" ] && continue
+            # an active deployment cannot be deleted, so mark it inactive first
+            gh api -X POST "repos/${REPO}/deployments/${id}/statuses" \
+              -f state=inactive --silent 2>/dev/null || true
+            gh api -X DELETE "repos/${REPO}/deployments/${id}" --silent
+            deleted=$((deleted + 1))
+            echo "Deleted deployment $id ($env, created $created)"
+          done <<< "$deployments"
+
+          echo ""
+          echo "Done. Deleted $deleted deployment(s)."
