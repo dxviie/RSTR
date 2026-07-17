@@ -211,6 +211,14 @@
 		<dl>
 			<dt>width (mm)</dt>
 			<dd>Physical output width — the height follows the image aspect.</dd>
+			<dt>fit on page</dt>
+			<dd>
+				One tap sets the width so the art fits a standard sheet — A6, A5, A4 or A3 — within the
+				margin below. The page is turned to match the art: wider-than-tall art gets a landscape
+				sheet, taller art a portrait one, and anything square-ish defaults to portrait.
+			</dd>
+			<dt>margin (mm)</dt>
+			<dd>The border kept clear on every edge of the sheet when fitting to a page. Defaults to 10mm.</dd>
 			<dt>↓ SVG</dt>
 			<dd>A plottable SVG with one layer group per pen, ready for plotter software.</dd>
 			<dt>↓ PNG</dt>
