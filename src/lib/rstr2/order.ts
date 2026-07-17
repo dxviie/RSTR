@@ -151,7 +151,7 @@ export const PRICING = {
 	/** plot minutes covered by the base price */
 	includedPlotMin: 60,
 	/** per minute beyond the included window */
-	plotMinEur: .5,
+	plotMinEur: 0.5,
 	/** the time component stops growing here */
 	plotTimeFeeCapEur: 150,
 	/** flat-pack tracked shipping, folded into the advertised total */
