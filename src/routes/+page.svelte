@@ -37,6 +37,18 @@
 		{ name: 'melkmeisje', alt: "Vermeer's Milkmaid plotted in single-pen black hatching" },
 		{ name: 'webb-1', alt: 'a nebula plotted in bands of purple, gold and red with bright stars' },
 		{
+			name: 'puma-1',
+			alt: "a puma's face rebuilt in dense multicolor pen hatching, with bright yellow eyes"
+		},
+		{
+			name: 'siesta-1',
+			alt: 'a dog resting in a sunlit garden, rebuilt in warm multicolor hatching'
+		},
+		{
+			name: 'weave-1',
+			alt: 'a portrait of a bearded man rebuilt in woven blocks of colored pen hatching'
+		},
+		{
 			name: 'broken-gradient-2',
 			alt: 'abstract gradient study — a dark monolith over a teal-to-magenta field'
 		},
@@ -64,6 +76,9 @@
 		'path-1',
 		'melkmeisje',
 		'webb-1',
+		'puma-1',
+		'siesta-1',
+		'weave-1',
 		'metro-1',
 		'lines-1',
 		'space-2-1',
