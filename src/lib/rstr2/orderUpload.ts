@@ -7,7 +7,7 @@
 // hidden field tells the form which face to show.
 
 /** The upload Worker. Deployed from workers/order-upload in this repo. */
-export const ORDER_UPLOAD_ENDPOINT = 'https://rstr-order-upload.d17e.workers.dev';
+export const ORDER_UPLOAD_ENDPOINT = 'https://rstr-order-upload.david-cloudflare-862.workers.dev';
 
 /** Give slow connections a real chance but never hold the order hostage. */
 export const ORDER_UPLOAD_TIMEOUT_MS = 12000;
