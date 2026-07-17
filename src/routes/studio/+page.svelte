@@ -54,7 +54,19 @@
 	} from '$lib/rstr2/video';
 	import { buildZip, type ZipEntry } from '$lib/rstr2/zip';
 	import { buildExportName } from '$lib/rstr2/exportName';
-	import { PAGES, pageDims, type PageId } from '$lib/prep/pages';
+	import { pageDims, type PageId } from '$lib/prep/pages';
+	import {
+		allowedPens,
+		checkOrder,
+		designFingerprint,
+		orderHiddenFields,
+		quoteOrder,
+		ORDER_MARGIN_MM,
+		PRICING,
+		type OrderCheck,
+		type OrderQuote
+	} from '$lib/rstr2/order';
+	import { openOrderPopup, orderFormUrl } from '$lib/rstr2/orderForm';
 
 	//***************************************************************
 	// 														STATE
@@ -979,8 +991,9 @@
 		markSettingsEdited();
 	};
 
-	const downloadSvg = () => {
-		if (!imgWidth) return;
+	/** assemble the current design as SVG text — shared by export and ordering */
+	const buildSvgText = (): string | null => {
+		if (!imgWidth) return null;
 		const pxPerMm = imgWidth / params.outputWidthMm;
 		const exportLayers = layers
 			.filter((layer) => layer.enabled)
@@ -992,11 +1005,18 @@
 					segments: result?.regions.map((region) => region.hatchSegments ?? []) ?? []
 				};
 			});
-		const svg = buildSvgDocument(exportLayers, imgWidth, imgHeight, params.outputWidthMm, {
+		return buildSvgDocument(exportLayers, imgWidth, imgHeight, params.outputWidthMm, {
 			params,
 			layers
 		});
+	};
+
+	const downloadSvgText = (svg: string) =>
 		downloadBlob(new Blob([svg], { type: 'image/svg+xml' }), exportName('', 'svg'));
+
+	const downloadSvg = () => {
+		const svg = buildSvgText();
+		if (svg) downloadSvgText(svg);
 	};
 
 	// Raster exports carry the same small brand mark as /classic, but drawn
@@ -1063,6 +1083,74 @@
 		canvas.toBlob((blob) => {
 			if (blob) downloadBlob(blob, exportName('', 'png'));
 		});
+	};
+
+	//***************************************************************
+	// 												ORDER A PLOT
+	//***************************************************************
+
+	// The order flow hands off to a Tally form in a popup. Everything stays in
+	// the browser until the customer deliberately submits; the only artifact
+	// that leaves is the exported SVG they attach — never the source image.
+	// Unsupported configurations (inks I don't stock, larger than A3) keep the
+	// button clickable and explain themselves in a dialog instead.
+
+	let orderDialog: 'closed' | 'summary' | 'unsupported' = $state('closed');
+	let orderCheck: OrderCheck | null = $state(null);
+	let orderQuote: OrderQuote | null = $state(null);
+	// set when the popup widget can't load — the dialog offers a plain link out
+	let orderFallback = $state('');
+
+	const ORDER_FROM_EUR = PRICING.tiers.A6.base + PRICING.shippingEur;
+
+	// the pens on my shelf, grouped by ink, for the unsupported dialog
+	const ORDER_PEN_SHELF = (() => {
+		const shelf: { color: string; name: string; widths: number[] }[] = [];
+		for (const pen of allowedPens()) {
+			const entry = shelf.find((item) => item.color === pen.color);
+			if (entry) entry.widths.push(pen.widthMm);
+			else shelf.push({ color: pen.color, name: pen.name, widths: [pen.widthMm] });
+		}
+		for (const entry of shelf) entry.widths.sort((a, b) => a - b);
+		return shelf;
+	})();
+
+	const orderPlot = () => {
+		if (!hatchReady || status.busy || !imgWidth || !imgHeight) return;
+		orderFallback = '';
+		const check = checkOrder(params, layers, imgHeight / imgWidth);
+		orderCheck = check;
+		orderQuote = quoteOrder(check, plotEstimate?.seconds ?? 0);
+		orderDialog = check.supported && orderQuote ? 'summary' : 'unsupported';
+	};
+
+	const closeOrderDialog = () => {
+		orderDialog = 'closed';
+		orderFallback = '';
+	};
+
+	// Download the exact file the customer will attach, fingerprint it, and
+	// hand over to the order form — popup when the widget loads (it is fetched
+	// only now, the studio itself ships no third-party scripts), plain link in
+	// a new tab otherwise.
+	const confirmOrder = async () => {
+		const check = orderCheck;
+		const quote = orderQuote;
+		const svg = buildSvgText();
+		if (!check || !quote || !svg) return;
+		downloadSvgText(svg);
+		const fields = orderHiddenFields(check, quote, {
+			plotSeconds: plotEstimate?.seconds ?? 0,
+			lineCount: status.lines,
+			sourceName: videoName || inputName,
+			presetName: selectedPreset,
+			designHash: await designFingerprint(svg)
+		});
+		if (await openOrderPopup(fields)) {
+			closeOrderDialog();
+		} else {
+			orderFallback = orderFormUrl(fields);
+		}
 	};
 
 	//***************************************************************
@@ -1536,7 +1624,7 @@
 					<button
 						class="browse-btn"
 						onclick={() => fileInput?.click()}
-						title="pick an image or video from your device — it never leaves the browser"
+						title="pick an image or video from your device — it never leaves the browser (ordering a plot sends only the drawn lines, never the image)"
 					>
 						browse image / video<span class="browse-sub">or drop one on the render</span>
 					</button>
@@ -1798,7 +1886,7 @@
 				{:else if !videoSrc}
 					<div class="dropzone-hint">
 						<p class="hint-title">drop an image or video here</p>
-						<p class="hint-sub">everything stays in your browser</p>
+						<p class="hint-sub">your image stays in your browser — always</p>
 					</div>
 				{/if}
 			{/if}
@@ -2350,6 +2438,19 @@
 						↺ saxi defaults
 					</button>
 				</details>
+				<div class="order-block">
+					<button
+						class="order-btn"
+						onclick={orderPlot}
+						disabled={!hatchReady || status.busy || exporting.running}
+						title="have this exact design plotted with real pens and shipped to you — I check every file before any ink hits paper"
+					>
+						⚡ order this plot
+					</button>
+					<div class="order-sub">
+						real ink on paper, shipped to you — from €{ORDER_FROM_EUR}, shipping included
+					</div>
+				</div>
 			</section>
 
 			<div class="spacer"></div>
@@ -2390,7 +2491,114 @@
 			event.currentTarget.value = '';
 		}}
 	/>
+
+	{#if orderDialog !== 'closed' && orderCheck}
+		<div class="order-overlay">
+			<div class="order-dialog" role="dialog" aria-modal="true" aria-label="order this plot">
+				{#if orderDialog === 'summary' && orderQuote}
+					<div class="order-title">order this plot</div>
+					<div class="order-rows">
+						<div class="order-row">
+							<span>design</span>
+							<span
+								>{Math.round(orderCheck.widthMm)} × {Math.round(orderCheck.heightMm)} mm on {orderQuote.tier}</span
+							>
+						</div>
+						<div class="order-row">
+							<span>pens</span>
+							<span
+								>{orderCheck.pens
+									.map((pen) => `${pen.pen?.name} ${pen.widthMm}mm`)
+									.join(' · ')}</span
+							>
+						</div>
+						<div class="order-row">
+							<span>plot time</span>
+							<span>{plotEstimate ? `~${formatPlotTime(plotEstimate.seconds)}` : '—'}</span>
+						</div>
+						<div class="order-row total">
+							<span>price</span>
+							<span><b>{orderQuote.totalEur} €</b> — shipping included</span>
+						</div>
+						{#if orderQuote.capped}
+							<div class="order-fine">
+								long plot — the {orderQuote.tier} price cap kicked in, lucky you
+							</div>
+						{/if}
+					</div>
+					{#if videoSrc}
+						<p class="order-note">
+							a video is loaded — this orders the current frame as a single plot.
+						</p>
+					{/if}
+					<p class="order-note">
+						ordering sends only the plot file (.svg) — the lines to draw — never your image. the
+						file downloads to your device now; attach it in the order form.
+					</p>
+					{#if orderFallback}
+						<p class="order-note">
+							the order popup couldn't load here — no worries, this link opens the same form with
+							your design details:
+							<a class="order-link" href={orderFallback} target="_blank" rel="noreferrer"
+								>open the order form ↗</a
+							>
+						</p>
+						<div class="order-actions">
+							<button onclick={closeOrderDialog}>close</button>
+						</div>
+					{:else}
+						<div class="order-actions">
+							<button onclick={closeOrderDialog}>not now</button>
+							<button class="order-confirm" onclick={confirmOrder}>⚡ download & order</button>
+						</div>
+					{/if}
+				{:else}
+					<div class="order-title">can't plot this one (yet)</div>
+					<p class="order-note">
+						plot orders are limited to what my machine and pen shelf physically do:
+					</p>
+					<ul class="order-limits">
+						<li class:issue={orderCheck.tier === null}>
+							<b>up to A3</b> with a {ORDER_MARGIN_MM}mm margin — this design is
+							{Math.round(orderCheck.widthMm)} × {Math.round(orderCheck.heightMm)} mm{orderCheck.tier ===
+							null
+								? ' (too big)'
+								: ''}
+						</li>
+						<li class:issue={orderCheck.pens.some((pen) => !pen.pen)}>
+							<b>inks I stock:</b>
+							{ORDER_PEN_SHELF.map(
+								(ink) => `${ink.name} (${ink.widths.map((w) => `${w}mm`).join(' / ')})`
+							).join(' · ')}
+							{#if orderCheck.pens.some((pen) => !pen.pen)}
+								— no match for {orderCheck.pens
+									.filter((pen) => !pen.pen)
+									.map((pen) => `${pen.layerName} (${pen.color} @ ${pen.widthMm}mm)`)
+									.join(', ')}
+							{/if}
+						</li>
+						{#if orderCheck.pens.length === 0}
+							<li class="issue">at least one layer has to be enabled</li>
+						{/if}
+					</ul>
+					<p class="order-note">
+						quickest fix: apply a built-in preset (or roll the dice with “stick to built-in presets”
+						on), use “fit on page” up to A3 — then order away.
+					</p>
+					<div class="order-actions">
+						<button onclick={closeOrderDialog}>got it</button>
+					</div>
+				{/if}
+			</div>
+		</div>
+	{/if}
 </div>
+
+<svelte:window
+	onkeydown={(event) => {
+		if (event.key === 'Escape' && orderDialog !== 'closed') closeOrderDialog();
+	}}
+/>
 
 <style>
 	@font-face {
@@ -3136,6 +3344,162 @@
 	.primary-btn:disabled {
 		opacity: 0.35;
 		cursor: default;
+	}
+
+	/* ------------------------------------------------- order a plot */
+
+	.order-block {
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+		margin-top: 0.35rem;
+		padding-top: 0.6rem;
+		border-top: 1px solid var(--border);
+	}
+
+	.order-btn {
+		width: 100%;
+		padding: 0.5rem;
+		border: 1px solid var(--ink);
+		background: var(--ink);
+		color: var(--bg);
+		border-radius: 8px;
+		cursor: pointer;
+	}
+
+	.order-btn:hover:not(:disabled) {
+		background: var(--ink-soft) !important;
+		border-color: var(--ink-soft);
+		color: #fff;
+	}
+
+	.order-btn:disabled {
+		opacity: 0.35;
+		cursor: default;
+	}
+
+	.order-sub {
+		font-size: 0.68rem;
+		color: var(--muted);
+		text-align: center;
+	}
+
+	.order-overlay {
+		position: fixed;
+		inset: 0;
+		z-index: 300;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 1rem;
+		background: rgba(26, 32, 44, 0.45);
+	}
+
+	.order-dialog {
+		width: min(420px, 100%);
+		max-height: calc(100dvh - 2rem);
+		overflow-y: auto;
+		display: flex;
+		flex-direction: column;
+		gap: 0.6rem;
+		padding: 1rem;
+		background: var(--bg);
+		border: 1px solid var(--ink);
+		border-radius: 10px;
+		box-shadow: 0 12px 40px rgba(26, 32, 44, 0.25);
+	}
+
+	.order-title {
+		font-family: 'mono-bold', monospace;
+		font-size: 0.9rem;
+	}
+
+	.order-rows {
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+		padding: 0.55rem;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: #fff;
+	}
+
+	.order-row {
+		display: flex;
+		justify-content: space-between;
+		gap: 0.8rem;
+	}
+
+	.order-row > span:first-child {
+		color: var(--muted);
+		flex-shrink: 0;
+	}
+
+	.order-row > span:last-child {
+		text-align: right;
+	}
+
+	.order-row.total {
+		border-top: 1px solid var(--border);
+		padding-top: 0.35rem;
+		margin-top: 0.15rem;
+	}
+
+	.order-fine {
+		font-size: 0.68rem;
+		color: var(--muted);
+	}
+
+	.order-note {
+		margin: 0;
+		font-size: 0.72rem;
+		color: var(--ink-soft);
+		line-height: 1.45;
+	}
+
+	.order-limits {
+		margin: 0;
+		padding-left: 1.1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+		font-size: 0.72rem;
+		line-height: 1.45;
+	}
+
+	.order-limits li.issue {
+		color: #b3261e;
+	}
+
+	.order-link {
+		color: var(--ink);
+		text-decoration: underline;
+	}
+
+	.order-actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 0.5rem;
+	}
+
+	.order-actions button {
+		padding: 0.4rem 0.7rem;
+		border: 1px solid var(--border);
+		background: #fff;
+		border-radius: 8px;
+		cursor: pointer;
+		color: var(--ink);
+	}
+
+	.order-actions .order-confirm {
+		border-color: var(--ink);
+		background: var(--ink);
+		color: var(--bg);
+	}
+
+	.order-actions .order-confirm:hover:not(:disabled) {
+		background: var(--ink-soft) !important;
+		color: #fff;
 	}
 
 	/* details readout below the export buttons */
