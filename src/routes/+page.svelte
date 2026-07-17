@@ -89,6 +89,7 @@
 	// the carousel opens on a different piece each page load.
 	let heroSlides = $state(
 		GALLERY_PLOTS.filter((p) => HERO_PLOTS.has(p.name)).map((p) => ({
+			name: p.name,
 			src: plotSrc(p.name, 800),
 			srcset: plotSrcset(p.name),
 			alt: p.alt
@@ -209,6 +210,24 @@
 		'nothing leaves your device',
 		'everything you make is yours to keep'
 	];
+
+	// clicking any plot opens it near-fullscreen; the "open full size" link
+	// inside the overlay hands off to a new tab for unlimited native zoom/pan.
+	let lightbox = $state<{ srcset: string; full: string; alt: string } | null>(null);
+
+	const openLightbox = (name: string, alt: string) => {
+		lightbox = { srcset: plotSrcset(name), full: plotSrc(name, 1920), alt };
+	};
+	const closeLightbox = () => (lightbox = null);
+
+	// lock the page behind the overlay so only the image scrolls/zooms
+	$effect(() => {
+		if (lightbox) {
+			const prev = document.body.style.overflow;
+			document.body.style.overflow = 'hidden';
+			return () => (document.body.style.overflow = prev);
+		}
+	});
 </script>
 
 <svelte:head>
@@ -248,15 +267,23 @@
 				<div class="hero-art">
 					{#each heroSlides as slide, index (slide.src)}
 						{#if index <= heroMounted}
-							<img
-								src={slide.src}
-								srcset={slide.srcset}
-								sizes={slide.srcset ? '(max-width: 820px) 92vw, 480px' : undefined}
-								alt={slide.alt}
+							<button
+								type="button"
+								class="hero-slide"
 								class:current={index === heroCurrent}
 								aria-hidden={index !== heroCurrent}
-								loading={index === 0 ? 'eager' : 'lazy'}
-							/>
+								tabindex={index === heroCurrent ? 0 : -1}
+								aria-label="open plot: {slide.alt}"
+								onclick={() => openLightbox(slide.name, slide.alt)}
+							>
+								<img
+									src={slide.src}
+									srcset={slide.srcset}
+									sizes={slide.srcset ? '(max-width: 820px) 92vw, 480px' : undefined}
+									alt={slide.alt}
+									loading={index === 0 ? 'eager' : 'lazy'}
+								/>
+							</button>
 						{/if}
 					{/each}
 				</div>
@@ -345,15 +372,23 @@
 				{#each gallerySlots as plotIndex, slot (slot)}
 					<div class="gallery-item">
 						{#key plotIndex}
-							<img
+							<button
+								type="button"
+								class="zoom"
+								aria-label="open plot: {GALLERY_PLOTS[plotIndex].alt}"
+								onclick={() =>
+									openLightbox(GALLERY_PLOTS[plotIndex].name, GALLERY_PLOTS[plotIndex].alt)}
 								in:fade={{ duration: 500 }}
 								out:fade={{ duration: 500 }}
-								src={plotSrc(GALLERY_PLOTS[plotIndex].name, 400)}
-								srcset={plotSrcset(GALLERY_PLOTS[plotIndex].name)}
-								sizes="(max-width: 820px) 46vw, 250px"
-								alt={GALLERY_PLOTS[plotIndex].alt}
-								loading="lazy"
-							/>
+							>
+								<img
+									src={plotSrc(GALLERY_PLOTS[plotIndex].name, 400)}
+									srcset={plotSrcset(GALLERY_PLOTS[plotIndex].name)}
+									sizes="(max-width: 820px) 46vw, 250px"
+									alt={GALLERY_PLOTS[plotIndex].alt}
+									loading="lazy"
+								/>
+							</button>
 						{/key}
 					</div>
 				{/each}
@@ -407,6 +442,29 @@
 		<BrandFooter/>
 	</footer>
 </div>
+
+<svelte:window onkeydown={(e) => lightbox && e.key === 'Escape' && closeLightbox()} />
+
+{#if lightbox}
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<div
+		class="lightbox"
+		role="dialog"
+		aria-modal="true"
+		aria-label={lightbox.alt}
+		tabindex="-1"
+		transition:fade={{ duration: 200 }}
+		onclick={(e) => e.target === e.currentTarget && closeLightbox()}
+	>
+		<button class="lightbox-close" type="button" aria-label="close" onclick={closeLightbox}>
+			×
+		</button>
+		<img src={lightbox.full} srcset={lightbox.srcset} sizes="100vw" alt={lightbox.alt} />
+		<a class="lightbox-full" href={lightbox.full} target="_blank" rel="noopener">
+			open full size ↗
+		</a>
+	</div>
+{/if}
 
 <style>
 	/* Landing page in the d17e.dev brand. Normal document flow — the page
@@ -643,23 +701,39 @@
 			0 12px 32px rgba(96, 115, 159, 0.2);
 	}
 
-	.hero-art img {
+	.hero-slide {
 		position: absolute;
 		inset: 0;
+		margin: 0;
+		padding: 0;
+		border: none;
+		background: none;
+		overflow: hidden;
+		opacity: 0;
+		/* only the visible slide takes the click */
+		pointer-events: none;
+		cursor: zoom-in;
+		transition: opacity 0.9s ease;
+	}
+
+	.hero-slide.current {
+		opacity: 1;
+		pointer-events: auto;
+	}
+
+	.hero-art img {
+		display: block;
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
-		opacity: 0;
 		/* held zoomed in even at rest so the photographed paper/desk margins
 		   around each plot stay cropped out of the frame */
 		transform: scale(1.14);
-		transition: opacity 0.9s ease;
 	}
 
 	/* slow Ken Burns: each slide starts further in and eases back out to the
 	   1.14 rest zoom — never far enough to bring the borders back in */
-	.hero-art img.current {
-		opacity: 1;
+	.hero-slide.current img {
 		animation: hero-zoom 6s ease-out both;
 	}
 
@@ -673,7 +747,7 @@
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.hero-art img.current {
+		.hero-slide.current img {
 			animation: none;
 		}
 	}
@@ -824,9 +898,17 @@
 		box-shadow: 0 2px 8px rgba(96, 115, 159, 0.2);
 	}
 
-	.gallery-item img {
+	.gallery-item .zoom {
 		position: absolute;
 		inset: 0;
+		margin: 0;
+		padding: 0;
+		border: none;
+		background: none;
+		cursor: zoom-in;
+	}
+
+	.gallery-item img {
 		display: block;
 		width: 100%;
 		height: 100%;
@@ -916,5 +998,65 @@
 		.gallery {
 			grid-template-columns: repeat(2, 1fr);
 		}
+	}
+
+	/* ------------------------------------------------- lightbox */
+
+	.lightbox {
+		position: fixed;
+		inset: 0;
+		z-index: 100;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 4vmin;
+		background: rgba(26, 32, 44, 0.92);
+		cursor: zoom-out;
+	}
+
+	.lightbox img {
+		max-width: 100%;
+		max-height: 100%;
+		object-fit: contain;
+		cursor: default;
+		box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
+	}
+
+	.lightbox-close {
+		position: absolute;
+		top: 0.75rem;
+		right: 1.1rem;
+		padding: 0;
+		background: none;
+		border: none;
+		color: #fff;
+		font-family: 'mono-light', monospace;
+		font-size: 2.25rem;
+		line-height: 1;
+		cursor: pointer;
+		opacity: 0.8;
+		transition: opacity 0.1s ease;
+	}
+
+	.lightbox-close:hover {
+		opacity: 1;
+	}
+
+	.lightbox-full {
+		position: absolute;
+		bottom: 1.1rem;
+		left: 50%;
+		transform: translateX(-50%);
+		font-family: 'mono-bold', monospace;
+		font-size: 0.8rem;
+		color: #fff;
+		text-decoration: none;
+		border-bottom: 1px dashed rgba(255, 255, 255, 0.55);
+		opacity: 0.85;
+		transition: opacity 0.1s ease;
+	}
+
+	.lightbox-full:hover {
+		opacity: 1;
 	}
 </style>
