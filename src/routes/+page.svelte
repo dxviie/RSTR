@@ -193,7 +193,7 @@
 	const STEPS = [
 		{
 			title: 'drop an image or video',
-			text: 'Any photo or video works. It never leaves your browser. All the processing happens right on your machine.'
+			text: 'Any photo or video works. It stays on your device — all the processing happens right in your browser.'
 		},
 		{
 			title: 'shape the lines',
@@ -207,7 +207,7 @@
 
 	const USPS = [
 		'free & open source',
-		'your photos never leave your device',
+		'your photo stays on your device — orders send only the drawn lines',
 		'everything you make is yours to keep'
 	];
 
@@ -365,6 +365,11 @@
 					No problem — I can plot yours for you. Make something in the studio, then hit
 					<strong>⚡ order this plot</strong> to have it drawn with real pens on real paper and shipped
 					to your door.
+				</p>
+				<p>
+					Transparency note: ordering is the one moment anything leaves your browser — the plot file
+					(the drawn lines as an SVG) goes into my plot queue so I can draw it. Your photo never
+					does.
 				</p>
 			</div>
 		</section>
