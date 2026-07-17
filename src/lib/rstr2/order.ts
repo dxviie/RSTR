@@ -2,7 +2,7 @@
 //
 // Pure logic only: which designs are physically plottable (pens I own, paper
 // the machine takes), what a plot costs, and the metadata payload handed to
-// the order form. The UI wiring (button, dialogs, Tally popup) lives with the
+// the order form. The UI wiring (button, dialogs, Tally embed) lives with the
 // studio page; keeping this file DOM-free makes the rules unit-testable.
 
 import { PAGES, type PageId } from '../prep/pages';
