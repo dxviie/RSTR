@@ -2,7 +2,6 @@ node_modules
 
 # Output
 .output
-.vercel
 /.svelte-kit
 /build
 
@@ -28,3 +27,9 @@ test-results/
 /playwright/.cache/
 
 /downloads/
+
+# Wrangler local state
+.wrangler/
+
+# Local docs & research material (not for the repo)
+_docs/
