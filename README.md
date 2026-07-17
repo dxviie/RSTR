@@ -2,7 +2,7 @@
 
 **Turn any image or video into plottable, multi-pen hatched line art — entirely in your browser.**
 
-RSTR splits a picture into regions of similar tone and refills each one with parallel pen strokes: dense where the image is dark, sparse where it's light. The result is a layered SVG a [pen plotter](https://d17e.dev/projects/plotter-art/) can draw with real ink on real paper — or a PNG to share and print. Nothing is uploaded; every pixel stays on your device.
+RSTR splits a picture into regions of similar tone and refills each one with parallel pen strokes: dense where the image is dark, sparse where it's light. The result is a layered SVG a [pen plotter](https://d17e.dev/projects/plotter-art/) can draw with real ink on real paper — or a PNG to share and print. Everything runs in your browser and your image never leaves your device. The one exception is deliberate: when you order a physical plot, the finished plot file (the drawn lines as SVG — never your photo) is uploaded into the plot queue.
 
 🎨 **Live app:** [rstr.d17e.dev](https://rstr.d17e.dev) · 📖 **How to use it:** the in-app [help page](https://rstr.d17e.dev/help) documents every control · 🖋️ **The art:** [#madewithrstr](https://d17e.dev/projects/rstr/)
 
@@ -85,7 +85,8 @@ Other notable areas:
 - `src/lib/prep/` — the **plot prep** tool: takes an exported SVG and dresses it for the machine (output page, paper outline, calibration markers, reversed-layer doubling). `reverse.ts` reverses SVG path direction so a layer can be plotted twice for denser ink.
 - `src/lib/rstr/` + `src/lib/ccp/` — the **classic** engine, the original Paper.js-based RSTR, kept intact for nostalgia. Marked `@ts-nocheck` and intentionally left as-is.
 - `src/lib/fsm.svelte.ts` — a small state machine for the render lifecycle (`config → render → done / error / exporting`).
-- `src/service-worker.ts` — precaches the app so it works offline; RSTR is an installable PWA.
+- `src/service-worker.ts` — precaches the app shell so it works offline; RSTR is an installable PWA.
+- `workers/order-upload/` — the Cloudflare Worker behind **⚡ order this plot**: takes the exported plot SVG (only the drawn lines — never the source image), verifies it against its design fingerprint and stores it, rate-limited, in a private R2 bucket. Deploy and retention notes live in `workers/order-upload/README.md`.
 
 ### Routes
 
@@ -153,7 +154,7 @@ RSTR stands on a lot of other people's work:
 - The **[AxiDraw](https://shop.evilmadscientist.com/908)** by Evil Mad Scientist / Bantam Tools — the pen plotter RSTR targets.
 - **Fountain- and drawing-ink makers** whose real colors seed the randomizer's palette: [De Atramentis](https://www.de-atramentis.com/en/Artist-ink-/), [Octopus Fluids](https://www.octopus-fluids.de/en/write-draw-inks), [Rohrer & Klingner](https://www.rohrer-klingner.de/en/en_home/) and [Diamine](https://www.diamineinks.co.uk/collections/diamine-50ml-forever-ink).
 - **[IBM Plex Mono](https://www.ibm.com/plex/) and IBM Plex Serif** ([SIL Open Font License 1.1](https://openfontlicense.org)) — the interface typefaces.
-- Reference reading that informed the approach lives in `_docs/` (including Kang et al.'s _Coherent Line Drawing_ and painterly-rendering / weighted-stippling work).
+- Reference reading that informed the approach: Kang et al.'s _Coherent Line Drawing_ (NPAR '07) and painterly-rendering / weighted-stippling work.
 
 RSTR began as a sketch for the [Genuary '24](https://genuary24.d17e.dev/?prompt=5) prompt _"In the style of Vera Molnár"_ and grew from there. Made by **David Vandenbogaerde** ([d17e.dev](https://www.d17e.dev)), a software engineer and artist in Amsterdam.
 
