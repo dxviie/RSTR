@@ -66,7 +66,13 @@
 		type OrderCheck,
 		type OrderQuote
 	} from '$lib/rstr2/order';
-	import { openOrderPopup, orderFormUrl } from '$lib/rstr2/orderForm';
+	import {
+		orderEmbedUrl,
+		orderFormSignal,
+		orderFormUrl,
+		ORDER_AUTOCLOSE_MS,
+		ORDER_EMBED_TIMEOUT_MS
+	} from '$lib/rstr2/orderForm';
 
 	//***************************************************************
 	// 														STATE
@@ -1089,17 +1095,27 @@
 	// 												ORDER A PLOT
 	//***************************************************************
 
-	// The order flow hands off to a Tally form in a popup. Everything stays in
-	// the browser until the customer deliberately submits; the only artifact
-	// that leaves is the exported SVG they attach — never the source image.
-	// Unsupported configurations (inks I don't stock, larger than A3) keep the
-	// button clickable and explain themselves in a dialog instead.
+	// The order flow hands off to a Tally form embedded in a studio-owned
+	// modal. Everything stays in the browser until the customer deliberately
+	// submits; the only artifact that leaves is the exported SVG they attach —
+	// never the source image. The embed is a plain tally.so iframe (no
+	// third-party script — Tally's widget loaded its popup from a /popup/ URL
+	// that adblock filter lists kill, stranding those visitors on a spinner);
+	// when even the iframe shows no sign of life, the dialog falls back to the
+	// same form as a plain link in a new tab. Unsupported configurations (inks
+	// I don't stock, larger than A3) keep the button clickable and explain
+	// themselves in a dialog instead.
 
-	let orderDialog: 'closed' | 'summary' | 'unsupported' = $state('closed');
+	let orderDialog: 'closed' | 'summary' | 'unsupported' | 'form' = $state('closed');
 	let orderCheck: OrderCheck | null = $state(null);
 	let orderQuote: OrderQuote | null = $state(null);
-	// set when the popup widget can't load — the dialog offers a plain link out
+	// the embedded form and its plain-link fallback, built together at confirm
+	let orderEmbedSrc = $state('');
 	let orderFallback = $state('');
+	let orderEmbedState: 'loading' | 'ready' | 'blocked' = $state('loading');
+	// the exact file name the order download used, echoed in the form modal
+	let orderFileName = $state('');
+	let orderTimer = 0;
 
 	const ORDER_FROM_EUR = PRICING.tiers.A6.base + PRICING.shippingEur;
 
@@ -1117,7 +1133,6 @@
 
 	const orderPlot = () => {
 		if (!hatchReady || status.busy || !imgWidth || !imgHeight) return;
-		orderFallback = '';
 		const check = checkOrder(params, layers, imgHeight / imgWidth);
 		orderCheck = check;
 		orderQuote = quoteOrder(check, plotEstimate?.seconds ?? 0);
@@ -1125,20 +1140,23 @@
 	};
 
 	const closeOrderDialog = () => {
+		window.clearTimeout(orderTimer);
 		orderDialog = 'closed';
+		orderEmbedSrc = '';
 		orderFallback = '';
 	};
 
 	// Download the exact file the customer will attach, fingerprint it, and
-	// hand over to the order form — popup when the widget loads (it is fetched
-	// only now, the studio itself ships no third-party scripts), plain link in
-	// a new tab otherwise.
+	// swap the dialog over to the embedded order form. When the embed shows no
+	// sign of life within the timeout — content blockers are the usual reason —
+	// the dialog offers the same form as a plain link instead.
 	const confirmOrder = async () => {
 		const check = orderCheck;
 		const quote = orderQuote;
 		const svg = buildSvgText();
 		if (!check || !quote || !svg) return;
-		downloadSvgText(svg);
+		orderFileName = exportName('', 'svg');
+		downloadBlob(new Blob([svg], { type: 'image/svg+xml' }), orderFileName);
 		const fields = orderHiddenFields(check, quote, {
 			plotSeconds: plotEstimate?.seconds ?? 0,
 			lineCount: status.lines,
@@ -1146,10 +1164,27 @@
 			presetName: selectedPreset,
 			designHash: await designFingerprint(svg)
 		});
-		if (await openOrderPopup(fields)) {
-			closeOrderDialog();
-		} else {
-			orderFallback = orderFormUrl(fields);
+		orderEmbedSrc = orderEmbedUrl(fields);
+		orderFallback = orderFormUrl(fields);
+		orderEmbedState = 'loading';
+		orderDialog = 'form';
+		window.clearTimeout(orderTimer);
+		orderTimer = window.setTimeout(() => {
+			if (orderEmbedState === 'loading') orderEmbedState = 'blocked';
+		}, ORDER_EMBED_TIMEOUT_MS);
+	};
+
+	// Sign-of-life watcher for the embedded form. The iframe stays mounted
+	// behind the blocked fallback, so a slow form still flips the dialog back
+	// the moment it reports in.
+	const onOrderMessage = (event: MessageEvent) => {
+		if (orderDialog !== 'form') return;
+		const signal = orderFormSignal(event.origin, event.data);
+		if (!signal) return;
+		orderEmbedState = 'ready';
+		if (signal === 'submitted') {
+			window.clearTimeout(orderTimer);
+			orderTimer = window.setTimeout(closeOrderDialog, ORDER_AUTOCLOSE_MS);
 		}
 	};
 
@@ -2494,7 +2529,13 @@
 
 	{#if orderDialog !== 'closed' && orderCheck}
 		<div class="order-overlay">
-			<div class="order-dialog" role="dialog" aria-modal="true" aria-label="order this plot">
+			<div
+				class="order-dialog"
+				class:order-dialog-form={orderDialog === 'form'}
+				role="dialog"
+				aria-modal="true"
+				aria-label="order this plot"
+			>
 				{#if orderDialog === 'summary' && orderQuote}
 					<div class="order-title">order this plot</div>
 					<div class="order-rows">
@@ -2535,10 +2576,25 @@
 						ordering sends only the plot file (.svg) — the lines to draw — never your image. the
 						file downloads to your device now; attach it in the order form.
 					</p>
-					{#if orderFallback}
+					<div class="order-actions">
+						<button onclick={closeOrderDialog}>not now</button>
+						<button class="order-confirm" onclick={confirmOrder}>⚡ download & order</button>
+					</div>
+				{:else if orderDialog === 'form'}
+					<div class="order-form-head">
+						<div class="order-title">order this plot</div>
+						<button class="order-close" onclick={closeOrderDialog} aria-label="close the order form"
+							>✕</button
+						>
+					</div>
+					<p class="order-note">
+						your plot file <b>{orderFileName}</b> just downloaded — attach it where the form asks for
+						your .svg.
+					</p>
+					{#if orderEmbedState === 'blocked'}
 						<p class="order-note">
-							the order popup couldn't load here — no worries, this link opens the same form with
-							your design details:
+							the form isn't loading in here — usually a strict ad/content blocker being careful. no
+							worries: the same form with your design details works in its own tab —
 							<a class="order-link" href={orderFallback} target="_blank" rel="noreferrer"
 								>open the order form ↗</a
 							>
@@ -2546,11 +2602,28 @@
 						<div class="order-actions">
 							<button onclick={closeOrderDialog}>close</button>
 						</div>
-					{:else}
-						<div class="order-actions">
-							<button onclick={closeOrderDialog}>not now</button>
-							<button class="order-confirm" onclick={confirmOrder}>⚡ download & order</button>
-						</div>
+					{/if}
+					<div class="order-frame" class:blocked={orderEmbedState === 'blocked'}>
+						{#if orderEmbedState === 'loading'}
+							<div class="order-frame-loading">
+								<div class="busy-dot"></div>
+								loading the order form…
+							</div>
+						{/if}
+						<iframe
+							class="order-iframe"
+							src={orderEmbedSrc}
+							title="RSTR order form"
+							allow="fullscreen"
+						></iframe>
+					</div>
+					{#if orderEmbedState !== 'blocked'}
+						<p class="order-note">
+							form stuck?
+							<a class="order-link" href={orderFallback} target="_blank" rel="noreferrer"
+								>open it in a new tab ↗</a
+							>
+						</p>
 					{/if}
 				{:else}
 					<div class="order-title">can't plot this one (yet)</div>
@@ -2598,6 +2671,7 @@
 	onkeydown={(event) => {
 		if (event.key === 'Escape' && orderDialog !== 'closed') closeOrderDialog();
 	}}
+	onmessage={onOrderMessage}
 />
 
 <style>
@@ -3500,6 +3574,65 @@
 	.order-actions .order-confirm:hover:not(:disabled) {
 		background: var(--ink-soft) !important;
 		color: #fff;
+	}
+
+	/* the embedded-form step is a taller card built around the iframe */
+	.order-dialog-form {
+		width: min(480px, 100%);
+	}
+
+	.order-form-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem;
+	}
+
+	.order-close {
+		padding: 0.15rem 0.5rem;
+		border: 1px solid var(--border);
+		background: #fff;
+		border-radius: 8px;
+		cursor: pointer;
+		color: var(--ink);
+	}
+
+	.order-close:hover {
+		border-color: var(--ink);
+	}
+
+	.order-frame {
+		position: relative;
+		height: clamp(340px, 64dvh, 620px);
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		overflow: hidden;
+		background: #fff;
+	}
+
+	/* kept mounted (display:none still loads) so a late form can revive it */
+	.order-frame.blocked {
+		display: none;
+	}
+
+	.order-frame-loading {
+		position: absolute;
+		inset: 0;
+		z-index: 1;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.5rem;
+		font-size: 0.75rem;
+		color: var(--muted);
+		background: #fff;
+	}
+
+	.order-iframe {
+		display: block;
+		width: 100%;
+		height: 100%;
+		border: 0;
 	}
 
 	/* details readout below the export buttons */
