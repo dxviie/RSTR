@@ -1,80 +1,61 @@
-// Tally order-form wiring: lazy widget loading and the popup handoff.
+// Tally order-form wiring: embed URL construction and the postMessage protocol.
 //
-// The studio page ships no third-party scripts. Tally's widget is fetched the
-// moment someone actually orders — and if it can't load (offline, blocked),
-// the caller falls back to the plain form URL in a new tab.
+// The studio used to hand off to Tally's widget script, but the widget loads
+// its popup from a `tally.so/popup/…` URL — a path adblock filter lists block
+// on sight, which left blocked visitors staring at an endless spinner. So no
+// third-party script at all anymore: the studio renders its own modal around
+// a plain iframe on the standard `/embed/` path and drives the spinner, the
+// auto-close and the blocked fallback off the messages the embedded form
+// posts to its parent window (the same events the widget listened for).
 
-/** The RSTR order form (kept as a draft on Tally while in development). */
+/** The RSTR order form on Tally. */
 export const ORDER_FORM_ID = 'NpQY5G';
 
-const TALLY_WIDGET_SRC = 'https://tally.so/widgets/embed.js';
+/** Only messages from this origin count as signals from the embedded form. */
+export const TALLY_ORIGIN = 'https://tally.so';
 
-interface TallyPopupOptions {
-	layout?: 'default' | 'modal';
-	width?: number;
-	overlay?: boolean;
-	autoClose?: number;
-	hiddenFields?: Record<string, string>;
-	onClose?: () => void;
-	onSubmit?: (payload: unknown) => void;
-}
+/** How long the embed gets to show a sign of life before the fallback shows. */
+export const ORDER_EMBED_TIMEOUT_MS = 8000;
 
-interface TallyWidget {
-	openPopup(formId: string, options?: TallyPopupOptions): void;
-	closePopup(formId: string): void;
-}
-
-declare global {
-	interface Window {
-		Tally?: TallyWidget;
-	}
-}
-
-let widgetPromise: Promise<TallyWidget | null> | null = null;
-
-const loadWidget = (): Promise<TallyWidget | null> => {
-	if (typeof window === 'undefined') return Promise.resolve(null);
-	if (window.Tally) return Promise.resolve(window.Tally);
-	widgetPromise ??= new Promise((resolve) => {
-		const script = document.createElement('script');
-		script.src = TALLY_WIDGET_SRC;
-		script.async = true;
-		script.onload = () => resolve(window.Tally ?? null);
-		script.onerror = () => {
-			// leave the promise unset so a later attempt retries the load
-			widgetPromise = null;
-			script.remove();
-			resolve(null);
-		};
-		document.head.appendChild(script);
-	});
-	return widgetPromise;
-};
+/** How long the thank-you page stays up after submission before auto-close. */
+export const ORDER_AUTOCLOSE_MS = 5000;
 
 /** The plain form URL with the payload as query params — new-tab fallback. */
 export const orderFormUrl = (hiddenFields: Record<string, string>): string => {
 	const query = new URLSearchParams(hiddenFields).toString();
-	return `https://tally.so/r/${ORDER_FORM_ID}${query ? `?${query}` : ''}`;
+	return `${TALLY_ORIGIN}/r/${ORDER_FORM_ID}${query ? `?${query}` : ''}`;
 };
 
 /**
- * Open the order form as a Tally popup over the studio. Resolves false when
- * the widget can't load — the caller should offer orderFormUrl instead.
+ * The iframe src for the in-studio order modal: the standard embed path with
+ * the payload as query params. alignLeft keeps the form flush in the modal
+ * card, matching how the old widget popup rendered it.
  */
-export const openOrderPopup = async (
-	hiddenFields: Record<string, string>,
-	onClose?: () => void
-): Promise<boolean> => {
-	const tally = await loadWidget();
-	if (!tally) return false;
-	tally.openPopup(ORDER_FORM_ID, {
-		layout: 'modal',
-		width: 480,
-		overlay: true,
-		// give the thank-you page a beat, then tidy up after submission
-		autoClose: 5000,
-		hiddenFields,
-		onClose
-	});
-	return true;
+export const orderEmbedUrl = (hiddenFields: Record<string, string>): string => {
+	const query = new URLSearchParams({ alignLeft: '1', ...hiddenFields });
+	return `${TALLY_ORIGIN}/embed/${ORDER_FORM_ID}?${query.toString()}`;
+};
+
+/** What a window message means for the order modal. */
+export type OrderFormSignal = 'alive' | 'submitted';
+
+/**
+ * Classify a window message arriving while the order modal is open. Only
+ * frames served from tally.so can post with that origin, so any such message
+ * proves the embed is up — height reports and page views count as much as the
+ * official Tally.FormLoaded. A Tally.FormSubmitted for this form becomes
+ * 'submitted' so the modal can auto-close after the thank-you page.
+ */
+export const orderFormSignal = (origin: string, data: unknown): OrderFormSignal | null => {
+	if (origin !== TALLY_ORIGIN) return null;
+	if (typeof data === 'string') {
+		try {
+			const message = JSON.parse(data) as { event?: unknown; payload?: { formId?: unknown } };
+			if (message?.event === 'Tally.FormSubmitted' && message.payload?.formId === ORDER_FORM_ID)
+				return 'submitted';
+		} catch {
+			// not JSON — an iframe-resizer heartbeat, still proof of life
+		}
+	}
+	return 'alive';
 };
