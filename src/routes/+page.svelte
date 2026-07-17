@@ -327,23 +327,6 @@
 			</figure>
 		</section>
 
-		<!-- how it works -->
-		<section class="steps-section" id="how">
-			<h2>how it works</h2>
-			<ol class="steps">
-				{#each STEPS as step, index (step.title)}
-					<li>
-						<div class="step-head">
-							<span class="step-number">{index + 1}</span>
-							<h3>{step.title}</h3>
-						</div>
-						<p>{step.text}</p>
-					</li>
-				{/each}
-			</ol>
-			<p>Don't own a plotter? No problem! I can plot your design for you.</p>
-		</section>
-
 		<!-- ownership + open source -->
 		<section class="yours">
 			<div class="hatch-strip" aria-hidden="true">
@@ -360,6 +343,30 @@
 				<a href="https://github.com/dxviie/RSTR" target="_blank" rel="noopener">GitHub</a>, licensed
 				under the GPL.
 			</p>
+		</section>
+
+		<!-- how it works -->
+		<section class="steps-section" id="how">
+			<h2>how it works</h2>
+			<ol class="steps">
+				{#each STEPS as step, index (step.title)}
+					<li>
+						<div class="step-head">
+							<span class="step-number">{index + 1}</span>
+							<h3>{step.title}</h3>
+						</div>
+						<p>{step.text}</p>
+					</li>
+				{/each}
+			</ol>
+			<div class="plot-service">
+				<h3>don't own a plotter?</h3>
+				<p>
+					No problem — I can plot yours for you. Make something in the studio, then hit
+					<strong>⚡ order this plot</strong> to have it drawn with real pens on real paper and shipped
+					to your door.
+				</p>
+			</div>
 		</section>
 
 		<!-- #madewithrstr -->
@@ -859,6 +866,31 @@
 		font-size: 0.9rem;
 		color: var(--ink-soft);
 		margin: 0;
+	}
+
+	.plot-service {
+		max-width: 50rem;
+		justify-self: center;
+		margin-top: 2rem;
+		border: 1px dashed var(--muted);
+		border-radius: 8px;
+		padding: 1.5rem;
+		background: #fff;
+	}
+
+	.plot-service h3 {
+		font-size: 1rem;
+		margin-bottom: 0.5rem;
+	}
+
+	.plot-service p {
+		margin: 0;
+		color: var(--ink-soft);
+	}
+
+	.plot-service strong {
+		font-family: 'mono-bold', monospace;
+		font-size: 0.9em;
 	}
 
 	/* ------------------------------------------------- yours (ownership) */
