@@ -207,7 +207,7 @@
 
 	const USPS = [
 		'free & open source',
-		'nothing leaves your device',
+		'your photos never leave your device',
 		'everything you make is yours to keep'
 	];
 
@@ -250,7 +250,7 @@
 				</div>
 				<h1>turn your best memories into plotter art</h1>
 				<p class="lede">
-					RSTR redraws any picture as hatched line art.<br/>
+					RSTR redraws any picture as hatched line art.<br />
 					Made in your browser, ready to print, share, or hand to a pen plotter.
 				</p>
 				<ul class="usp-list">
@@ -296,11 +296,13 @@
 			<div class="split-copy">
 				<h2>what's a plotter?</h2>
 				<p>
-				    A pen plotter is a machine that draws by moving a real pen across paper along vector paths.
-					It can't color in shapes the way software does. If you want a colored square,
-					you have to draw a bunch of lines neatly next to each other — or with some spacing in
-					between to create different shades. That technique is called
-					<a href="https://en.wikipedia.org/wiki/Hatching" target="_blank" rel="noopener"><em>hatching</em></a>, and it's probably as old as drawing itself.
+					A pen plotter is a machine that draws by moving a real pen across paper along vector
+					paths. It can't color in shapes the way software does. If you want a colored square, you
+					have to draw a bunch of lines neatly next to each other — or with some spacing in between
+					to create different shades. That technique is called
+					<a href="https://en.wikipedia.org/wiki/Hatching" target="_blank" rel="noopener"
+						><em>hatching</em></a
+					>, and it's probably as old as drawing itself.
 				</p>
 				<p>
 					RSTR reimagines hatching for pen plotters: it splits your image into regions of similar
@@ -339,12 +341,8 @@
 					</li>
 				{/each}
 			</ol>
-			<p>
-			Don't own a plotter? No problem! I can plot your design for you.
-			</p>
+			<p>Don't own a plotter? No problem! I can plot your design for you.</p>
 		</section>
-
-
 
 		<!-- ownership + open source -->
 		<section class="yours">
@@ -353,12 +351,14 @@
 			</div>
 			<h2>everything you make is yours</h2>
 			<p>
-				Whatever you create with RSTR belongs to you: personal projects, gifts, client work, prints or plots
-				you sell. Commercial use included, no strings attached. All processing happens in your browser.
+				Whatever you create with RSTR belongs to you: personal projects, gifts, client work, prints
+				or plots you sell. Commercial use included, no strings attached. All processing happens in
+				your browser.
 			</p>
 			<p>
 				The tool itself is in the open, too: the source code is on
-				<a href="https://github.com/dxviie/RSTR" target="_blank" rel="noopener">GitHub</a>, licensed under the GPL.
+				<a href="https://github.com/dxviie/RSTR" target="_blank" rel="noopener">GitHub</a>, licensed
+				under the GPL.
 			</p>
 		</section>
 
@@ -428,8 +428,9 @@
 					href="https://www.d17e.dev"
 					target="_blank"
 					rel="noopener">d17e</a
-				> for short), a software engineer and artist living in Amsterdam 🇳🇱.
-				Ever since I owned a plotter, I've been experimenting with novel ways to turn images into plotter art.<br />
+				>
+				for short), a software engineer and artist living in Amsterdam 🇳🇱. Ever since I owned a plotter,
+				I've been experimenting with novel ways to turn images into plotter art.<br />
 				Which is why RSTR exists. I hope you like it.
 			</p>
 			<div class="cta-row center">
@@ -439,7 +440,7 @@
 	</main>
 
 	<footer class="footer">
-		<BrandFooter/>
+		<BrandFooter />
 	</footer>
 </div>
 
