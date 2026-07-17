@@ -1,10 +1,11 @@
 // Silent order-file upload: the studio sends the exported SVG to the plot
 // queue (a Cloudflare Worker in front of an R2 bucket, see
-// workers/order-upload) right before the order form opens, so the customer
-// doesn't have to re-attach the file they just downloaded. Best-effort by
-// design: when the upload can't complete (endpoint down, blocked, slow
-// network) the order form simply keeps its manual attach step — the `upload`
-// hidden field tells the form which face to show.
+// workers/order-upload) right before the order form opens. This is the
+// primary way the file reaches me — no download step involved. Best-effort
+// by design: when the upload can't complete (endpoint down, blocked, slow
+// network) the studio downloads the file instead and the order form keeps
+// its manual attach step — the `upload` hidden field tells it which face to
+// show.
 
 /** The upload Worker. Deployed from workers/order-upload in this repo. */
 export const ORDER_UPLOAD_ENDPOINT = 'https://rstr-order-upload.david-cloudflare-862.workers.dev';
