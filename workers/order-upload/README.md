@@ -1,8 +1,9 @@
 # order-upload worker
 
-Receives the plot `.svg` the studio exports when someone clicks
-**⚡ download & order**, and stores it in the `rstr-order-files` R2 bucket as
-`orders/<design-hash>.svg`. The Tally order submission carries the same hash
+Receives the plot `.svg` the studio exports when someone confirms an order,
+and stores it in the `rstr-order-files` R2 bucket as
+`orders/<design-hash>.svg`. This is the primary channel — the file only
+downloads to the customer's device when this upload fails. The Tally order submission carries the same hash
 in its `design` hidden field, and its `upload` field says `ok` when the file
 arrived this way — submissions without it fall back to the form's manual
 attach step, so a broken or unreachable worker can never block an order.
