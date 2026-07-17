@@ -54,6 +54,7 @@
 	} from '$lib/rstr2/video';
 	import { buildZip, type ZipEntry } from '$lib/rstr2/zip';
 	import { buildExportName } from '$lib/rstr2/exportName';
+	import { PAGES, pageDims, type PageId } from '$lib/prep/pages';
 
 	//***************************************************************
 	// 														STATE
@@ -953,6 +954,30 @@
 	// priority while one is loaded, otherwise the image.
 	const exportName = (suffix: string, ext: string): string =>
 		buildExportName(videoName || inputName, suffix, ext, stamp());
+
+	// paper sizes offered by the "fit on page" buttons (subset of the shared
+	// PAGES table, smallest → largest)
+	const FIT_PAGES: PageId[] = ['A6', 'A5', 'A4', 'A3'];
+
+	// Set outputWidthMm so the art fits within the chosen paper size, leaving the
+	// configured margin clear on every edge. The page is turned to match the art:
+	// wider-than-tall art gets a landscape page, taller art a portrait page, and
+	// anything square-ish (within ~5%) defaults to portrait.
+	const fitToPage = (pageId: PageId) => {
+		if (!imgWidth || !imgHeight) return;
+		const artAspect = imgWidth / imgHeight; // >1 = landscape art
+		const orient = artAspect > 1.05 ? 'landscape' : 'portrait';
+		const [pageW, pageH] = pageDims(pageId, orient);
+		const margin = Math.max(0, params.fitMarginMm);
+		const availW = Math.max(0, pageW - 2 * margin);
+		const availH = Math.max(0, pageH - 2 * margin);
+		// art width is the free variable; its height is availW-derived via the
+		// aspect, so cap the width by whichever page edge binds first
+		const width = Math.min(availW, availH * artAspect);
+		if (width <= 0) return;
+		params.outputWidthMm = Math.round(width * 10) / 10;
+		markSettingsEdited();
+	};
 
 	const downloadSvg = () => {
 		if (!imgWidth) return;
@@ -2107,6 +2132,31 @@
 					<input type="range" min="10" max="1000" step="1" bind:value={params.outputWidthMm} />
 					<input type="number" min="10" max="1000" step="1" bind:value={params.outputWidthMm} />
 				</label>
+				<div
+					class="fit-title"
+					title="set the width so the art fits on a standard paper size within the margin below — the page turns to match the art's orientation"
+				>
+					fit on page
+				</div>
+				<div class="fit-pages">
+					{#each FIT_PAGES as pageId (pageId)}
+						<button
+							onclick={() => fitToPage(pageId)}
+							disabled={!imgWidth || !imgHeight}
+							title={`size the art to fit ${pageId} with a ${params.fitMarginMm}mm margin`}
+						>
+							{pageId}
+						</button>
+					{/each}
+				</div>
+				<label
+					class="slider-row"
+					title="margin kept clear on every edge of the page when fitting the art to a paper size"
+				>
+					<span>margin (mm)</span>
+					<input type="range" min="0" max="50" step="1" bind:value={params.fitMarginMm} />
+					<input type="number" min="0" max="50" step="1" bind:value={params.fitMarginMm} />
+				</label>
 				<div class="export-actions">
 					<button
 						class="primary-btn"
@@ -3036,6 +3086,35 @@
 	.export-actions {
 		display: flex;
 		gap: 0.4rem;
+	}
+
+	.fit-title {
+		font-size: 0.68rem;
+		color: var(--muted);
+	}
+
+	.fit-pages {
+		display: flex;
+		gap: 0.4rem;
+	}
+
+	.fit-pages button {
+		flex: 1;
+		padding: 0.3rem;
+		border: 1px solid var(--border);
+		background: #fff;
+		border-radius: 4px;
+		cursor: pointer;
+		color: var(--ink);
+	}
+
+	.fit-pages button:hover:not(:disabled) {
+		border-color: var(--ink);
+	}
+
+	.fit-pages button:disabled {
+		opacity: 0.35;
+		cursor: default;
 	}
 
 	.primary-btn {

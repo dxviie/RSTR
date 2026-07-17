@@ -68,6 +68,7 @@ export const settingsComment = (settings: Rstr2Settings): string => {
 	lines.push('');
 	lines.push('  export');
 	line('output width', mm(params.outputWidthMm));
+	line('fit margin', mm(params.fitMarginMm));
 	layers.forEach((layer, index) => {
 		lines.push('');
 		lines.push(`  layer ${index + 1}: ${layer.name}${layer.enabled ? '' : ' (disabled)'}`);
