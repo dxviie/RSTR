@@ -14,18 +14,18 @@ RSTR splits a picture into regions of similar tone and refills each one with par
 
 ![The RSTR studio, its sections outlined and numbered](static/help/studio-sections.webp)
 
-| # | Section | What it does |
-|---|---------|--------------|
-| 1 | **image** | Load a picture or video and tune it (brightness, contrast, gamma, saturation, vibrance) before tracing. |
-| 2 | **video** | Frame rate and export window — shown while a video is loaded. |
-| 3 | **segmentation** | How the image is carved into tonal regions (watershed, posterize, k-means, SLIC). |
-| 4 | **lines** | Pen width and how ink intensity turns into line spacing. |
-| 5 | **presets** | Randomize everything, or save and share complete looks as JSON. |
-| 6 | **layers** | One pen per layer: color, image channel, hatch angles, per-layer overrides. |
-| 7 | **export** | Output width (or fit-to-page A6–A3 with a margin) and the SVG / PNG / frame-sequence downloads. |
-| 8 | **stats** | Render numbers and the estimated plot time. |
+| #   | Section          | What it does                                                                                            |
+| --- | ---------------- | ------------------------------------------------------------------------------------------------------- |
+| 1   | **image**        | Load a picture or video and tune it (brightness, contrast, gamma, saturation, vibrance) before tracing. |
+| 2   | **video**        | Frame rate and export window — shown while a video is loaded.                                           |
+| 3   | **segmentation** | How the image is carved into tonal regions (watershed, posterize, k-means, SLIC).                       |
+| 4   | **lines**        | Pen width and how ink intensity turns into line spacing.                                                |
+| 5   | **presets**      | Randomize everything, or save and share complete looks as JSON.                                         |
+| 6   | **layers**       | One pen per layer: color, image channel, hatch angles, per-layer overrides.                             |
+| 7   | **export**       | Output width (or fit-to-page A6–A3 with a margin) and the SVG / PNG / frame-sequence downloads.         |
+| 8   | **stats**        | Render numbers and the estimated plot time.                                                             |
 
-> This README covers **how RSTR is built**. For what each setting *does*, see the [help page](https://rstr.d17e.dev/help) (`src/routes/(site)/help/+page.svelte`) — it mirrors the in-app tooltips.
+> This README covers **how RSTR is built**. For what each setting _does_, see the [help page](https://rstr.d17e.dev/help) (`src/routes/(site)/help/+page.svelte`) — it mirrors the in-app tooltips.
 
 ---
 
@@ -62,20 +62,20 @@ Each stage is wired to Svelte 5 runes as an independent `$effect` with its own d
 
 The engine (`src/lib/rstr2/`) is pure TypeScript with no framework imports, so it's fully unit-testable in isolation:
 
-| File | Responsibility |
-|------|----------------|
-| `grid.ts` | Downsample the source image to the working cell grid. |
-| `imageAdjust.ts` | Brightness / contrast / gamma / saturation / vibrance. |
-| `segmentation.ts` | Watershed / posterize / k-means / SLIC + shared post-processing. |
-| `regionTools.ts` | Region contour tracing (with holes). |
-| `hatchTools.ts` | Hatch-line generation and the ink→spacing curves. |
-| `layers.ts` | Layer model (channel + pen mapping), defaults, persistence. |
-| `params.ts` | Global parameter defaults and localStorage persistence. |
-| `inkColors.ts` | Curated real-ink palette and color harmonies for the dice. |
-| `randomize.ts` | The one-click randomize roll. |
-| `presets.ts` | Built-in and user presets, JSON import/export. |
-| `plotTime.ts` | saxi-compatible plot-time estimation. |
-| `svgExport.ts` | Standalone SVG document assembly (one group per pen). |
+| File                  | Responsibility                                                                               |
+| --------------------- | -------------------------------------------------------------------------------------------- |
+| `grid.ts`             | Downsample the source image to the working cell grid.                                        |
+| `imageAdjust.ts`      | Brightness / contrast / gamma / saturation / vibrance.                                       |
+| `segmentation.ts`     | Watershed / posterize / k-means / SLIC + shared post-processing.                             |
+| `regionTools.ts`      | Region contour tracing (with holes).                                                         |
+| `hatchTools.ts`       | Hatch-line generation and the ink→spacing curves.                                            |
+| `layers.ts`           | Layer model (channel + pen mapping), defaults, persistence.                                  |
+| `params.ts`           | Global parameter defaults and localStorage persistence.                                      |
+| `inkColors.ts`        | Curated real-ink palette and color harmonies for the dice.                                   |
+| `randomize.ts`        | The one-click randomize roll.                                                                |
+| `presets.ts`          | Built-in and user presets, JSON import/export.                                               |
+| `plotTime.ts`         | saxi-compatible plot-time estimation.                                                        |
+| `svgExport.ts`        | Standalone SVG document assembly (one group per pen).                                        |
 | `video.ts` · `zip.ts` | Video-frame sampling math and a dependency-free stored-ZIP writer for frame-sequence export. |
 
 Most of these are backed by `*.test.ts` unit tests in the same folder.
@@ -89,14 +89,14 @@ Other notable areas:
 
 ### Routes
 
-| Route | Purpose |
-|-------|---------|
-| `/` | Landing page. |
-| `/studio` | The main studio — the `rstr2` engine (client-rendered only; state lives in localStorage). |
-| `/prep` | Plot prep tool. |
-| `/classic` | The original Paper.js RSTR. |
-| `/help` | Full settings & feature reference. |
-| `/about`, `/landing`, `/v2` | Redirects (`/about`→`/help`, `/landing`→`/`, `/v2`→`/studio`) so old links keep working. |
+| Route                       | Purpose                                                                                   |
+| --------------------------- | ----------------------------------------------------------------------------------------- |
+| `/`                         | Landing page.                                                                             |
+| `/studio`                   | The main studio — the `rstr2` engine (client-rendered only; state lives in localStorage). |
+| `/prep`                     | Plot prep tool.                                                                           |
+| `/classic`                  | The original Paper.js RSTR.                                                               |
+| `/help`                     | Full settings & feature reference.                                                        |
+| `/about`, `/landing`, `/v2` | Redirects (`/about`→`/help`, `/landing`→`/`, `/v2`→`/studio`) so old links keep working.  |
 
 ---
 
@@ -131,16 +131,16 @@ npm run preview
 
 ### Scripts
 
-| Command | Does |
-|---------|------|
-| `npm run dev` | Start the Vite dev server. |
-| `npm run build` | Production build. |
-| `npm run preview` | Preview the production build locally. |
-| `npm test` | Run the unit tests once (Vitest). |
-| `npm run test:unit` | Run Vitest in watch mode. |
-| `npm run check` | Type-check with `svelte-check`. |
-| `npm run lint` | Prettier check + ESLint. |
-| `npm run format` | Format with Prettier. |
+| Command             | Does                                  |
+| ------------------- | ------------------------------------- |
+| `npm run dev`       | Start the Vite dev server.            |
+| `npm run build`     | Production build.                     |
+| `npm run preview`   | Preview the production build locally. |
+| `npm test`          | Run the unit tests once (Vitest).     |
+| `npm run test:unit` | Run Vitest in watch mode.             |
+| `npm run check`     | Type-check with `svelte-check`.       |
+| `npm run lint`      | Prettier check + ESLint.              |
+| `npm run format`    | Format with Prettier.                 |
 
 ---
 
@@ -153,12 +153,12 @@ RSTR stands on a lot of other people's work:
 - The **[AxiDraw](https://shop.evilmadscientist.com/908)** by Evil Mad Scientist / Bantam Tools — the pen plotter RSTR targets.
 - **Fountain- and drawing-ink makers** whose real colors seed the randomizer's palette: [De Atramentis](https://www.de-atramentis.com/en/Artist-ink-/), [Octopus Fluids](https://www.octopus-fluids.de/en/write-draw-inks), [Rohrer & Klingner](https://www.rohrer-klingner.de/en/en_home/) and [Diamine](https://www.diamineinks.co.uk/collections/diamine-50ml-forever-ink).
 - **[IBM Plex Mono](https://www.ibm.com/plex/) and IBM Plex Serif** ([SIL Open Font License 1.1](https://openfontlicense.org)) — the interface typefaces.
-- Reference reading that informed the approach lives in `_docs/` (including Kang et al.'s *Coherent Line Drawing* and painterly-rendering / weighted-stippling work).
+- Reference reading that informed the approach lives in `_docs/` (including Kang et al.'s _Coherent Line Drawing_ and painterly-rendering / weighted-stippling work).
 
-RSTR began as a sketch for the [Genuary '24](https://genuary24.d17e.dev/?prompt=5) prompt *"In the style of Vera Molnár"* and grew from there. Made by **David Vandenbogaerde** ([d17e.dev](https://www.d17e.dev)), a software engineer and artist in Amsterdam.
+RSTR began as a sketch for the [Genuary '24](https://genuary24.d17e.dev/?prompt=5) prompt _"In the style of Vera Molnár"_ and grew from there. Made by **David Vandenbogaerde** ([d17e.dev](https://www.d17e.dev)), a software engineer and artist in Amsterdam.
 
 ---
 
 ## License
 
-RSTR is released under the **[GNU General Public License v3.0](license.txt)**. You're free to use, study, share and modify it; derivative works must stay under the GPL. Anything you *create* with RSTR is entirely yours — including commercial use.
+RSTR is released under the **[GNU General Public License v3.0](license.txt)**. You're free to use, study, share and modify it; derivative works must stay under the GPL. Anything you _create_ with RSTR is entirely yours — including commercial use.

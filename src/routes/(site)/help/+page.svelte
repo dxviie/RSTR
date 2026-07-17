@@ -218,11 +218,21 @@
 				sheet, taller art a portrait one, and anything square-ish defaults to portrait.
 			</dd>
 			<dt>margin (mm)</dt>
-			<dd>The border kept clear on every edge of the sheet when fitting to a page. Defaults to 10mm.</dd>
+			<dd>
+				The border kept clear on every edge of the sheet when fitting to a page. Defaults to 10mm.
+			</dd>
 			<dt>↓ SVG</dt>
 			<dd>A plottable SVG with one layer group per pen, ready for plotter software.</dd>
 			<dt>↓ PNG</dt>
 			<dd>The current render as an image — for screens, sharing and regular printing.</dd>
+			<dt>⚡ order this plot</dt>
+			<dd>
+				No plotter? I'll plot it for you — real pens on paper, shipped flat-packed with tracking,
+				shipping included in the price. Orders are limited to the inks in the built-in presets and
+				sizes up to A3; the order dialog tells you if a design needs adjusting. Only the exported
+				SVG — the lines to draw — is sent with your order, never your image, and it's used solely to
+				produce your plot.
+			</dd>
 		</dl>
 	</section>
 
@@ -315,7 +325,11 @@
 		<h2>good to know</h2>
 		<dl>
 			<dt>private by design</dt>
-			<dd>Images, videos and settings never leave your device.</dd>
+			<dd>
+				Images, videos and settings never leave your device. The one deliberate exception: ordering
+				a plot sends the exported SVG — the drawn lines, never your image — along with your order,
+				and it's used solely to produce that plot.
+			</dd>
 			<dt>works offline</dt>
 			<dd>RSTR is an installable web app — once visited, it keeps working without a connection.</dd>
 			<dt>settings persistence</dt>

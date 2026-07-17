@@ -580,7 +580,7 @@ describe('settingsComment', () => {
 			expect(comment).toContain(label);
 		}
 		expect(comment).toContain('slic');
-		expect(comment).toContain('layer 1: Cyan');
+		expect(comment).toContain('layer 1: Octopus Blue Sloth');
 		expect(comment).toContain('Cyan (1-R)');
 		expect(comment).toContain('#00BFE8');
 		expect(comment).toContain('15 to 105 deg');
@@ -592,7 +592,7 @@ describe('settingsComment', () => {
 		layers[1].penWidthMm = 0.8;
 		const comment = settingsComment({ params: defaultParams(), layers });
 		expect(comment).not.toContain('superpixel size');
-		expect(comment).toContain('layer 2: Magenta (disabled)');
+		expect(comment).toContain('layer 2: De Atramentis Magenta (disabled)');
 		expect(comment).toContain('0.8 mm');
 		// inherited overrides stay silent
 		expect(comment).not.toContain('spacing min');
