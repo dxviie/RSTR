@@ -141,21 +141,21 @@ export const checkOrder = (
 export const PRICING = {
 	/** per-tier base (first pen + included plot time) and total cap */
 	tiers: {
-		A6: { base: 19, cap: 49 },
-		A5: { base: 29, cap: 69 },
-		A4: { base: 49, cap: 109 },
-		A3: { base: 79, cap: 169 }
+		A6: { base: 20, cap: 55 },
+		A5: { base: 30, cap: 75 },
+		A4: { base: 50, cap: 125 },
+		A3: { base: 80, cap: 250 }
 	} as Record<OrderTier, { base: number; cap: number }>,
 	/** every pen after the first: swap, registration, cleaning */
-	extraPenEur: 4,
+	extraPenEur: 10,
 	/** plot minutes covered by the base price */
-	includedPlotMin: 30,
+	includedPlotMin: 60,
 	/** per minute beyond the included window */
-	plotMinEur: 0.25,
+	plotMinEur: .5,
 	/** the time component stops growing here */
-	plotTimeFeeCapEur: 40,
+	plotTimeFeeCapEur: 150,
 	/** flat-pack tracked shipping, folded into the advertised total */
-	shippingEur: 9
+	shippingEur: 15
 } as const;
 
 export interface OrderQuote {
