@@ -1,20 +1,33 @@
 // The origin gate is the part of the worker that fails in the wild —
 // bumped vite ports, LAN dev via `npm run dev-host`, lookalike domains —
 // so the tests enumerate its edge: every shape of legitimate studio
-// origin, and the near-misses that must stay outside.
+// origin, and the near-misses that must stay outside. The upload gates
+// (content address, size, rate limits) are covered below with the studio's
+// own client behavior in mind: every rejection must stay CORS-readable so
+// the studio can fall back to the manual attach step.
 import { describe, expect, it } from 'vitest';
 import worker from './index.js';
 
 const WORKER_URL = 'https://rstr-order-upload.test.workers.dev';
 const SVG = '<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"></svg>';
-const HASH = '90bec2899cee';
+
+// the studio keys uploads by the first 12 hex chars of the body's SHA-256 —
+// derive the fixture's key the same way instead of hardcoding a stale hash
+const designHashOf = async (text) => {
+	const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+	return [...new Uint8Array(digest)]
+		.map((byte) => byte.toString(16).padStart(2, '0'))
+		.join('')
+		.slice(0, 12);
+};
+const HASH = await designHashOf(SVG);
 
 const bucketStub = () => {
 	const puts = [];
 	return { puts, put: async (key, value, opts) => void puts.push({ key, value, opts }) };
 };
 
-const putRequest = (origin, { path = `/orders/${HASH}`, body = SVG } = {}) =>
+const putRequest = (origin, { path = `/orders/${HASH}`, body = SVG, headers = {} } = {}) =>
 	new Request(`${WORKER_URL}${path}`, {
 		method: 'PUT',
 		body,
@@ -22,7 +35,11 @@ const putRequest = (origin, { path = `/orders/${HASH}`, body = SVG } = {}) =>
 		headers: {
 			...(origin ? { origin } : {}),
 			'content-type': 'image/svg+xml',
-			'x-rstr-name': 'rstr-plot.svg'
+			// undici does not surface an implicit content-length on the server
+			// side the way the Workers runtime does — declare it like a browser
+			'content-length': String(new TextEncoder().encode(body).byteLength),
+			'x-rstr-name': 'rstr-plot.svg',
+			...headers
 		}
 	});
 
@@ -105,9 +122,11 @@ describe('rejections the studio must be able to read', () => {
 	});
 
 	it('CORS-tags a non-svg body', async () => {
-		const response = await worker.fetch(putRequest(origin, { body: '%PDF-1.4 not an svg' }), {
-			FILES: bucketStub()
-		});
+		const body = '%PDF-1.4 not an svg';
+		const response = await worker.fetch(
+			putRequest(origin, { path: `/orders/${await designHashOf(body)}`, body }),
+			{ FILES: bucketStub() }
+		);
 		expect(response.status).toBe(415);
 		expect(response.headers.get('access-control-allow-origin')).toBe(origin);
 	});
@@ -120,9 +139,85 @@ describe('rejections the studio must be able to read', () => {
 		expect(response.headers.get('access-control-allow-origin')).toBe(origin);
 	});
 
-	it('stores the customer file name on the object', async () => {
+	it('CORS-tags a missing content-length', async () => {
+		const request = new Request(`${WORKER_URL}/orders/${HASH}`, {
+			method: 'PUT',
+			body: SVG,
+			duplex: 'half',
+			headers: { origin, 'content-type': 'image/svg+xml' }
+		});
 		const env = { FILES: bucketStub() };
-		await worker.fetch(putRequest(origin), env);
-		expect(env.FILES.puts[0].opts.customMetadata.name).toBe('rstr-plot.svg');
+		const response = await worker.fetch(request, env);
+		expect(response.status).toBe(411);
+		expect(response.headers.get('access-control-allow-origin')).toBe(origin);
+		expect(env.FILES.puts).toHaveLength(0);
+	});
+});
+
+describe('content address', () => {
+	const origin = 'https://rstr.d17e.dev';
+
+	it('refuses a body that does not hash to its key', async () => {
+		const env = { FILES: bucketStub() };
+		const response = await worker.fetch(putRequest(origin, { path: '/orders/aaaaaaaaaaaa' }), env);
+		expect(response.status).toBe(422);
+		expect(response.headers.get('access-control-allow-origin')).toBe(origin);
+		expect(env.FILES.puts).toHaveLength(0);
+	});
+
+	it('stores the customer file name on the object, control chars stripped', async () => {
+		const env = { FILES: bucketStub() };
+		await worker.fetch(putRequest(origin, { headers: { 'x-rstr-name': 'rstr\tplot.svg' } }), env);
+		expect(env.FILES.puts[0].opts.customMetadata.name).toBe('rstrplot.svg');
+	});
+});
+
+describe('rate limits', () => {
+	const origin = 'https://rstr.d17e.dev';
+	const limiter = (success) => {
+		const keys = [];
+		return { keys, limit: async ({ key }) => (keys.push(key), { success }) };
+	};
+
+	it('passes when both limiters approve, keyed by connecting IP', async () => {
+		const env = { FILES: bucketStub(), RATE_IP: limiter(true), RATE_GLOBAL: limiter(true) };
+		const response = await worker.fetch(
+			putRequest(origin, { headers: { 'cf-connecting-ip': '203.0.113.7' } }),
+			env
+		);
+		expect(response.status).toBe(200);
+		expect(env.RATE_IP.keys).toEqual(['203.0.113.7']);
+		expect(env.RATE_GLOBAL.keys).toEqual(['all']);
+	});
+
+	it('429s with retry-after when the IP budget is spent, before touching R2', async () => {
+		const env = { FILES: bucketStub(), RATE_IP: limiter(false), RATE_GLOBAL: limiter(true) };
+		const response = await worker.fetch(putRequest(origin), env);
+		expect(response.status).toBe(429);
+		expect(response.headers.get('retry-after')).toBe('60');
+		expect(response.headers.get('access-control-allow-origin')).toBe(origin);
+		expect(env.FILES.puts).toHaveLength(0);
+	});
+
+	it('429s when the global budget is spent', async () => {
+		const env = { FILES: bucketStub(), RATE_IP: limiter(true), RATE_GLOBAL: limiter(false) };
+		const response = await worker.fetch(putRequest(origin), env);
+		expect(response.status).toBe(429);
+		expect(env.FILES.puts).toHaveLength(0);
+	});
+
+	it('does not spend budget on preflights', async () => {
+		const rate = limiter(true);
+		const env = { FILES: bucketStub(), RATE_IP: rate, RATE_GLOBAL: rate };
+		const response = await worker.fetch(preflight(origin), env);
+		expect(response.status).toBe(204);
+		expect(rate.keys).toHaveLength(0);
+	});
+
+	it('fails open when the bindings are absent', async () => {
+		const env = { FILES: bucketStub() };
+		const response = await worker.fetch(putRequest(origin), env);
+		expect(response.status).toBe(200);
+		expect(env.FILES.puts).toHaveLength(1);
 	});
 });

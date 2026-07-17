@@ -8,10 +8,14 @@
 // piling up copies.
 //
 // This is deliberately not authenticated (the studio is a public static
-// site, so any secret it held would be public too). The guardrails are:
-// browser cross-site abuse dies on the origin allowlist, and anything else
-// is bounded by the size cap, the strict key shape, the SVG sniff, and
-// idempotent keys.
+// site, so any secret it held would be public too). The guardrails, in the
+// order they run: browser cross-site abuse dies on the origin allowlist,
+// scripted floods run into the per-IP and global rate limits, and whatever
+// squeezes through is bounded by the size cap, the strict key shape, the
+// SVG sniff — and the content address: the key must equal the SHA-256
+// prefix of the body, the same fingerprint the studio computes client-side.
+// A request can only ever write the file its own content names, so junk can
+// never replace a real order and every write stays idempotent.
 
 // The origin gate matches by shape, not exact strings: vite bumps 5173 to
 // the next free port when it's busy, `npm run dev-host` serves the studio
@@ -50,6 +54,30 @@ const corsHeaders = (origin) => ({
 	vary: 'origin'
 });
 
+// Rate limits (see [[ratelimits]] in wrangler.toml): RATE_IP boxes in a
+// single address, RATE_GLOBAL caps the endpoint as a whole so rotating IPs
+// buys nothing sustained. Both are per-colo and eventually consistent —
+// fine, this is a cost fuse, not an accounting system. A real customer
+// needs exactly one PUT per order (preflights are exempt), so the limits
+// are far above legitimate use. Deploys without the bindings (local dev,
+// tests, an older wrangler) fail open on purpose: an order must never be
+// lost to a missing limiter.
+const rateLimited = async (env, ip) => {
+	const gates = [];
+	if (env.RATE_IP) gates.push(env.RATE_IP.limit({ key: ip }));
+	if (env.RATE_GLOBAL) gates.push(env.RATE_GLOBAL.limit({ key: 'all' }));
+	const results = await Promise.all(gates);
+	return results.some((result) => !result?.success);
+};
+
+/** First 12 hex chars of SHA-256 — the studio's design fingerprint. */
+const designHashOf = async (body) => {
+	const digest = await crypto.subtle.digest('SHA-256', body);
+	return [...new Uint8Array(digest).slice(0, 6)]
+		.map((byte) => byte.toString(16).padStart(2, '0'))
+		.join('');
+};
+
 export default {
 	async fetch(request, env) {
 		const origin = request.headers.get('origin') ?? '';
@@ -60,10 +88,20 @@ export default {
 		if (request.method !== 'PUT')
 			return new Response('method not allowed', { status: 405, headers: cors });
 
+		const ip = request.headers.get('cf-connecting-ip') ?? 'unknown';
+		if (await rateLimited(env, ip))
+			return new Response('slow down', { status: 429, headers: { ...cors, 'retry-after': '60' } });
+
 		const match = new URL(request.url).pathname.match(KEY_RE);
 		if (!match) return new Response('bad path', { status: 400, headers: cors });
 
-		if (Number(request.headers.get('content-length') ?? '0') > MAX_BYTES)
+		// an honest declared length up front, the real byte count re-checked
+		// after buffering — chunked bodies with no declared length are refused
+		// before any buffering happens at all
+		const declaredLength = request.headers.get('content-length');
+		if (declaredLength === null)
+			return new Response('length required', { status: 411, headers: cors });
+		if (Number(declaredLength) > MAX_BYTES)
 			return new Response('too large', { status: 413, headers: cors });
 		const body = await request.arrayBuffer();
 		if (body.byteLength === 0 || body.byteLength > MAX_BYTES)
@@ -80,7 +118,17 @@ export default {
 		if (!head.startsWith('<?xml') && !head.startsWith('<svg'))
 			return new Response('not an svg', { status: 415, headers: cors });
 
-		const name = (request.headers.get('x-rstr-name') ?? '').slice(0, 120);
+		// the content address: the studio derives the key from the exact bytes
+		// it uploads, so anything else is a forgery (or corruption) — refuse it
+		if ((await designHashOf(body)) !== match[1])
+			return new Response('design hash mismatch', { status: 422, headers: cors });
+
+		// metadata is display-only in the dashboard — keep it printable (the
+		// control-char match is the point, hence the lint exemption)
+		const name = (request.headers.get('x-rstr-name') ?? '')
+			// eslint-disable-next-line no-control-regex
+			.replace(/[\u0000-\u001f\u007f-\u009f]/g, '')
+			.slice(0, 120);
 		await env.FILES.put(`orders/${match[1]}.svg`, body, {
 			httpMetadata: { contentType: 'image/svg+xml' },
 			customMetadata: { name, receivedAt: new Date().toISOString() }
