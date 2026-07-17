@@ -1098,8 +1098,9 @@
 
 	// The order flow hands off to a Tally form embedded in a studio-owned
 	// modal. Everything stays in the browser until the customer deliberately
-	// submits; the only artifact that leaves is the exported SVG they attach —
-	// never the source image. The embed is a plain tally.so iframe (no
+	// confirms; the only artifact that leaves is the exported plot SVG — sent
+	// straight into my queue, or downloaded and attached by hand when that
+	// upload fails — never the source image. The embed is a plain tally.so iframe (no
 	// third-party script — Tally's widget loaded its popup from a /popup/ URL
 	// that adblock filter lists kill, stranding those visitors on a spinner);
 	// when even the iframe shows no sign of life, the dialog falls back to the
@@ -1159,10 +1160,10 @@
 		orderFallback = '';
 	};
 
-	// Download the customer's copy, fingerprint the SVG, send it into the plot
-	// queue, and swap the dialog over to the embedded order form. The upload is
-	// best-effort: when it fails the form keeps its manual attach step (and the
-	// download already happened). When the embed itself shows no sign of life
+	// Fingerprint the SVG, send it into the plot queue, and swap the dialog
+	// over to the embedded order form. The upload is best-effort: only when it
+	// fails does the file download, because then the customer has to attach it
+	// in the form themselves. When the embed itself shows no sign of life
 	// within the timeout — content blockers are the usual reason — the dialog
 	// offers the same form as a plain link instead.
 	const confirmOrder = async () => {
@@ -1171,13 +1172,16 @@
 		const svg = buildSvgText();
 		if (!check || !quote || !svg || orderUploading) return;
 		orderFileName = exportName('', 'svg');
-		downloadBlob(new Blob([svg], { type: 'image/svg+xml' }), orderFileName);
 		const designHash = await designFingerprint(svg);
 		orderUploading = true;
 		orderUploaded = await uploadOrderSvg(svg, designHash, orderFileName);
 		orderUploading = false;
 		// the customer may have closed the dialog while the upload ran
 		if (orderDialog !== 'summary') return;
+		// only the manual fallback needs the file on the customer's device —
+		// an unconditional download stalls the flow on mobile (iOS pauses on
+		// the native save sheet), so the happy path skips it entirely
+		if (!orderUploaded) downloadBlob(new Blob([svg], { type: 'image/svg+xml' }), orderFileName);
 		const fields = orderHiddenFields(check, quote, {
 			plotSeconds: plotEstimate?.seconds ?? 0,
 			lineCount: status.lines,
@@ -2598,13 +2602,13 @@
 						</p>
 					{/if}
 					<p class="order-note">
-						ordering sends only the plot file (.svg) — the lines to draw — never your image. the
-						file downloads to your device and goes straight into my plot queue.
+						ordering sends only the plot file (.svg) — the lines to draw — never your image. it goes
+						straight into my plot queue. want your own copy? the ↓ SVG button exports the same file.
 					</p>
 					<div class="order-actions">
 						<button onclick={closeOrderDialog}>not now</button>
 						<button class="order-confirm" onclick={confirmOrder} disabled={orderUploading}
-							>{orderUploading ? 'sending your file…' : '⚡ download & order'}</button
+							>{orderUploading ? 'sending your plot…' : '⚡ continue to order'}</button
 						>
 					</div>
 				{:else if orderDialog === 'form'}
@@ -2616,13 +2620,12 @@
 					</div>
 					{#if orderUploaded}
 						<p class="order-note">
-							your plot file <b>{orderFileName}</b> went straight into my plot queue — nothing to attach.
-							a copy downloaded to your device for your records.
+							your plot file is in my queue — <b>nothing to attach</b>.
 						</p>
 					{:else}
 						<p class="order-note">
-							your plot file <b>{orderFileName}</b> just downloaded — attach it where the form asks for
-							your .svg.
+							the automatic upload didn't work here, so your plot file <b>{orderFileName}</b> just downloaded
+							— attach it where the form asks for your .svg.
 						</p>
 					{/if}
 					{#if orderEmbedState === 'blocked'}
