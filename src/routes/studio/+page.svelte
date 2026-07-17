@@ -2618,11 +2618,7 @@
 							>✕</button
 						>
 					</div>
-					{#if orderUploaded}
-						<p class="order-note">
-							your plot file is in my queue — <b>nothing to attach</b>.
-						</p>
-					{:else}
+					{#if !orderUploaded}
 						<p class="order-note">
 							the automatic upload didn't work here, so your plot file <b>{orderFileName}</b> just downloaded
 							— attach it where the form asks for your .svg.
