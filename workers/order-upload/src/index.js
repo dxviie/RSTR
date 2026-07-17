@@ -13,13 +13,29 @@
 // is bounded by the size cap, the strict key shape, the SVG sniff, and
 // idempotent keys.
 
-const ALLOWED_ORIGINS = new Set([
-	'https://rstr.d17e.dev',
-	// vite dev + preview
-	'http://localhost:5173',
-	'http://localhost:5199',
-	'http://localhost:4173'
-]);
+// The origin gate matches by shape, not exact strings: vite bumps 5173 to
+// the next free port when it's busy, `npm run dev-host` serves the studio
+// from a LAN address for phone testing, and 127.0.0.1 is localhost by
+// another name — all legitimate studio origins, and an exact-match set
+// 403s each of them as an opaque CORS failure at the moment of ordering.
+// Allowed: the d17e.dev zone over https (production and any preview
+// subdomain), and loopback or private-LAN (RFC 1918) hosts on any port.
+const PROD_ORIGIN_RE = /^https:\/\/([a-z0-9-]+\.)*d17e\.dev$/;
+const DEV_HOSTNAME_RE =
+	/^(localhost|127\.0\.0\.1|\[::1\]|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3})$/;
+
+const isAllowedOrigin = (origin) => {
+	if (PROD_ORIGIN_RE.test(origin)) return true;
+	let url;
+	try {
+		url = new URL(origin);
+	} catch {
+		return false;
+	}
+	return (
+		(url.protocol === 'http:' || url.protocol === 'https:') && DEV_HOSTNAME_RE.test(url.hostname)
+	);
+};
 
 /** Generous for dense A3 plots; far below the Worker request-body limit. */
 const MAX_BYTES = 30 * 1024 * 1024;
@@ -37,7 +53,8 @@ const corsHeaders = (origin) => ({
 export default {
 	async fetch(request, env) {
 		const origin = request.headers.get('origin') ?? '';
-		if (!ALLOWED_ORIGINS.has(origin)) return new Response('forbidden origin', { status: 403 });
+		if (!isAllowedOrigin(origin))
+			return new Response(`forbidden origin: ${origin || '(none)'}`, { status: 403 });
 		const cors = corsHeaders(origin);
 		if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
 		if (request.method !== 'PUT')
