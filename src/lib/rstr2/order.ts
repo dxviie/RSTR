@@ -2,7 +2,7 @@
 //
 // Pure logic only: which designs are physically plottable (pens I own, paper
 // the machine takes), what a plot costs, and the metadata payload handed to
-// the order form. The UI wiring (button, dialogs, Tally popup) lives with the
+// the order form. The UI wiring (button, dialogs, Tally embed) lives with the
 // studio page; keeping this file DOM-free makes the rules unit-testable.
 
 import { PAGES, type PageId } from '../prep/pages';
@@ -212,6 +212,8 @@ export interface OrderContext {
 	presetName: string;
 	/** fingerprint of the exact SVG that was downloaded */
 	designHash: string;
+	/** the SVG reached the plot queue — the form skips its attach step */
+	uploaded: boolean;
 }
 
 /**
@@ -236,6 +238,8 @@ export const orderHiddenFields = (
 		image: fileSlug(context.sourceName),
 		design: context.designHash,
 		preset: context.presetName,
+		// exactly 'ok' switches the form to its nothing-to-attach face
+		upload: context.uploaded ? 'ok' : '',
 		v: ORDER_PAYLOAD_VERSION
 	};
 	// empty values would still show up as `key=` in the URL — drop them
