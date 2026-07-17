@@ -1,5 +1,6 @@
 <script lang="ts">
 	import BrandFooter from '$lib/components/BrandFooter.svelte';
+	import TopBar from '$lib/components/TopBar.svelte';
 	import { buildCalibrationBlock } from '$lib/prep/calibration';
 	import {
 		PAGE_LABELS,
@@ -36,6 +37,7 @@
 	let calibX: number | null = $state(null);
 	let calibY: number | null = $state(null);
 	let calibRotated = $state(false);
+	let calibCompact = $state(false);
 
 	// output page + layers
 	let pageSize: PageId = $state('A3');
@@ -51,9 +53,12 @@
 	let paperOutlineH = $state(297);
 	let penCount = $state(3);
 
-	// stage
-	let stageW = $state(0);
-	let stageH = $state(0);
+	// stage — the preview is sized to the wrap (the stage minus the footer),
+	// and the footer height feeds the mobile clamp so the sticky preview clears
+	// the top bar instead of tucking under it
+	let wrapW = $state(0);
+	let wrapH = $state(0);
+	let footerH = $state(0);
 	let previewSvgEl: SVGSVGElement | undefined = $state();
 	let fileInput: HTMLInputElement | undefined = $state();
 	let dragActive = $state(false);
@@ -71,8 +76,8 @@
 		const [pageW, pageH] = page;
 		const vpW = pageW + PAD * 2;
 		const vpH = pageH + PAD * 2;
-		const cw = stageW || 900;
-		const ch = stageH || 600;
+		const cw = wrapW || 900;
+		const ch = wrapH || 600;
 		return Math.min((cw - 32) / vpW, (ch - 32) / vpH);
 	});
 
@@ -265,12 +270,15 @@
 				penCount: pens,
 				forExport: false,
 				rotated: calibRotated,
+				compact: calibCompact,
 				x: calibX,
 				y: calibY
 			});
 			html += calib.svg;
+			// invisible drag surface — the visible outline is drawn (in yellow)
+			// by the calibration block itself
 			html += `<rect x="${calib.bx}" y="${calib.by}" width="${calib.bw}" height="${calib.bh}"
-        fill="transparent" stroke="#93a1bd" stroke-width="0.3" stroke-dasharray="1.5 1.5"
+        fill="transparent" stroke="none"
         style="cursor:move" data-drag="calib"/>`;
 		}
 
@@ -369,6 +377,7 @@
 			penCount: pens,
 			forExport: false,
 			rotated: calibRotated,
+			compact: calibCompact,
 			x: calibX,
 			y: calibY
 		});
@@ -470,6 +479,7 @@ ${wrapRotation(artworkInner)}
 			penCount: pens,
 			forExport: true,
 			rotated: calibRotated,
+			compact: calibCompact,
 			x: calibX,
 			y: calibY
 		}).svg
@@ -505,32 +515,7 @@ ${wrapRotation(artworkInner)}
 </svelte:head>
 
 <div class="app">
-	<!-------------------------------------------------------------
-		TOP BAR
-	-------------------------------------------------------------->
-	<header class="topbar">
-		<a class="logo-link" href="https://d17e.dev" title="d17e.dev">
-			<svg
-				class="logo"
-				role="img"
-				aria-label="D17E logo"
-				viewBox="0 0 1046 447"
-				xmlns="http://www.w3.org/2000/svg"
-			>
-				<g transform="matrix(1.2778,0,0,0.628916,-169.768,-154.959)">
-					<path
-						d="M930.998,957.001L930.998,957.183L132.86,957.183L132.86,246.391L930.998,246.391L930.998,246.802L951.958,246.802L951.958,957.001L930.998,957.001ZM399.748,807.315L517.675,807.315L517.675,734.622L477.603,734.622L477.603,400.234L441.538,400.234L441.538,417.68C441.538,444.431 436.099,452.573 422.647,452.573L401.18,452.573L401.18,522.358L441.252,522.358L441.252,734.622L399.748,734.622L399.748,807.315ZM586.656,807.315L627.3,807.315L706.3,475.253L706.3,400.234L566.047,400.234L566.047,472.345L665.655,472.345L586.656,801.499L586.656,807.315ZM208.261,807.315L268.083,807.315C326.76,807.315 354.238,728.806 354.238,627.036L354.238,580.513C354.238,478.742 326.76,400.234 268.083,400.234L208.261,400.234L208.261,807.315ZM245.471,734.622L245.471,472.927L268.083,472.927C306.438,472.927 317.028,516.543 317.028,580.513L317.028,627.036C317.028,691.006 306.438,734.622 268.083,734.622L245.471,734.622ZM750.665,807.315L876.606,807.315L876.606,735.785L787.875,735.785L787.875,632.852L867.733,632.852L867.733,561.903L787.875,561.903L787.875,471.764L876.606,471.764L876.606,400.234L750.665,400.234L750.665,807.315Z"
-						fill="currentColor"
-					/>
-				</g>
-			</svg>
-		</a>
-		<span class="wordmark">RSTR<span class="wordmark-sub">·PREP</span></span>
-		<span class="tagline">decorate SVGs for pen plotting</span>
-		<div class="spacer"></div>
-		<a class="top-link" href="/v2" title="back to the RSTR studio">studio</a>
-		<a class="top-link" href="/about" title="about RSTR">?</a>
-	</header>
+	<TopBar active="prep" sub="PREP" tagline="decorate SVGs for pen plotting" />
 
 	<div class="workspace">
 		<!-------------------------------------------------------------
@@ -609,7 +594,15 @@ ${wrapRotation(artworkInner)}
 					page boundary
 				</label>
 				<label
-					class="toggle-row reversed-toggle"
+					class="toggle-row extras-start"
+					title="strip the calibration block down to the cal-half and cal-pen layers, packed into the smallest possible rectangle"
+				>
+					<input type="checkbox" bind:checked={calibCompact} />
+					<span class="layer-dot compact-dot"></span>
+					compact calibration
+				</label>
+				<label
+					class="toggle-row"
 					title="duplicate every artwork layer as a '-reversed' layer with the same lines running in the opposite direction — each line gets plotted twice, once in each direction, for denser ink"
 				>
 					<input type="checkbox" bind:checked={addReversed} />
@@ -731,8 +724,7 @@ ${wrapRotation(artworkInner)}
 		<main
 			class="stage"
 			class:drag-active={dragActive}
-			bind:clientWidth={stageW}
-			bind:clientHeight={stageH}
+			style={`--stage-aspect: ${(page[1] + PAD * 2) / (page[0] + PAD * 2)}; --footer-h: ${footerH}px`}
 			ondragover={(event) => {
 				event.preventDefault();
 				dragActive = true;
@@ -740,7 +732,7 @@ ${wrapRotation(artworkInner)}
 			ondragleave={() => (dragActive = false)}
 			ondrop={onDrop}
 		>
-			<div class="preview-wrap">
+			<div class="preview-wrap" bind:clientWidth={wrapW} bind:clientHeight={wrapH}>
 				<div class="svg-wrap">
 					<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 					<!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -764,7 +756,7 @@ ${wrapRotation(artworkInner)}
 					{/if}
 				</div>
 			</div>
-			<div class="stage-footer">
+			<div class="stage-footer" bind:clientHeight={footerH}>
 				<span><span class="legend-dot" style="background: #00BFE8"></span>paper outline</span>
 				<span><span class="legend-dot" style="background: #FFB000"></span>calibration</span>
 				<span><span class="legend-dot" style="background: #FF2AA6"></span>page boundary</span>
@@ -787,30 +779,30 @@ ${wrapRotation(artworkInner)}
 
 <style>
 	@font-face {
-		font-family: 'nudica_monobold';
-		src: url('/fonts/nudicamono-bold-webfont.woff') format('woff');
+		font-family: 'mono-bold';
+		src: url('/fonts/ibm-plex-mono-bold.woff2') format('woff2');
 		font-weight: normal;
 		font-style: normal;
 		font-display: swap;
 	}
 
 	@font-face {
-		font-family: 'nudica_monolight';
-		src: url('/fonts/nudicamono-light-webfont.woff') format('woff');
+		font-family: 'mono-light';
+		src: url('/fonts/ibm-plex-mono-light.woff2') format('woff2');
 		font-weight: normal;
 		font-style: normal;
 		font-display: swap;
 	}
 
 	@font-face {
-		font-family: 'argesta_regular';
-		src: url('/fonts/argestatext-regular-webfont.woff') format('woff');
+		font-family: 'serif-text';
+		src: url('/fonts/ibm-plex-serif-regular.woff2') format('woff2');
 		font-weight: normal;
 		font-style: normal;
 		font-display: swap;
 	}
 
-	/* Full-viewport app shell in the d17e.dev brand, matching the v2 studio. */
+	/* Full-viewport app shell in the d17e.dev brand, matching the studio. */
 	.app {
 		--ink: #1a202c;
 		--bg: #fdfaff;
@@ -825,17 +817,12 @@ ${wrapRotation(artworkInner)}
 		flex-direction: column;
 		background: var(--bg);
 		color: var(--ink);
-		font-family: 'nudica_monolight', monospace;
+		font-family: 'mono-light', monospace;
 		font-size: 0.8rem;
 	}
 
-	.app a {
-		border: none;
-		color: var(--ink);
-	}
-
 	.app button {
-		font-family: 'nudica_monobold', monospace !important;
+		font-family: 'mono-bold', monospace !important;
 		font-size: 0.75rem !important;
 		transition: all 0.1s ease;
 	}
@@ -857,61 +844,8 @@ ${wrapRotation(artworkInner)}
 		accent-color: var(--ink);
 	}
 
-	/* ------------------------------------------------- top bar */
-
-	.topbar {
-		display: flex;
-		align-items: center;
-		gap: 0.6rem;
-		padding: 0.4rem 1rem;
-		border-bottom: 1px solid var(--border);
-		flex-shrink: 0;
-	}
-
-	.logo-link {
-		display: flex;
-		align-items: center;
-	}
-
-	.logo {
-		height: 26px;
-		width: auto;
-		color: var(--ink);
-	}
-
-	.logo-link:hover .logo {
-		opacity: 0.7;
-	}
-
-	.wordmark {
-		font-family: 'nudica_monobold', monospace;
-		font-size: 1.15rem;
-		letter-spacing: 0.08em;
-	}
-
-	.wordmark-sub {
-		color: var(--muted);
-	}
-
-	.tagline {
-		font-family: 'argesta_regular', serif;
-		color: var(--muted);
-		font-size: 0.8rem;
-	}
-
 	.spacer {
 		flex: 1;
-	}
-
-	.top-link {
-		font-family: 'nudica_monobold', monospace;
-		padding: 0.1rem 0.55rem;
-		border: 1px solid var(--border) !important;
-		border-radius: 999px;
-	}
-
-	.top-link:hover {
-		border-color: var(--ink) !important;
 	}
 
 	/* ------------------------------------------------- workspace */
@@ -949,7 +883,7 @@ ${wrapRotation(artworkInner)}
 	}
 
 	.group-title {
-		font-family: 'nudica_monobold', monospace;
+		font-family: 'mono-bold', monospace;
 		font-size: 0.72rem;
 		text-transform: uppercase;
 		letter-spacing: 0.08em;
@@ -976,7 +910,7 @@ ${wrapRotation(artworkInner)}
 	}
 
 	.drop-sub {
-		font-family: 'argesta_regular', serif;
+		font-family: 'serif-text', serif;
 		font-size: 0.66rem;
 		color: var(--muted);
 		font-weight: normal;
@@ -1060,7 +994,7 @@ ${wrapRotation(artworkInner)}
 		border-radius: 4px;
 		background: #fff;
 		color: var(--ink);
-		font-family: 'nudica_monolight', monospace;
+		font-family: 'mono-light', monospace;
 		font-size: 0.68rem;
 	}
 
@@ -1085,7 +1019,7 @@ ${wrapRotation(artworkInner)}
 		border-radius: 4px;
 		background: #fff;
 		color: var(--ink);
-		font-family: 'nudica_monolight', monospace;
+		font-family: 'mono-light', monospace;
 		font-size: 0.7rem;
 	}
 
@@ -1105,7 +1039,15 @@ ${wrapRotation(artworkInner)}
 		flex-shrink: 0;
 	}
 
-	.reversed-toggle {
+	/* hollow ring in the calibration yellow — “calibration, slimmed down” */
+	.compact-dot {
+		background: none;
+		border: 2px solid #ffb000;
+		box-sizing: border-box;
+	}
+
+	/* dashed divider between the layer toggles and the extra options */
+	.extras-start {
 		border-top: 1px dashed var(--border);
 		padding-top: 0.45rem;
 		margin-top: 0.15rem;
@@ -1238,6 +1180,86 @@ ${wrapRotation(artworkInner)}
 	}
 
 	.legend-hint {
-		font-family: 'argesta_regular', serif;
+		font-family: 'serif-text', serif;
+	}
+
+	/* ------------------------------------------------- responsive */
+
+	@media (max-width: 900px) {
+		.workspace {
+			flex-direction: column;
+			overflow-y: auto;
+		}
+
+		/* The preview stays pinned at the top while the control pane scrolls
+		   over it on a translucent, blurred backdrop (same overlay trick as
+		   the studio and v1 pages) — the effect of every tweak stays visible. */
+		.stage {
+			position: sticky;
+			top: 0;
+			order: 1;
+			/* the base rule's flex: 1 means flex-basis: 0%, which would
+			   collapse the height in the column layout */
+			flex: none;
+			/* Follow the page's aspect so the preview always spans the full
+			   width. Clamped so portrait pages still leave the controls
+			   peeking in (they scroll over the sticky stage anyway) and wide
+			   pages keep a usable drop target. The 1.5rem compensates the
+			   preview-wrap's own padding; --footer-h reserves the legend row so
+			   the preview fills the width without overflowing up under the top
+			   bar. */
+			height: clamp(
+				25vh,
+				calc((100vw - 1.5rem) * var(--stage-aspect, 0.75) + 1.5rem + var(--footer-h, 0px)),
+				80vh
+			);
+			height: clamp(
+				25svh,
+				calc((100vw - 1.5rem) * var(--stage-aspect, 0.75) + 1.5rem + var(--footer-h, 0px)),
+				80svh
+			);
+			/* exact fit where container units are supported — 100cqw is the
+			   workspace's content width, scrollbars already excluded */
+			height: clamp(
+				25svh,
+				calc((100cqw - 1.5rem) * var(--stage-aspect, 0.75) + 1.5rem + var(--footer-h, 0px)),
+				80svh
+			);
+			z-index: 0;
+		}
+
+		.pane {
+			width: auto;
+			overflow-y: visible;
+			position: relative;
+			z-index: 1;
+			background: rgba(253, 250, 255, 0.82);
+			-webkit-backdrop-filter: blur(6px);
+			backdrop-filter: blur(6px);
+		}
+
+		.pane.left {
+			border-right: none;
+			border-top: 1px solid var(--border);
+			order: 2;
+		}
+
+		/* let the preview shimmer through the cards too */
+		.drop-zone,
+		.file-info {
+			background: rgba(255, 255, 255, 0.55);
+		}
+
+		/* Mobile browsers zoom the whole page when a focused control renders
+		   under 16px — keep every text-editable control at 16px on small
+		   screens (also easier to hit), and widen the value columns to fit. */
+		.slider-row input[type='number'],
+		.select-row select {
+			font-size: 16px;
+		}
+
+		.slider-row {
+			grid-template-columns: 5.4rem 1fr 4.4rem;
+		}
 	}
 </style>

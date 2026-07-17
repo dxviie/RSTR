@@ -63,7 +63,7 @@ export const defaultCmyLayers = (): LayerConfig[] => [
 	// Default pen colors are the d17e.dev brand accents.
 	{
 		id: 'cyan',
-		name: 'Cyan',
+		name: 'Octopus Blue Sloth',
 		channel: 'c',
 		color: '#00BFE8',
 		angleMin: 15,
@@ -73,7 +73,7 @@ export const defaultCmyLayers = (): LayerConfig[] => [
 	},
 	{
 		id: 'magenta',
-		name: 'Magenta',
+		name: 'De Atramentis Magenta',
 		channel: 'm',
 		color: '#FF2AA6',
 		angleMin: 75,
@@ -83,7 +83,7 @@ export const defaultCmyLayers = (): LayerConfig[] => [
 	},
 	{
 		id: 'yellow',
-		name: 'Yellow',
+		name: 'De Atramentis Yellow',
 		channel: 'y',
 		color: '#FFB000',
 		angleMin: 135,
@@ -98,7 +98,7 @@ export const defaultCmyLayers = (): LayerConfig[] => [
 export const defaultClassicLayers = (): LayerConfig[] => [
 	{
 		id: 'black',
-		name: 'Black',
+		name: 'Copic Fineliner Black',
 		channel: 'luma-inv',
 		color: '#000000',
 		angleMin: 0,

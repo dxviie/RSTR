@@ -42,7 +42,7 @@ const dosDateTime = (date: Date): { time: number; date: number } => ({
  * Entries larger than 4GiB or archives with 65k+ files would need ZIP64 —
  * far beyond what a frame sequence produces, so not supported.
  */
-export const buildZip = (entries: ZipEntry[], now: Date = new Date()): Uint8Array => {
+export const buildZip = (entries: ZipEntry[], now: Date = new Date()): Uint8Array<ArrayBuffer> => {
 	const encoder = new TextEncoder();
 	const { time, date } = dosDateTime(now);
 

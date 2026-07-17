@@ -2,6 +2,8 @@
 
 /** [portrait-width, portrait-height] in mm */
 export const PAGES = {
+	A6: [105, 148],
+	A5: [148, 210],
 	A4: [210, 297],
 	A3: [297, 420],
 	A2: [420, 594],
@@ -14,6 +16,8 @@ export const PAGES = {
 export type PageId = keyof typeof PAGES;
 
 export const PAGE_LABELS: Record<PageId, string> = {
+	A6: 'A6 105 × 148 mm',
+	A5: 'A5 148 × 210 mm',
 	A4: 'A4 210 × 297 mm',
 	A3: 'A3 297 × 420 mm',
 	A2: 'A2 420 × 594 mm',
