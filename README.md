@@ -22,7 +22,7 @@ RSTR splits a picture into regions of similar tone and refills each one with par
 | 4 | **lines** | Pen width and how ink intensity turns into line spacing. |
 | 5 | **presets** | Randomize everything, or save and share complete looks as JSON. |
 | 6 | **layers** | One pen per layer: color, image channel, hatch angles, per-layer overrides. |
-| 7 | **export** | Output width and the SVG / PNG / frame-sequence downloads. |
+| 7 | **export** | Output width (or fit-to-page A6–A3 with a margin) and the SVG / PNG / frame-sequence downloads. |
 | 8 | **stats** | Render numbers and the estimated plot time. |
 
 > This README covers **how RSTR is built**. For what each setting *does*, see the [help page](https://rstr.d17e.dev/help) (`src/routes/(site)/help/+page.svelte`) — it mirrors the in-app tooltips.

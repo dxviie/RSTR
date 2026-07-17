@@ -28,6 +28,8 @@ export interface Rstr2Params {
 	inkBoost: number;
 	// export
 	outputWidthMm: number;
+	// margin (mm) kept clear around the art when fitting it to a paper size
+	fitMarginMm: number;
 }
 
 export const defaultParams = (): Rstr2Params => ({
@@ -49,7 +51,8 @@ export const defaultParams = (): Rstr2Params => ({
 	hatchThreshold: 0.1,
 	hatchGamma: 1.8,
 	inkBoost: 1,
-	outputWidthMm: 200
+	outputWidthMm: 200,
+	fitMarginMm: 10
 });
 
 export const PARAMS_STORAGE_KEY = 'rstr:v2:params';
