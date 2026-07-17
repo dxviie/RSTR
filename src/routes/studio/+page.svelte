@@ -1123,6 +1123,15 @@
 
 	const ORDER_FROM_EUR = PRICING.tiers.A6.base + PRICING.shippingEur;
 
+	// live quote for the order-button subtext: the same math the order dialog
+	// runs, recomputed as the design changes. null (falling back to the
+	// starting price) while the render is busy or the design isn't orderable.
+	const orderLiveQuote = $derived.by(() => {
+		if (!hatchReady || status.busy || !imgWidth || !imgHeight) return null;
+		const check = checkOrder(params, layers, imgHeight / imgWidth);
+		return quoteOrder(check, plotEstimate?.seconds ?? 0);
+	});
+
 	// the pens on my shelf, grouped by ink, for the unsupported dialog
 	const ORDER_PEN_SHELF = (() => {
 		const shelf: { color: string; name: string; widths: number[] }[] = [];
@@ -2496,7 +2505,9 @@
 						⚡ order this plot
 					</button>
 					<div class="order-sub">
-						real ink on paper, shipped to you — from €{ORDER_FROM_EUR}, shipping included
+						real ink on paper, shipped to you —
+						{#if orderLiveQuote}for <b>€{orderLiveQuote.totalEur}</b>{:else}from €{ORDER_FROM_EUR}{/if},
+						shipping included
 					</div>
 				</div>
 			</section>
@@ -2545,6 +2556,7 @@
 			<div
 				class="order-dialog"
 				class:order-dialog-form={orderDialog === 'form'}
+				class:order-dialog-blocked={orderDialog === 'form' && orderEmbedState === 'blocked'}
 				role="dialog"
 				aria-modal="true"
 				aria-label="order this plot"
@@ -3603,9 +3615,18 @@
 		color: #fff;
 	}
 
-	/* the embedded-form step is a taller card built around the iframe */
+	/* The embedded-form step is a taller card built around the iframe. It
+	   takes a fixed (viewport-capped) height and never scrolls as a whole —
+	   the iframe flexes to fill, so the only scrollbar is the form's own.
+	   The blocked fallback has no frame to fill and shrinks back to fit. */
 	.order-dialog-form {
 		width: min(480px, 100%);
+		height: min(760px, calc(100dvh - 2rem));
+		overflow: hidden;
+	}
+
+	.order-dialog-blocked {
+		height: auto;
 	}
 
 	.order-form-head {
@@ -3630,7 +3651,8 @@
 
 	.order-frame {
 		position: relative;
-		height: clamp(340px, 64dvh, 620px);
+		flex: 1 1 auto;
+		min-height: 200px;
 		border: 1px solid var(--border);
 		border-radius: 8px;
 		overflow: hidden;
