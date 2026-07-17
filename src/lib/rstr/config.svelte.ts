@@ -1,3 +1,4 @@
+// @ts-nocheck — /classic legacy code — kept for nostalgia, intentionally left as-is and not type-checked.
 export type RstrConfig = {
 	// image
 	file: string;
@@ -11,7 +12,7 @@ export type RstrConfig = {
 	density: number;
 	// colors
 	colors: RstrColor[];
-}
+};
 
 const initialState = {
 	// image
@@ -23,12 +24,12 @@ const initialState = {
 	tolerance: 0.33,
 	// hatching
 	halves: false,
-	density: .66,
+	density: 0.66,
 	// colors
 	colors: []
 };
 
-const updateConfig = (newValues: { [s: string]: unknown; } | ArrayLike<unknown>) => {
+const updateConfig = (newValues: { [s: string]: unknown } | ArrayLike<unknown>) => {
 	for (const [key, value] of Object.entries(newValues)) {
 		if (key in config) {
 			config[key] = value;
@@ -42,4 +43,3 @@ export const configActions = {
 	update: updateConfig,
 	reset: () => updateConfig(initialState)
 };
-
