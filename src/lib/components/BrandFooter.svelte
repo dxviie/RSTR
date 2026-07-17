@@ -1,6 +1,5 @@
 <script lang="ts">
-	let { align = 'center' }: { align?: 'center' | 'right' } = $props();
-	const year = new Date().getFullYear();
+	const { align = 'center' }: { align?: 'center' | 'right' } = $props();
 </script>
 
 <div class="brand-footer {align}">
@@ -20,7 +19,7 @@
 		--bf-muted: #60739f;
 		--bf-magenta: #ff2aa6;
 
-		font-family: 'nudica_monolight', monospace;
+		font-family: 'mono-light', monospace;
 		font-size: 0.72rem;
 		line-height: 1.5;
 		color: var(--bf-muted);

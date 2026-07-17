@@ -46,10 +46,28 @@ export const hatchPolygon = (
 	}
 	if (!isFinite(minP) || maxP - minP < 1e-9) return segments;
 
+	// Scanlines sit on a GLOBAL lattice: absolute multiples of the spacing
+	// plus a fixed phase, not a grid anchored at this polygon's own minP.
+	// Regions hatched with the same angle and spacing therefore share exactly
+	// the same line positions, so a visually uniform area that segmentation
+	// split into several regions is hatched seamlessly. A per-region anchor
+	// gives every region a random phase, which doubles lines or leaves a bald
+	// strip along boundary sections parallel to the hatch — visible as
+	// streaks in plots. The irrational-ish phase factor keeps scanlines off
+	// grid-traced contour vertices (degenerate intersection counts).
+	const phase = spacingPx * 0.5137;
+	const first = (Math.floor((minP - phase) / spacingPx) + 1) * spacingPx + phase;
+	const offsets: number[] = [];
+	if (first < maxP) {
+		for (let off = first; off < maxP; off += spacingPx) offsets.push(off);
+	} else {
+		// polygon thinner than the spacing and no lattice line crosses it:
+		// hatch its midline so inked slivers don't silently disappear
+		offsets.push((minP + maxP) / 2);
+	}
+
 	const ts: number[] = [];
-	// Small irrational-ish phase offset avoids scanlines passing exactly
-	// through contour vertices (degenerate intersection counts).
-	for (let off = minP + spacingPx * 0.5 + spacingPx * 0.0137; off < maxP; off += spacingPx) {
+	for (const off of offsets) {
 		ts.length = 0;
 		for (const loop of loops) {
 			const len = loop.length;

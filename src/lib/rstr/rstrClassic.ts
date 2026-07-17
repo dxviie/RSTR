@@ -1,4 +1,11 @@
-import type { RstrColor, RstrFillingAlgo, RstrGroup, RstrGroupingAlgo, RstrPixel } from '$lib/rstr/rstr.ts';
+// @ts-nocheck — /classic legacy code — kept for nostalgia, intentionally left as-is and not type-checked.
+import type {
+	RstrColor,
+	RstrFillingAlgo,
+	RstrGroup,
+	RstrGroupingAlgo,
+	RstrPixel
+} from '$lib/rstr/rstr.ts';
 import paper from 'paper';
 import type { RstrConfig } from '$lib/rstr/config.svelte.ts';
 
@@ -30,7 +37,9 @@ class RstrClassicGroup implements RstrGroup {
 	}
 
 	getAverageColor(): paper.Color {
-		return this.pixels.reduce((acc, p) => acc.add(p.color), new paper.Color('white')).divide(this.pixels.length);
+		return this.pixels
+			.reduce((acc, p) => acc.add(p.color), new paper.Color('white'))
+			.divide(this.pixels.length);
 	}
 
 	getAverageLightness(): number {
@@ -38,7 +47,7 @@ class RstrClassicGroup implements RstrGroup {
 	}
 
 	getBoundingBox(): paper.Rectangle {
-		const rectangles = this.pixels.map(p => p.rect);
+		const rectangles = this.pixels.map((p) => p.rect);
 		if (rectangles.length === 0) {
 			console.error('No rectangles found in group. Returning empty bounding box.');
 			return new paper.Path.Rectangle([0, 0], [0, 0]);
@@ -49,7 +58,7 @@ class RstrClassicGroup implements RstrGroup {
 		let maxX = -Infinity;
 		let maxY = -Infinity;
 
-		rectangles.forEach(rect => {
+		rectangles.forEach((rect) => {
 			minX = Math.min(minX, rect.bounds.left);
 			minY = Math.min(minY, rect.bounds.top);
 			maxX = Math.max(maxX, rect.bounds.right);
@@ -63,7 +72,12 @@ class RstrClassicGroup implements RstrGroup {
 		});
 	}
 
-	getCornerPixels(): { topLeft: RstrPixel; topRight: RstrPixel; bottomLeft: RstrPixel; bottomRight: RstrPixel } {
+	getCornerPixels(): {
+		topLeft: RstrPixel;
+		topRight: RstrPixel;
+		bottomLeft: RstrPixel;
+		bottomRight: RstrPixel;
+	} {
 		if (this.pixels.length === 0) {
 			throw new Error('Pixel group is empty');
 		}
@@ -73,7 +87,7 @@ class RstrClassicGroup implements RstrGroup {
 		let bottomLeft = this.pixels[0];
 		let bottomRight = this.pixels[0];
 
-		this.pixels.forEach(pixel => {
+		this.pixels.forEach((pixel) => {
 			if (pixel.x <= topLeft.x && pixel.y <= topLeft.y) {
 				topLeft = pixel;
 			}
@@ -96,19 +110,26 @@ class RstrClassicGroup implements RstrGroup {
  						GROUPING
  ***************************************/
 
-function findNeighboringGroups(group: RstrGroup, groups: RstrGroup[], maxPixelCount: number = Number.MAX_VALUE): RstrGroup[] {
+function findNeighboringGroups(
+	group: RstrGroup,
+	groups: RstrGroup[],
+	maxPixelCount: number = Number.MAX_VALUE
+): RstrGroup[] {
 	const neighbors = [];
 
 	const verticalSliceCount = Math.ceil(Math.sqrt(groups.length));
 	const startIndex = Math.max(0, groups.indexOf(group)) + 1;
-	const endIndex = Math.min(groups.length, startIndex + (verticalSliceCount * 2));
+	const endIndex = Math.min(groups.length, startIndex + verticalSliceCount * 2);
 
 	for (let index = startIndex; index < endIndex; index++) {
 		const neighbor = groups[index];
 		if (neighbor === group) continue;
 		if (neighbor.pixels.length > maxPixelCount) continue;
 		if (neighbor.timesVisited > group.timesVisited) continue;
-		if (!neighbors.includes(neighbor) && neighbor.pixels.some(p => group.pixels.some(gp => gp.isNeighbor(p, false)))) {
+		if (
+			!neighbors.includes(neighbor) &&
+			neighbor.pixels.some((p) => group.pixels.some((gp) => gp.isNeighbor(p, false)))
+		) {
 			neighbors.push(neighbor);
 		}
 	}
@@ -118,7 +139,6 @@ function findNeighboringGroups(group: RstrGroup, groups: RstrGroup[], maxPixelCo
 const groupColors = ['darkorange', 'red', 'purple', 'blue', 'black'];
 
 export class RstrClassicGrouping implements RstrGroupingAlgo, RstrFillingAlgo {
-
 	doGroupingStep(groups: RstrGroup[], config: RstrConfig): RstrGroup[] {
 		let iters = this.iterationsFinished(groups);
 		for (let i = 0; i < groups.length; i++) {
@@ -148,7 +168,9 @@ export class RstrClassicGrouping implements RstrGroupingAlgo, RstrFillingAlgo {
 						groups.splice(groups.indexOf(neighbor), 1);
 					}
 				}
-				group.shape.strokeColor = new paper.Color(groupColors[group.timesVisited % groupColors.length]);
+				group.shape.strokeColor = new paper.Color(
+					groupColors[group.timesVisited % groupColors.length]
+				);
 				group.timesVisited++;
 				return groups;
 			}
@@ -172,7 +194,7 @@ export class RstrClassicGrouping implements RstrGroupingAlgo, RstrFillingAlgo {
 	}
 
 	iterationsFinished(groups: RstrGroup[]): number {
-		return Math.min(...groups.map(g => g.timesVisited));
+		return Math.min(...groups.map((g) => g.timesVisited));
 	}
 
 	/***************************************
@@ -189,8 +211,20 @@ export class RstrClassicGrouping implements RstrGroupingAlgo, RstrFillingAlgo {
 	orange = '#fc8851';
 	brown = '#5b4e54';
 	copicOrange = '#F7941D';
-	kelbColors = [new paper.Color(this.orange), new paper.Color(this.yellow), new paper.paper.Color(this.purple), new paper.Color(this.grape), new paper.Color(this.brown)];
-	kHoodColors = [new paper.Color(this.green), new paper.Color(this.pink), new paper.paper.Color(this.blue), new paper.Color(this.black), new paper.Color(this.yellow)];
+	kelbColors = [
+		new paper.Color(this.orange),
+		new paper.Color(this.yellow),
+		new paper.paper.Color(this.purple),
+		new paper.Color(this.grape),
+		new paper.Color(this.brown)
+	];
+	kHoodColors = [
+		new paper.Color(this.green),
+		new paper.Color(this.pink),
+		new paper.paper.Color(this.blue),
+		new paper.Color(this.black),
+		new paper.Color(this.yellow)
+	];
 
 	fillGroup(group: RstrGroup, layer: paper.Layer, config: RstrConfig): void {
 		if (group.isFilled) return;
@@ -198,29 +232,36 @@ export class RstrClassicGrouping implements RstrGroupingAlgo, RstrFillingAlgo {
 		const box = group.getBoundingBox();
 
 		const colors = [];
-		config.colors.forEach(c => colors.push(new paper.Color(c)));
+		config.colors.forEach((c) => colors.push(new paper.Color(c)));
 		if (colors.length === 0) colors.push(new paper.Color('black'));
 
 		// get the average color for each quadrant of the block
 		const corners = group.getCornerPixels();
-		const diffDesc = Math.abs(corners.topLeft.getAverageColorValue() - corners.bottomRight.getAverageColorValue());
-		const diffAsc = Math.abs(corners.topRight.getAverageColorValue() - corners.bottomLeft.getAverageColorValue());
+		const diffDesc = Math.abs(
+			corners.topLeft.getAverageColorValue() - corners.bottomRight.getAverageColorValue()
+		);
+		const diffAsc = Math.abs(
+			corners.topRight.getAverageColorValue() - corners.bottomLeft.getAverageColorValue()
+		);
 		let start, end;
 		let pattern = 2;
 		if (diffAsc < diffDesc) {
 			// descending
 			if (config.halves && diffDesc > config.tolerance / 2) {
-				pattern = corners.topLeft.getAverageColorValue() > corners.bottomRight.getAverageColorValue() ? 1 : 0;
+				pattern =
+					corners.topLeft.getAverageColorValue() > corners.bottomRight.getAverageColorValue()
+						? 1
+						: 0;
 			}
 			start = new paper.Point(box.bounds.x, box.bounds.y);
-			end = new paper.Point(
-				box.bounds.x + box.bounds.width,
-				box.bounds.y + box.bounds.height
-			);
+			end = new paper.Point(box.bounds.x + box.bounds.width, box.bounds.y + box.bounds.height);
 		} else {
 			// ascending
 			if (config.halves && diffAsc > config.tolerance / 2) {
-				pattern = corners.topRight.getAverageColorValue() > corners.bottomLeft.getAverageColorValue() ? 1 : 0;
+				pattern =
+					corners.topRight.getAverageColorValue() > corners.bottomLeft.getAverageColorValue()
+						? 1
+						: 0;
 			}
 			start = new paper.Point(box.bounds.x, box.bounds.y + box.bounds.height);
 			end = new paper.Point(box.bounds.x + box.bounds.width, box.bounds.y);
@@ -242,8 +283,19 @@ export class RstrClassicGrouping implements RstrGroupingAlgo, RstrFillingAlgo {
 		group.fillColor = color;
 
 		// map average color to linecount
-		const lineCount = (config.density * box.bounds.width) * (1 - group.getAverageLightness());
-		hatchFillRectangle(false, start, end, box, group.shape, lineCount, pattern, layer, group, color);
+		const lineCount = config.density * box.bounds.width * (1 - group.getAverageLightness());
+		hatchFillRectangle(
+			false,
+			start,
+			end,
+			box,
+			group.shape,
+			lineCount,
+			pattern,
+			layer,
+			group,
+			color
+		);
 		if (box) box.remove();
 	}
 }
@@ -253,7 +305,18 @@ const magenta = new paper.Color('magenta');
 const yellow = new paper.Color('yellow');
 const black = new paper.Color('black');
 
-function hatchFillRectangle(debug, start, end, rectangle, shape, lineCount, pattern, layer, group, color) {
+function hatchFillRectangle(
+	debug,
+	start,
+	end,
+	rectangle,
+	shape,
+	lineCount,
+	pattern,
+	layer,
+	group,
+	color
+) {
 	let direction = new paper.Path.Line(start, end);
 	let actualLineCount = lineCount;
 	if (pattern === 0) {
@@ -277,7 +340,7 @@ function hatchFillRectangle(debug, start, end, rectangle, shape, lineCount, patt
 		if (hrs && hrs.length > 0 && hrs.length % 2 === 0) {
 			const lines = Math.ceil(hrs.length / 2);
 			for (let i = 0; i < lines; i++) {
-				const l = new paper.Path.Line(hrs[i * 2].point, hrs[(i * 2) + 1].point);
+				const l = new paper.Path.Line(hrs[i * 2].point, hrs[i * 2 + 1].point);
 				l.strokeColor = color;
 				l.blendMode = 'multiply';
 				group.fills.push(l);
@@ -338,20 +401,20 @@ function rgbToLab(color) {
 	let g = color.green;
 	let b = color.blue;
 
-	r = (r > 0.04045) ? Math.pow((r + 0.055) / 1.055, 2.4) : r / 12.92;
-	g = (g > 0.04045) ? Math.pow((g + 0.055) / 1.055, 2.4) : g / 12.92;
-	b = (b > 0.04045) ? Math.pow((b + 0.055) / 1.055, 2.4) : b / 12.92;
+	r = r > 0.04045 ? Math.pow((r + 0.055) / 1.055, 2.4) : r / 12.92;
+	g = g > 0.04045 ? Math.pow((g + 0.055) / 1.055, 2.4) : g / 12.92;
+	b = b > 0.04045 ? Math.pow((b + 0.055) / 1.055, 2.4) : b / 12.92;
 
 	const x = (r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047;
-	const y = (r * 0.2126 + g * 0.7152 + b * 0.0722) / 1.00000;
+	const y = (r * 0.2126 + g * 0.7152 + b * 0.0722) / 1.0;
 	const z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883;
 
 	// Then, convert XYZ to Lab
-	const fx = (x > 0.008856) ? Math.pow(x, 1 / 3) : (7.787 * x) + 16 / 116;
-	const fy = (y > 0.008856) ? Math.pow(y, 1 / 3) : (7.787 * y) + 16 / 116;
-	const fz = (z > 0.008856) ? Math.pow(z, 1 / 3) : (7.787 * z) + 16 / 116;
+	const fx = x > 0.008856 ? Math.pow(x, 1 / 3) : 7.787 * x + 16 / 116;
+	const fy = y > 0.008856 ? Math.pow(y, 1 / 3) : 7.787 * y + 16 / 116;
+	const fz = z > 0.008856 ? Math.pow(z, 1 / 3) : 7.787 * z + 16 / 116;
 
-	const l = (116 * fy) - 16;
+	const l = 116 * fy - 16;
 	const a = 500 * (fx - fy);
 	const bb = 200 * (fy - fz);
 
