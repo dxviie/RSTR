@@ -1,13 +1,15 @@
 # rstr-order-upload — the studio's silent order-file drop.
 #
-# Deploy (from this directory, needs a one-time `npx wrangler login`):
+# Deploy (from this directory, needs a one-time `npx wrangler login` and
+# wrangler >= 4.36 for the ratelimit bindings):
 #   npx wrangler deploy
 # The printed URL must match ORDER_UPLOAD_ENDPOINT in
 # src/lib/rstr2/orderUpload.ts — adjust that constant if it differs.
 #
 # The R2 bucket already exists (created 2026-07-17). Uploads land under
 # orders/<design-hash>.svg, where <design-hash> equals the `design` hidden
-# field on the Tally order submission.
+# field on the Tally order submission. Retention is handled by an R2
+# lifecycle rule on the orders/ prefix — see README.md.
 
 name = "rstr-order-upload"
 main = "src/index.js"
@@ -17,6 +19,20 @@ workers_dev = true
 [[r2_buckets]]
 binding = "FILES"
 bucket_name = "rstr-order-files"
+
+# Cost fuses for the unauthenticated endpoint: per-IP and endpoint-wide PUT
+# budgets (per colo, best effort). One real order = one PUT, so these are
+# far above legitimate use. namespace_id is just a unique number per
+# account; period must be 10 or 60 seconds.
+[[ratelimits]]
+name = "RATE_IP"
+namespace_id = "1001"
+simple = { limit = 10, period = 60 }
+
+[[ratelimits]]
+name = "RATE_GLOBAL"
+namespace_id = "1002"
+simple = { limit = 60, period = 60 }
 
 [observability]
 enabled = true
