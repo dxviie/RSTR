@@ -34,9 +34,14 @@ behaves exactly as it always did** — the shipped tables sampled through
    min region size, SLIC cell size/compactness, pen width, spacing min/max,
    hatch threshold/gamma, ink boost) from its curve in `profile.curves`.
 3. Rolls the **layer stack**: layer count, per-layer channel (from
-   `profile.channelWeights`, avoiding duplicates while possible) and hatch
-   angle ranges. Layer inks come from `pickInkScheme` — one harmony set for
-   the whole stack, one distinct real ink per layer, steered by
+   `profile.channelWeights`) and hatch angle ranges. Channels are picked
+   axis-first (`CHANNEL_AXES` in `layers.ts` groups them into red / green /
+   blue / lightness): a stack is **guaranteed to span min(layerCount, 4)
+   distinct information axes**, and while any non-degenerate option remains
+   it never holds a channel together with its exact negative (`c`+`r`,
+   `m`+`g`, `y`+`b`, `luma`+`luma-inv` — such a pair inks to a constant
+   between them). Layer inks come from `pickInkScheme` — one harmony set
+   for the whole stack, one distinct real ink per layer, steered by
    `profile.colors` (see below). Families are handed out in shuffle order
    and wrap to a second shade only after every family in the set has had a
    turn — the accent layer counts as its own family's turn — so a stack is
@@ -91,6 +96,13 @@ option from the draw. The sanitizer guarantees every known option appears
 exactly once: duplicates keep the first entry, unknown values are dropped,
 missing ones get their shipped weight — so old stored profiles survive new
 options being added.
+
+Channel weights steer the draw _within_ the axis-coverage rule above: each
+layer picks (weighted) among the channels of the axes the stack hasn't used
+yet, falling back to unused non-inverse channels, then to any unused
+channel. Weight `0` wins over axis coverage — a zeroed channel stays out of
+the draw even when its axis is the only fresh one left (the stack then
+reuses an axis instead).
 
 ### Colours (`colors`)
 
@@ -247,5 +259,10 @@ Rules of the registry:
   harmony set spans min(layerCount, set families) distinct families even
   with the accent forced on. This is what makes the harmony sets an
   enforced promise rather than a tendency.
+- `rngProfiles.test.ts` pins the **channel axis guarantee**: 2–4 layer
+  stacks read one channel per information axis, 5-layer stacks cover all
+  four axes without ever pairing a channel with its exact negative, and
+  zero-weighted channels stay out of the draw even when axis coverage has
+  to degrade.
 - `randomize.test.ts` is the original dice suite, untouched — it must keep
   passing without modification.

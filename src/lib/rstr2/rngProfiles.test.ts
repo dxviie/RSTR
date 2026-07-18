@@ -20,7 +20,7 @@ import { builtinRngProfiles, isBuiltinRngProfileId } from './rngBuiltinProfiles'
 import { ACCENT_RATE, HARMONY_SETS, INK_COLORS } from './inkColors';
 import { mulberry32 } from './rngSources';
 import { defaultParams } from './params';
-import { defaultCmyLayers } from './layers';
+import { CHANNEL_AXES, defaultCmyLayers, type LayerChannel, type LayerConfig } from './layers';
 
 const currentSettings = () => ({ params: defaultParams(), layers: defaultCmyLayers() });
 
@@ -276,6 +276,59 @@ describe('profile colors', () => {
 		for (let seed = 0; seed < 25; seed++) {
 			const { layers } = randomizeSettings(currentSettings(), false, mulberry32(seed), profile);
 			for (const layer of layers) expect(allowed.has(layer.color)).toBe(true);
+		}
+	});
+});
+
+describe('channel axis coverage', () => {
+	it('2–4 layer stacks read one channel per information axis', () => {
+		for (const count of [2, 3, 4]) {
+			const profile = defaultRngProfile();
+			profile.curves.layerCount = { kind: 'constant', value: count, min: 1, max: 8, step: 1 };
+			for (let seed = 0; seed < 200; seed++) {
+				const { layers } = randomizeSettings(currentSettings(), false, mulberry32(seed), profile);
+				const axes = new Set(layers.map((layer) => CHANNEL_AXES[layer.channel]));
+				expect(axes.size).toBe(count);
+			}
+		}
+	});
+
+	it('5 layers span all four axes and never a channel with its exact negative', () => {
+		const INVERSE_PAIRS: [LayerChannel, LayerChannel][] = [
+			['c', 'r'],
+			['m', 'g'],
+			['y', 'b'],
+			['luma', 'luma-inv']
+		];
+		const hasInversePair = (layers: LayerConfig[]) => {
+			const channels = new Set(layers.map((layer) => layer.channel));
+			return INVERSE_PAIRS.some(([a, b]) => channels.has(a) && channels.has(b));
+		};
+		const profile = defaultRngProfile();
+		profile.curves.layerCount = { kind: 'constant', value: 5, min: 1, max: 8, step: 1 };
+		for (let seed = 0; seed < 200; seed++) {
+			const { layers } = randomizeSettings(currentSettings(), false, mulberry32(seed), profile);
+			const channels = layers.map((layer) => layer.channel);
+			expect(new Set(channels).size).toBe(channels.length);
+			expect(new Set(channels.map((channel) => CHANNEL_AXES[channel])).size).toBe(4);
+			expect(hasInversePair(layers)).toBe(false);
+		}
+	});
+
+	it('weight 0 still keeps channels out even when their axis is the only fresh one', () => {
+		const profile = defaultRngProfile();
+		profile.curves.layerCount = { kind: 'constant', value: 4, min: 1, max: 8, step: 1 };
+		for (const option of profile.channelWeights) {
+			if (CHANNEL_AXES[option.value] === 'lightness') option.weight = 0;
+		}
+		for (let seed = 0; seed < 200; seed++) {
+			const { layers } = randomizeSettings(currentSettings(), false, mulberry32(seed), profile);
+			const channels = layers.map((layer) => layer.channel);
+			// zeroed lightness channels never appear; the roll degrades to
+			// distinct channels on the three remaining axes instead
+			for (const channel of channels) expect(CHANNEL_AXES[channel]).not.toBe('lightness');
+			expect(new Set(channels).size).toBe(4);
+			expect(new Set(channels.map((channel) => CHANNEL_AXES[channel])).size).toBe(3);
 		}
 	});
 });

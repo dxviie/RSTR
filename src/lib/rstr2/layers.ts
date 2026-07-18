@@ -47,6 +47,42 @@ export const CHANNEL_LABELS: Record<LayerChannel, string> = {
 	'luma-inv': 'Inv. luminance'
 };
 
+/**
+ * The information axis a channel reads. c/m/y are the exact negatives of
+ * r/g/b, and k/luma/luma-inv all track lightness — two channels on one axis
+ * carry (nearly) the same separation, or its negative. The dice spreads a
+ * stack across distinct axes first (see randomLayer in randomize.ts).
+ */
+export type ChannelAxis = 'red' | 'green' | 'blue' | 'lightness';
+
+export const CHANNEL_AXES: Record<LayerChannel, ChannelAxis> = {
+	c: 'red',
+	r: 'red',
+	m: 'green',
+	g: 'green',
+	y: 'blue',
+	b: 'blue',
+	k: 'lightness',
+	luma: 'lightness',
+	'luma-inv': 'lightness'
+};
+
+/**
+ * Exact-negative channel pairs (v = 1 − inverse). Two layers holding both
+ * sides of a pair ink to a constant between them — the pair carries the
+ * information of one channel. k has no exact negative among the channels.
+ */
+export const CHANNEL_INVERSES: Partial<Record<LayerChannel, LayerChannel>> = {
+	c: 'r',
+	r: 'c',
+	m: 'g',
+	g: 'm',
+	y: 'b',
+	b: 'y',
+	luma: 'luma-inv',
+	'luma-inv': 'luma'
+};
+
 let layerCounter = 0;
 export const nextLayerId = (): string => `layer-${Date.now().toString(36)}-${layerCounter++}`;
 

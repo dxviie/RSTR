@@ -26,7 +26,13 @@
 // mapping) are rolled.
 
 import type { Rstr2Params, SegmentationAlgorithm } from './params';
-import { nextLayerId, type LayerChannel, type LayerConfig } from './layers';
+import {
+	CHANNEL_AXES,
+	CHANNEL_INVERSES,
+	nextLayerId,
+	type LayerChannel,
+	type LayerConfig
+} from './layers';
 import { builtinPresets, type Rstr2Settings } from './presets';
 import {
 	defaultColorOptions,
@@ -173,10 +179,32 @@ const randomLayer = (
 	ink: InkColor,
 	profile: RngProfile
 ): LayerConfig => {
-	// prefer channels the stack doesn't use yet, so multi-layer rolls
-	// separate the image instead of drawing it twice
+	// The channel pick prefers, in order: a whole new information axis (see
+	// CHANNEL_AXES — guarantees min(count, 4) distinct axes per stack), then
+	// an unused channel that is not the exact negative of a taken one (a
+	// c+r style pair inks to a constant between them), then any unused
+	// channel — so multi-layer rolls separate the image instead of drawing
+	// the same signal, or its negative, twice. Zero-weighted channels stay
+	// out of the draw unless literally nothing else is left.
 	const free = profile.channelWeights.filter((option) => !taken.has(option.value));
-	const channel = weightedPick(free.length > 0 ? free : profile.channelWeights, rng);
+	const weighted = free.filter((option) => option.weight > 0);
+	const takenAxes = new Set(Array.from(taken, (used) => CHANNEL_AXES[used]));
+	const freshAxis = weighted.filter((option) => !takenAxes.has(CHANNEL_AXES[option.value]));
+	const nonInverse = weighted.filter((option) => {
+		const inverse = CHANNEL_INVERSES[option.value];
+		return inverse === undefined || !taken.has(inverse);
+	});
+	const pool =
+		freshAxis.length > 0
+			? freshAxis
+			: nonInverse.length > 0
+				? nonInverse
+				: weighted.length > 0
+					? weighted
+					: free.length > 0
+						? free
+						: profile.channelWeights;
+	const channel = weightedPick(pool, rng);
 	taken.add(channel);
 	return {
 		id: nextLayerId(),
