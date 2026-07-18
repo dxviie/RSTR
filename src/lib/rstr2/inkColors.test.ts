@@ -180,3 +180,53 @@ describe('pickInkScheme with colour options (rng profiles)', () => {
 		expect(harmonySetSwatches('not a set')).toEqual([]);
 	});
 });
+
+describe('family coverage guarantee', () => {
+	// pin the roll to one harmony set so the expected family count is known
+	const pinSet = (name: string, accentRate: number) => ({
+		accentRate,
+		harmonyWeights: HARMONY_SETS.map((set) => ({
+			value: set.name,
+			weight: set.name === name ? 1 : 0
+		}))
+	});
+
+	const familiesOf = (inks: ReturnType<typeof pickInkScheme>) =>
+		new Set(inks.map((ink) => ink.family));
+
+	it('a multi-layer stack never collapses onto a single family', () => {
+		// every harmony set has ≥ 2 families, so 2+ layers must span ≥ 2 —
+		// the old layer-index rotation let an accent eat a family's only turn
+		for (let count = 2; count <= 5; count++) {
+			for (let seed = 0; seed < 400; seed++) {
+				expect(familiesOf(pickInkScheme(count, seededRng(seed))).size).toBeGreaterThanOrEqual(2);
+			}
+		}
+	});
+
+	it('a stack spans min(count, set families) distinct families', () => {
+		for (let seed = 0; seed < 300; seed++) {
+			// 2-family set, 3 layers, accent forced — both families, always
+			// (the exact scenario of the pink/pink/pink collapse)
+			expect(familiesOf(pickInkScheme(3, seededRng(seed), pinSet('green / pink', 1)))).toEqual(
+				new Set(['green', 'pink'])
+			);
+			// 3-family set, 3 layers, accent forced — all three families
+			expect(
+				familiesOf(pickInkScheme(3, seededRng(seed), pinSet('pink / teal / yellow', 1))).size
+			).toBe(3);
+			// 4-family set, 3 layers, accent forced — three distinct families
+			expect(familiesOf(pickInkScheme(3, seededRng(seed), pinSet('berry analogous', 1))).size).toBe(
+				3
+			);
+		}
+	});
+
+	it('without an accent the wrap still covers every family first', () => {
+		for (let seed = 0; seed < 300; seed++) {
+			expect(familiesOf(pickInkScheme(3, seededRng(seed), pinSet('green / pink', 0)))).toEqual(
+				new Set(['green', 'pink'])
+			);
+		}
+	});
+});

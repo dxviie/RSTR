@@ -282,11 +282,14 @@ const pickFromFamily = (family: InkFamily, used: Set<string>, rng: Rng): InkColo
 /**
  * Pick `count` distinct inks that form a deliberate scheme. One harmony set is
  * chosen for the whole stack; each layer draws from a different family in that
- * set (wrapping to a second shade of a family when a plot has more layers than
- * the set has families). ACCENT_RATE of rolls also reserve one layer for a
- * vibrant accent-shelf ink drawn from the set's families, so most stacks get
- * exactly one pop of colour. Returns the chosen inks in layer order — the
- * caller takes `hex` for the colour and `name` for the layer label.
+ * set, in shuffle order, wrapping to a second shade of a family only after
+ * every family in the set has had its turn — the accent counts as its own
+ * family's turn — so a stack always spans min(count, set families) distinct
+ * families and a small set can never be crowded out of the stack.
+ * ACCENT_RATE of rolls reserve one layer for a vibrant accent-shelf ink
+ * drawn from the set's families, so most stacks get exactly one pop of
+ * colour. Returns the chosen inks in layer order — the caller takes `hex`
+ * for the colour and `name` for the layer label.
  *
  * `colors` overrides the accent rate and harmony weights (rng profiles);
  * omitted, the shipped tables apply. The rng consumption is identical either
@@ -304,6 +307,7 @@ export const pickInkScheme = (count: number, rng: Rng, colors?: ColorRollOptions
 	const families = shuffle(set.families, rng);
 	const used = new Set<string>();
 	const picks: (InkColor | null)[] = Array.from({ length: count }, () => null);
+	let accent: InkColor | null = null;
 
 	// the vibrant accent layer — an accent ink from the set's own families keeps
 	// the scheme deliberate; only a set with no accent-covered family (none
@@ -313,18 +317,34 @@ export const pickInkScheme = (count: number, rng: Rng, colors?: ColorRollOptions
 		const inSet = shelf.filter((ink) => set.families.includes(ink.family));
 		const pool = inSet.length > 0 ? inSet : shelf;
 		if (pool.length > 0) {
-			const accent = pool[Math.floor(rng() * pool.length)];
+			accent = pool[Math.floor(rng() * pool.length)];
 			picks[Math.floor(rng() * count)] = accent;
 			used.add(accent.hex);
 		}
 	}
 
+	// The family plan for the regular layers: shuffle order, wrapping only
+	// once every family has had a turn. The accent claims the first slot of
+	// its own family — indexing families by layer position instead used to
+	// let an accent eat another family's only turn, collapsing e.g. a
+	// 3-layer green/pink roll into three pinks with no green at all.
+	const plan: InkFamily[] = [];
+	for (let i = 0; plan.length < count; i++) plan.push(families[i % families.length]);
+	if (accent) {
+		const slot = plan.indexOf(accent.family);
+		// accent from outside the set (whole-shelf fallback): it replaces the
+		// last, least-important slot instead of a family's turn
+		if (slot >= 0) plan.splice(slot, 1);
+		else plan.pop();
+	}
+
+	let planned = 0;
 	for (let i = 0; i < count; i++) {
 		if (picks[i] !== null) continue;
-		// prefer this layer's family; fall back to any set family with a free
+		// prefer the planned family; fall back to any set family with a free
 		// shade, then (only if the whole set is drained) allow any ink at all
 		let ink =
-			pickFromFamily(families[i % families.length], used, rng) ??
+			pickFromFamily(plan[planned++], used, rng) ??
 			families.map((f) => pickFromFamily(f, used, rng)).find(Boolean) ??
 			null;
 		if (!ink) {

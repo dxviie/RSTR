@@ -37,7 +37,11 @@ behaves exactly as it always did** — the shipped tables sampled through
    `profile.channelWeights`, avoiding duplicates while possible) and hatch
    angle ranges. Layer inks come from `pickInkScheme` — one harmony set for
    the whole stack, one distinct real ink per layer, steered by
-   `profile.colors` (see below).
+   `profile.colors` (see below). Families are handed out in shuffle order
+   and wrap to a second shade only after every family in the set has had a
+   turn — the accent layer counts as its own family's turn — so a stack is
+   **guaranteed to span min(layerCount, set families) distinct families**;
+   a roll can never collapse onto a single family.
 4. Leaves the **adjust** (image) parameters and the **export** size alone —
    those belong to the source image, not to the look.
 
@@ -238,5 +242,10 @@ Rules of the registry:
   comparable across tweaks).
 - `distributions.test.ts` pins every kind inside bounds and on the step
   grid, and pins the gaussian kind to the original `sampleCurve` math.
+- `inkColors.test.ts` pins the **family coverage guarantee**: a multi-layer
+  stack never lands on a single family, and a stack pinned to a known
+  harmony set spans min(layerCount, set families) distinct families even
+  with the accent forced on. This is what makes the harmony sets an
+  enforced promise rather than a tendency.
 - `randomize.test.ts` is the original dice suite, untouched — it must keep
   passing without modification.
