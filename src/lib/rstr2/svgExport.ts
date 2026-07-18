@@ -34,7 +34,8 @@ export const settingsComment = (settings: Rstr2Settings): string => {
 	const lines: string[] = [];
 	const line = (label: string, value: string | number | null) => {
 		if (value === null) return;
-		lines.push(`    ${label.padEnd(18)}${value}`);
+		// 20 keeps at least two spaces after the widest label (ink threshold high)
+		lines.push(`    ${label.padEnd(20)}${value}`);
 	};
 	const mm = (value: number | null) => (value === null ? null : `${value} mm`);
 
@@ -62,7 +63,7 @@ export const settingsComment = (settings: Rstr2Settings): string => {
 	lines.push('  lines');
 	line('pen width', mm(params.penWidthMm));
 	line('spacing', `${params.spacingMinMm} to ${params.spacingMaxMm} mm`);
-	line('ink threshold', params.hatchThreshold);
+	line('ink threshold', `${params.hatchThresholdLow} to ${params.hatchThresholdHigh}`);
 	line('ink gamma', params.hatchGamma);
 	line('ink boost', params.inkBoost);
 	lines.push('');
@@ -79,7 +80,8 @@ export const settingsComment = (settings: Rstr2Settings): string => {
 		line('pen width', mm(layer.penWidthMm));
 		line('spacing min', mm(layer.spacingMinMm));
 		line('spacing max', mm(layer.spacingMaxMm));
-		line('ink threshold', layer.threshold);
+		line('ink threshold low', layer.thresholdLow);
+		line('ink threshold high', layer.thresholdHigh);
 		line('ink gamma', layer.inkGamma);
 		line('ink boost', layer.inkBoost);
 	});

@@ -50,7 +50,8 @@ export const CURVE_META: Record<RandomCurveKey, CurveMeta> = {
 	penWidthMm: { label: 'pen width', group: 'lines', hardMin: 0.1, hardMax: 2.5, unit: 'mm' },
 	spacingMinMm: { label: 'spacing min', group: 'lines', hardMin: 0.05, hardMax: 3, unit: 'mm' },
 	spacingMaxMm: { label: 'spacing max', group: 'lines', hardMin: 0.5, hardMax: 12, unit: 'mm' },
-	hatchThreshold: { label: 'hatch threshold', group: 'lines', hardMin: 0, hardMax: 0.6 },
+	hatchThresholdLow: { label: 'ink threshold low', group: 'lines', hardMin: 0, hardMax: 0.6 },
+	hatchThresholdHigh: { label: 'ink threshold high', group: 'lines', hardMin: 0.3, hardMax: 1 },
 	hatchGamma: { label: 'hatch gamma', group: 'lines', hardMin: 0.3, hardMax: 4 },
 	inkBoost: { label: 'ink boost', group: 'lines', hardMin: 0.3, hardMax: 3.5 },
 	layerCount: { label: 'layer count', group: 'layers', hardMin: 1, hardMax: 8 },
@@ -65,7 +66,8 @@ export const LAYER_OVERRIDE_LABELS: Record<LayerOverrideKey, string> = {
 	penWidthMm: 'pen width',
 	spacingMinMm: 'spacing min',
 	spacingMaxMm: 'spacing max',
-	threshold: 'ink threshold',
+	thresholdLow: 'ink threshold low',
+	thresholdHigh: 'ink threshold high',
 	inkGamma: 'ink gamma',
 	inkBoost: 'ink boost'
 };
@@ -102,10 +104,13 @@ const sanitizeOverrideChances = (
 	value: unknown,
 	defaults: Record<LayerOverrideKey, number>
 ): Record<LayerOverrideKey, number> => {
-	const record = (typeof value === 'object' && value !== null ? value : {}) as Record<
-		string,
-		unknown
-	>;
+	const record = {
+		...((typeof value === 'object' && value !== null ? value : {}) as Record<string, unknown>)
+	};
+	// profiles saved before the threshold became a band carried a single chance
+	if (record.threshold !== undefined && record.thresholdLow === undefined) {
+		record.thresholdLow = record.threshold;
+	}
 	return Object.fromEntries(
 		LAYER_OVERRIDE_KEYS.map((key) => {
 			const chance = record[key];
@@ -142,9 +147,15 @@ export const sanitizeRngProfile = (value: unknown): RngProfile | null => {
 	if (typeof record.id !== 'string' || record.id.trim() === '') return null;
 	if (typeof record.name !== 'string' || record.name.trim() === '') return null;
 	const base = defaultRngProfile();
-	const storedCurves = (
-		typeof record.curves === 'object' && record.curves !== null ? record.curves : {}
-	) as Record<string, unknown>;
+	const storedCurves = {
+		...((typeof record.curves === 'object' && record.curves !== null
+			? record.curves
+			: {}) as Record<string, unknown>)
+	};
+	// profiles saved before the threshold became a band carried a single curve
+	if (storedCurves.hatchThreshold !== undefined && storedCurves.hatchThresholdLow === undefined) {
+		storedCurves.hatchThresholdLow = storedCurves.hatchThreshold;
+	}
 	const curves = Object.fromEntries(
 		RNG_CURVE_KEYS.map((key) => [key, sanitizeDistribution(storedCurves[key], base.curves[key])])
 	) as Record<RandomCurveKey, Distribution>;

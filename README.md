@@ -19,7 +19,7 @@ RSTR splits a picture into regions of similar tone and refills each one with par
 | 1   | **image**        | Load a picture or video and tune it (brightness, contrast, gamma, saturation, vibrance) before tracing. |
 | 2   | **video**        | Frame rate and export window — shown while a video is loaded.                                           |
 | 3   | **segmentation** | How the image is carved into tonal regions (watershed, posterize, k-means, SLIC).                       |
-| 4   | **lines**        | Pen width and how ink intensity turns into line spacing.                                                |
+| 4   | **lines**        | Pen width, the ink threshold band (low/high pass) and how ink intensity turns into line spacing.        |
 | 5   | **presets**      | Randomize everything, or save and share complete looks as JSON.                                         |
 | 6   | **layers**       | One pen per layer: color, image channel, hatch angles, per-layer overrides.                             |
 | 7   | **export**       | Output width (or fit-to-page A6–A3 with a margin) and the SVG / PNG / frame-sequence downloads.         |
@@ -52,7 +52,7 @@ Each stage is wired to Svelte 5 runes as an independent `$effect` with its own d
 
 **Layers** are the pen model. A layer is just data: an image channel (cyan / magenta / yellow / key / R / G / B / luminance) that drives its ink amount, plus a color, a hatch-angle range, and optional per-layer overrides of the global line settings. Each layer maps to one physical pen and becomes one `<g>` in the exported SVG. CMY is only the default stack.
 
-**Hatching** fills each region's contours (holes included) with parallel lines whose spacing is driven by the region's mean ink, through a configurable gamma/boost curve. Each region picks its own angle within the layer's range based on its shape, so a single pen never looks mechanical.
+**Hatching** fills each region's contours (holes included) with parallel lines whose spacing is driven by the region's mean ink, through a configurable gamma/boost curve. An ink threshold band acts as a low/high pass filter: regions below its low bound (too faint) or above its high bound (too dense) are left empty, so a band narrowed from both ends isolates the midtones. Each region picks its own angle within the layer's range based on its shape, so a single pen never looks mechanical.
 
 **Plot-time estimation** is a duration-only port of [saxi](https://github.com/nornagon/saxi)'s constant-acceleration motion planner (which itself derives from [fogleman/axi](https://github.com/fogleman/axi)): per-segment cornering velocities, trapezoidal velocity profiles, pen lift/drop pauses and pen-up travel. Match the plotter profile to saxi's options and the estimate lines up with what saxi reports for the exported file.
 
@@ -110,7 +110,7 @@ Other notable areas:
 - **[Tailwind CSS 4](https://tailwindcss.com)** (via `@tailwindcss/vite`) with **[shadcn-svelte](https://shadcn-svelte.com)**, **[clsx](https://github.com/lukeed/clsx)**, **[tailwind-merge](https://github.com/dcastil/tailwind-merge)** and **[tailwind-variants](https://www.tailwind-variants.org)** for styling.
 - **[Paper.js](http://paperjs.org)** — geometry engine behind the classic app.
 - **[Tweakpane](https://tweakpane.github.io/docs/)** — the classic app's control panel.
-- **[@stanko/dual-range-input](https://github.com/stanko-arbutina/dual-range-input)** by [Stanko Tadić (muffinman)](https://muffinman.io) — the min/max spacing sliders in the studio, built on his [native dual range input technique](https://muffinman.io/blog/native-dual-range-input/).
+- **[@stanko/dual-range-input](https://github.com/stanko-arbutina/dual-range-input)** by [Stanko Tadić (muffinman)](https://muffinman.io) — the dual-range sliders in the studio (spacing, ink threshold band, video frame window), built on his [native dual range input technique](https://muffinman.io/blog/native-dual-range-input/).
 - **[Vitest](https://vitest.dev)** — unit tests · **[ESLint](https://eslint.org)** + **[Prettier](https://prettier.io)** — linting and formatting.
 
 ---

@@ -147,12 +147,17 @@
 		<dl>
 			<dt>pen width (mm)</dt>
 			<dd>Physical line width used for rendering and spacing math. Layers can override it.</dd>
-			<dt>ink threshold</dt>
-			<dd>Regions holding less ink than this stay empty.</dd>
 			<dt>ink gamma</dt>
 			<dd>Perceptual weight on ink intensity before it becomes line spacing.</dd>
 			<dt>ink boost</dt>
 			<dd>Coverage multiplier — above 1 pushes dark regions into overlapping lines.</dd>
+			<dt>ink threshold</dt>
+			<dd>
+				The band of ink a region must fall in to be hatched. The low bound is a high-pass filter —
+				regions holding less ink stay empty; the high bound is a low-pass filter — regions holding
+				more ink stay empty too (leave it at 1 to keep every dark region). Narrow the band from both
+				ends to isolate the midtones.
+			</dd>
 			<dt>spacing (mm)</dt>
 			<dd>
 				Nominal min–max line spacing. Each region lands somewhere in this range based on its ink:
@@ -181,8 +186,9 @@
 			</dd>
 			<dt>overrides</dt>
 			<dd>
-				Pen width, threshold, spacing, ink gamma and ink boost can be set per layer. Empty fields
-				inherit the global lines values (shown as grey italics); "clear overrides" resets them all.
+				Pen width, the threshold band (low / high), spacing, ink gamma and ink boost can be set per
+				layer. Empty fields inherit the global lines values (shown as grey italics); "clear
+				overrides" resets them all.
 			</dd>
 		</dl>
 	</section>

@@ -36,7 +36,9 @@ a default-profile roll is pinned bit-for-bit against a profile-less roll
 1. Picks a **segmentation algorithm** from `profile.algorithmWeights`.
 2. Samples every **numeric parameter** (resolution, smoothing, tolerance,
    min region size, SLIC cell size/compactness, pen width, spacing min/max,
-   hatch threshold/gamma, ink boost) from its curve in `profile.curves`.
+   ink threshold low/high, hatch gamma, ink boost) from its curve in
+   `profile.curves`. The threshold pair is kept ordered — if a custom
+   profile's curves cross, the sampled bounds are swapped.
 3. Rolls the **layer stack**: layer count, per-layer channel (from
    `profile.channelWeights`) and hatch angle ranges. Channels are picked
    axis-first (`CHANNEL_AXES` in `layers.ts` groups them into red / green /
@@ -52,9 +54,9 @@ a default-profile roll is pinned bit-for-bit against a profile-less roll
    **guaranteed to span min(layerCount, set families) distinct families**;
    a roll can never collapse onto a single family.
 4. Optionally rolls **per-layer overrides** (pen width, spacings,
-   threshold, gamma, boost) along `profile.layerOverrideChances` — by
-   default the chances are all 0 and every layer inherits the globals (see
-   [Layer overrides](#layer-overrides-layeroverridechances)).
+   threshold low/high, gamma, boost) along `profile.layerOverrideChances` —
+   by default the chances are all 0 and every layer inherits the globals
+   (see [Layer overrides](#layer-overrides-layeroverridechances)).
 5. Leaves the **adjust** (image) parameters and the **export** size alone —
    those belong to the source image, not to the look.
 
@@ -136,23 +138,24 @@ curated in `INK_COLORS` (real, buyable inks only). Add or retag inks there.
 
 ### Layer overrides (`layerOverrideChances`)
 
-Each rolled layer carries six nullable override fields (`penWidthMm`,
-`spacingMinMm`, `spacingMaxMm`, `threshold`, `inkGamma`, `inkBoost`); `null`
-means "inherit the global" and is what the dice always produced
-historically. `layerOverrideChances` gives each field a 0..1 chance that a
-rolled layer gets its **own** value instead — sampled from the same profile
-curve as the corresponding global (`threshold` → `hatchThreshold`,
-`inkGamma` → `hatchGamma`, the rest map by name), so one curve describes
-the physical quantity wherever it's rolled.
+Each rolled layer carries seven nullable override fields (`penWidthMm`,
+`spacingMinMm`, `spacingMaxMm`, `thresholdLow`, `thresholdHigh`,
+`inkGamma`, `inkBoost`); `null` means "inherit the global" and is what the
+dice always produced historically. `layerOverrideChances` gives each field
+a 0..1 chance that a rolled layer gets its **own** value instead — sampled
+from the same profile curve as the corresponding global (`thresholdLow` →
+`hatchThresholdLow`, `thresholdHigh` → `hatchThresholdHigh`, `inkGamma` →
+`hatchGamma`, the rest map by name), so one curve describes the physical
+quantity wherever it's rolled.
 
 Details worth knowing:
 
 - Shipped default is `0` everywhere: layers always inherit, and a zero
   chance consumes **no randomness**, which is what keeps the default dice
   bit-identical to the pre-override behaviour.
-- The layer's _effective_ spacing pair (`override ?? global`, the same
-  resolution the hatcher uses) is kept ordered: both-rolled pairs are
-  sorted, a lone rolled side is clamped against the global counterpart.
+- The layer's _effective_ spacing and threshold pairs (`override ?? global`,
+  the same resolution the hatcher uses) are kept ordered: both-rolled pairs
+  are sorted, a lone rolled side is clamped against the global counterpart.
 - **Stick to built-in presets** never rolls overrides — the preset's pen
   combination is physical and stays verbatim.
 - Enabling a chance changes how many rng draws a roll consumes, so seeded

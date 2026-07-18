@@ -106,12 +106,20 @@ export const BUILT_IN_COPY_RNG_PROFILE: RngProfile = {
 			max: 10,
 			step: 0.05
 		},
-		hatchThreshold: {
+		hatchThresholdLow: {
 			kind: 'gaussian',
 			mean: 0.08,
 			stdDev: 0.05,
 			min: 0,
 			max: 0.25,
+			step: 0.01
+		},
+		hatchThresholdHigh: {
+			kind: 'gaussian',
+			mean: 1,
+			stdDev: 0.15,
+			min: 0.5,
+			max: 1,
 			step: 0.01
 		},
 		hatchGamma: {
@@ -292,7 +300,10 @@ export const BUILT_IN_COPY_RNG_PROFILE: RngProfile = {
 		penWidthMm: 0.5,
 		spacingMinMm: 0.5,
 		spacingMaxMm: 0.5,
-		threshold: 0.5,
+		thresholdLow: 0.5,
+		// the high cut is new territory — roll it on layers more cautiously
+		// than the low cut (its curve sits on 1 = no cut most of the time)
+		thresholdHigh: 0.25,
 		inkGamma: 0,
 		inkBoost: 0.5
 	}

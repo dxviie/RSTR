@@ -378,16 +378,21 @@ describe('layer override chances', () => {
 			for (const layer of layers) {
 				expect(layer.penWidthMm).toBeGreaterThanOrEqual(RANDOM_CURVES.penWidthMm.min);
 				expect(layer.penWidthMm).toBeLessThanOrEqual(RANDOM_CURVES.penWidthMm.max);
-				expect(layer.threshold).toBeGreaterThanOrEqual(RANDOM_CURVES.hatchThreshold.min);
-				expect(layer.threshold).toBeLessThanOrEqual(RANDOM_CURVES.hatchThreshold.max);
+				expect(layer.thresholdLow).toBeGreaterThanOrEqual(RANDOM_CURVES.hatchThresholdLow.min);
+				expect(layer.thresholdLow).toBeLessThanOrEqual(RANDOM_CURVES.hatchThresholdLow.max);
+				expect(layer.thresholdHigh).toBeGreaterThanOrEqual(RANDOM_CURVES.hatchThresholdHigh.min);
+				expect(layer.thresholdHigh).toBeLessThanOrEqual(RANDOM_CURVES.hatchThresholdHigh.max);
 				expect(layer.inkGamma).toBeGreaterThanOrEqual(RANDOM_CURVES.hatchGamma.min);
 				expect(layer.inkGamma).toBeLessThanOrEqual(RANDOM_CURVES.hatchGamma.max);
 				expect(layer.inkBoost).toBeGreaterThanOrEqual(RANDOM_CURVES.inkBoost.min);
 				expect(layer.inkBoost).toBeLessThanOrEqual(RANDOM_CURVES.inkBoost.max);
-				// the pair the hatcher resolves (override ?? global) stays ordered
+				// the pairs the hatcher resolves (override ?? global) stay ordered
 				const effectiveMin = layer.spacingMinMm ?? params.spacingMinMm;
 				const effectiveMax = layer.spacingMaxMm ?? params.spacingMaxMm;
 				expect(effectiveMin).toBeLessThanOrEqual(effectiveMax);
+				const effectiveLow = layer.thresholdLow ?? params.hatchThresholdLow;
+				const effectiveHigh = layer.thresholdHigh ?? params.hatchThresholdHigh;
+				expect(effectiveLow).toBeLessThanOrEqual(effectiveHigh);
 			}
 			// overridden layers survive the same validation as storage / imports
 			expect(sanitizeLayers(JSON.parse(JSON.stringify(layers)))).not.toBeNull();
@@ -406,7 +411,8 @@ describe('layer override chances', () => {
 				else rolled++;
 				expect(layer.penWidthMm).toBeNull();
 				expect(layer.spacingMinMm).toBeNull();
-				expect(layer.threshold).toBeNull();
+				expect(layer.thresholdLow).toBeNull();
+				expect(layer.thresholdHigh).toBeNull();
 			}
 		}
 		expect(rolled).toBeGreaterThan(20);
@@ -450,7 +456,29 @@ describe('layer override chances', () => {
 		expect(profile?.layerOverrideChances.inkBoost).toBe(1);
 		expect(profile?.layerOverrideChances.penWidthMm).toBe(0);
 		expect(profile?.layerOverrideChances.spacingMaxMm).toBe(0);
-		expect(profile?.layerOverrideChances.threshold).toBe(0);
+		expect(profile?.layerOverrideChances.thresholdLow).toBe(0);
+		expect(profile?.layerOverrideChances.thresholdHigh).toBe(0);
+	});
+
+	it('migrates a pre-band profile: single threshold curve and chance become the low bound', () => {
+		const profile = sanitizeRngProfile({
+			id: 'old',
+			name: 'old',
+			curves: { hatchThreshold: { kind: 'uniform', min: 0.05, max: 0.3, step: 0.01 } },
+			layerOverrideChances: { threshold: 0.4 }
+		});
+		expect(profile?.curves.hatchThresholdLow).toEqual({
+			kind: 'uniform',
+			min: 0.05,
+			max: 0.3,
+			step: 0.01
+		});
+		// the high (low-pass) side did not exist — it falls back to the shipped curve
+		expect(profile?.curves.hatchThresholdHigh).toEqual(
+			defaultRngProfile().curves.hatchThresholdHigh
+		);
+		expect(profile?.layerOverrideChances.thresholdLow).toBe(0.4);
+		expect(profile?.layerOverrideChances.thresholdHigh).toBe(0);
 	});
 });
 
