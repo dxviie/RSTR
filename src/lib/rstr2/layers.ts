@@ -26,8 +26,10 @@ export interface LayerConfig {
 	spacingMinMm: number | null;
 	/** sparsest hatch spacing before a region is left empty-ish (mm) */
 	spacingMaxMm: number | null;
-	/** regions with mean ink below this are not hatched (0..1) */
-	threshold: number | null;
+	/** regions with mean ink below this are not hatched (0..1) — high-pass */
+	thresholdLow: number | null;
+	/** regions with mean ink above this are not hatched (0..1) — low-pass */
+	thresholdHigh: number | null;
 	/** perceptual weight on ink intensity before spacing */
 	inkGamma: number | null;
 	/** coverage multiplier — >1 pushes dark regions into overlapping lines */
@@ -90,7 +92,8 @@ const inheritedHatchSettings = () => ({
 	penWidthMm: null,
 	spacingMinMm: null,
 	spacingMaxMm: null,
-	threshold: null,
+	thresholdLow: null,
+	thresholdHigh: null,
 	inkGamma: null,
 	inkBoost: null
 });
@@ -203,7 +206,8 @@ const OVERRIDE_FIELDS = [
 	'penWidthMm',
 	'spacingMinMm',
 	'spacingMaxMm',
-	'threshold',
+	'thresholdLow',
+	'thresholdHigh',
 	'inkGamma',
 	'inkBoost'
 ] as const;
@@ -230,7 +234,7 @@ const LEGACY_DEFAULTS: Record<string, number> = {
 	penWidthMm: 0.4,
 	spacingMinMm: 0.5,
 	spacingMaxMm: 4,
-	threshold: 0.1
+	thresholdLow: 0.1
 };
 
 /** Upgrade layers stored by earlier versions. */
@@ -242,6 +246,11 @@ const migrateLayer = (layer: unknown): unknown => {
 		l.angleMin = l.angle;
 		l.angleMax = l.angle;
 		delete l.angle;
+	}
+	// single low-side `threshold` -> low bound of the threshold band
+	if (l.threshold !== undefined && l.thresholdLow === undefined) {
+		l.thresholdLow = l.threshold;
+		delete l.threshold;
 	}
 	// concrete hatch values -> nullable overrides
 	for (const field of OVERRIDE_FIELDS) {

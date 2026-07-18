@@ -78,7 +78,11 @@ export const RANDOM_CURVES = {
 	penWidthMm: { mean: 0.5, stdDev: 0.2, min: 0.2, max: 1.5, step: 0.05 },
 	spacingMinMm: { mean: 0.55, stdDev: 0.3, min: 0.2, max: 1.5, step: 0.05 },
 	spacingMaxMm: { mean: 3.5, stdDev: 1.4, min: 1.5, max: 6.5, step: 0.05 },
-	hatchThreshold: { mean: 0.08, stdDev: 0.05, min: 0, max: 0.25, step: 0.01 },
+	hatchThresholdLow: { mean: 0.08, stdDev: 0.05, min: 0, max: 0.25, step: 0.01 },
+	// the high (low-pass) cut sits on 1 most of the time — the mean rides the
+	// clamp, so roughly half the rolls cut nothing and the rest only shave the
+	// densest regions; cutting darks removes the strongest signal, keep it rare
+	hatchThresholdHigh: { mean: 1, stdDev: 0.15, min: 0.5, max: 1, step: 0.01 },
 	hatchGamma: { mean: 1.7, stdDev: 0.45, min: 0.8, max: 2.8, step: 0.05 },
 	inkBoost: { mean: 1.15, stdDev: 0.35, min: 0.7, max: 2.2, step: 0.05 },
 	// layers
@@ -136,7 +140,8 @@ export const LAYER_OVERRIDE_KEYS = [
 	'penWidthMm',
 	'spacingMinMm',
 	'spacingMaxMm',
-	'threshold',
+	'thresholdLow',
+	'thresholdHigh',
 	'inkGamma',
 	'inkBoost'
 ] as const;
@@ -149,7 +154,8 @@ const OVERRIDE_VALUE_CURVES: Record<LayerOverrideKey, RandomCurveKey> = {
 	penWidthMm: 'penWidthMm',
 	spacingMinMm: 'spacingMinMm',
 	spacingMaxMm: 'spacingMaxMm',
-	threshold: 'hatchThreshold',
+	thresholdLow: 'hatchThresholdLow',
+	thresholdHigh: 'hatchThresholdHigh',
 	inkGamma: 'hatchGamma',
 	inkBoost: 'inkBoost'
 };
@@ -209,6 +215,30 @@ const randomAngles = (
 };
 
 /**
+ * Keep an EFFECTIVE low/high pair (override ?? global, the same resolution
+ * the hatcher uses) ordered, whichever side rolled: both-rolled pairs are
+ * swapped, a lone rolled side is clamped against the global counterpart.
+ */
+const orderEffectivePair = (
+	overrides: Record<LayerOverrideKey, number | null>,
+	lowKey: LayerOverrideKey,
+	highKey: LayerOverrideKey,
+	globalLow: number,
+	globalHigh: number
+): void => {
+	const effectiveLow = overrides[lowKey] ?? globalLow;
+	const effectiveHigh = overrides[highKey] ?? globalHigh;
+	if (effectiveLow <= effectiveHigh) return;
+	if (overrides[lowKey] !== null && overrides[highKey] !== null) {
+		[overrides[lowKey], overrides[highKey]] = [overrides[highKey], overrides[lowKey]];
+	} else if (overrides[lowKey] !== null) {
+		overrides[lowKey] = effectiveHigh;
+	} else {
+		overrides[highKey] = effectiveLow;
+	}
+};
+
+/**
  * Per-layer overrides for one rolled layer. Each field rolls its own value
  * (from the same curve as its global) with the profile's chance for that
  * field, and inherits (null) otherwise. A zero chance consumes no
@@ -228,22 +258,20 @@ const rolledOverrides = (
 				? sampleDistribution(profile.curves[OVERRIDE_VALUE_CURVES[key]], rng)
 				: null;
 	}
-	// keep the layer's EFFECTIVE spacing pair (override ?? global, the same
-	// resolution the hatcher uses) ordered, whichever side rolled
-	const effectiveMin = overrides.spacingMinMm ?? globals.spacingMinMm;
-	const effectiveMax = overrides.spacingMaxMm ?? globals.spacingMaxMm;
-	if (effectiveMin > effectiveMax) {
-		if (overrides.spacingMinMm !== null && overrides.spacingMaxMm !== null) {
-			[overrides.spacingMinMm, overrides.spacingMaxMm] = [
-				overrides.spacingMaxMm,
-				overrides.spacingMinMm
-			];
-		} else if (overrides.spacingMinMm !== null) {
-			overrides.spacingMinMm = effectiveMax;
-		} else {
-			overrides.spacingMaxMm = effectiveMin;
-		}
-	}
+	orderEffectivePair(
+		overrides,
+		'spacingMinMm',
+		'spacingMaxMm',
+		globals.spacingMinMm,
+		globals.spacingMaxMm
+	);
+	orderEffectivePair(
+		overrides,
+		'thresholdLow',
+		'thresholdHigh',
+		globals.hatchThresholdLow,
+		globals.hatchThresholdHigh
+	);
 	return overrides;
 };
 
@@ -328,7 +356,15 @@ export const randomizeSettings = (
 	if (params.spacingMaxMm < params.spacingMinMm) {
 		[params.spacingMinMm, params.spacingMaxMm] = [params.spacingMaxMm, params.spacingMinMm];
 	}
-	params.hatchThreshold = sampleDistribution(curves.hatchThreshold, rng);
+	params.hatchThresholdLow = sampleDistribution(curves.hatchThresholdLow, rng);
+	params.hatchThresholdHigh = sampleDistribution(curves.hatchThresholdHigh, rng);
+	// the shipped curves cannot cross, but a custom profile's can
+	if (params.hatchThresholdHigh < params.hatchThresholdLow) {
+		[params.hatchThresholdLow, params.hatchThresholdHigh] = [
+			params.hatchThresholdHigh,
+			params.hatchThresholdLow
+		];
+	}
 	params.hatchGamma = sampleDistribution(curves.hatchGamma, rng);
 	params.inkBoost = sampleDistribution(curves.inkBoost, rng);
 

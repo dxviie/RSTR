@@ -23,7 +23,10 @@ export interface Rstr2Params {
 	penWidthMm: number;
 	spacingMinMm: number;
 	spacingMaxMm: number;
-	hatchThreshold: number;
+	/** ink band that gets hatched: regions below the low bound (high-pass) or
+	 *  above the high bound (low-pass) are left empty (0..1) */
+	hatchThresholdLow: number;
+	hatchThresholdHigh: number;
 	hatchGamma: number;
 	inkBoost: number;
 	// export
@@ -48,7 +51,8 @@ export const defaultParams = (): Rstr2Params => ({
 	penWidthMm: 0.4,
 	spacingMinMm: 0.5,
 	spacingMaxMm: 4,
-	hatchThreshold: 0.1,
+	hatchThresholdLow: 0.1,
+	hatchThresholdHigh: 1,
 	hatchGamma: 1.8,
 	inkBoost: 1,
 	outputWidthMm: 200,
@@ -67,8 +71,14 @@ const ALGORITHMS: SegmentationAlgorithm[] = ['watershed', 'posterize', 'kmeans',
 export const sanitizeParams = (parsed: unknown): Rstr2Params => {
 	const params = defaultParams();
 	if (typeof parsed !== 'object' || parsed === null) return params;
+	const record: Record<string, unknown> = { ...(parsed as Record<string, unknown>) };
+	// migrate: older versions stored a single low-side cutoff as hatchThreshold —
+	// it becomes the band's low bound (the high bound defaults to 1 = no cut)
+	if (typeof record.hatchThreshold === 'number' && typeof record.hatchThresholdLow !== 'number') {
+		record.hatchThresholdLow = record.hatchThreshold;
+	}
 	for (const key of Object.keys(params) as (keyof Rstr2Params)[]) {
-		const value = (parsed as Record<string, unknown>)[key];
+		const value = record[key];
 		if (typeof value === typeof params[key]) {
 			(params as unknown as Record<string, unknown>)[key] = value;
 		}

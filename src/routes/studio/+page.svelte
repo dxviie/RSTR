@@ -559,7 +559,8 @@
 			void layer.penWidthMm;
 			void layer.spacingMinMm;
 			void layer.spacingMaxMm;
-			void layer.threshold;
+			void layer.thresholdLow;
+			void layer.thresholdHigh;
 			void layer.inkGamma;
 			void layer.inkBoost;
 			void layer.color;
@@ -571,7 +572,8 @@
 		penWidthMm: layer.penWidthMm ?? params.penWidthMm,
 		spacingMinMm: layer.spacingMinMm ?? params.spacingMinMm,
 		spacingMaxMm: layer.spacingMaxMm ?? params.spacingMaxMm,
-		threshold: layer.threshold ?? params.hatchThreshold,
+		thresholdLow: layer.thresholdLow ?? params.hatchThresholdLow,
+		thresholdHigh: layer.thresholdHigh ?? params.hatchThresholdHigh,
 		gamma: layer.inkGamma ?? params.hatchGamma,
 		inkBoost: layer.inkBoost ?? params.inkBoost
 	});
@@ -647,7 +649,8 @@
 		void params.penWidthMm;
 		void params.spacingMinMm;
 		void params.spacingMaxMm;
-		void params.hatchThreshold;
+		void params.hatchThresholdLow;
+		void params.hatchThresholdHigh;
 		void params.hatchGamma;
 		void params.inkBoost;
 		const results = layerResults;
@@ -703,13 +706,14 @@
 			// and produces overlapping lines on purpose.
 			const minSpacingPx = Math.max(hatch.spacingMinMm * pxPerMm, 0.1);
 			const maxSpacingPx = Math.max(hatch.spacingMaxMm * pxPerMm, minSpacingPx);
+			const thresholdHigh = Math.max(hatch.thresholdHigh, hatch.thresholdLow);
 
 			ctx.strokeStyle = layer.color;
 			ctx.lineWidth = penWidthPx;
 			ctx.beginPath();
 			for (const region of result.regions) {
 				region.hatchSegments = undefined;
-				if (region.ink < hatch.threshold) continue;
+				if (region.ink < hatch.thresholdLow || region.ink > thresholdHigh) continue;
 				const spacing = spacingForInk(
 					region.ink,
 					penWidthPx,
@@ -832,7 +836,8 @@
 		'penWidthMm',
 		'spacingMinMm',
 		'spacingMaxMm',
-		'threshold',
+		'thresholdLow',
+		'thresholdHigh',
 		'inkGamma',
 		'inkBoost'
 	] as const;
@@ -1289,6 +1294,7 @@
 				const penWidthPx = hatch.penWidthMm * pxPerMm;
 				const minSpacingPx = Math.max(hatch.spacingMinMm * pxPerMm, 0.1);
 				const maxSpacingPx = Math.max(hatch.spacingMaxMm * pxPerMm, minSpacingPx);
+				const thresholdHigh = Math.max(hatch.thresholdHigh, hatch.thresholdLow);
 				const spacingOptions = {
 					curve: 'coverage' as const,
 					gamma: hatch.gamma,
@@ -1296,7 +1302,7 @@
 				};
 				const segments = geometries.map((geometry) => {
 					const ink = seg.regionMean[geometry.id];
-					if (ink < hatch.threshold) return [];
+					if (ink < hatch.thresholdLow || ink > thresholdHigh) return [];
 					const spacing = spacingForInk(
 						ink,
 						penWidthPx,
@@ -1552,14 +1558,6 @@
 			tip: 'physical line width — layers can override'
 		},
 		{
-			id: 'hatchThreshold',
-			label: 'ink threshold',
-			min: 0,
-			max: 1,
-			step: 0.05,
-			tip: 'regions with less ink are left empty — layers can override'
-		},
-		{
 			id: 'hatchGamma',
 			label: 'ink gamma',
 			min: 0.5,
@@ -1576,6 +1574,9 @@
 			tip: 'coverage multiplier — above 1 pushes dark regions into overlapping lines'
 		}
 	];
+
+	const THRESHOLD_TIP =
+		'ink band that gets hatched — the low bound cuts faint regions (high-pass), the high bound cuts dense ones (low-pass); layers can override';
 
 	const SPACING_TIP =
 		'nominal min/max line spacing — each region lands in this range based on its ink; layers can override';
@@ -1669,6 +1670,27 @@
 		// real (used) read of both bounds — see the frame slider effect above for
 		// why a bare `void x` is not enough to subscribe the effect here
 		const bound = params.spacingMinMm + params.spacingMaxMm;
+		if (dri && Number.isFinite(bound)) dri.update();
+	});
+
+	// Dual-range slider for the ink threshold band, same setup as the spacing one
+	let thresholdLowEl: HTMLInputElement | undefined = $state();
+	let thresholdHighEl: HTMLInputElement | undefined = $state();
+	let thresholdDri: DualRangeInput | undefined = $state();
+
+	$effect(() => {
+		if (!thresholdLowEl || !thresholdHighEl) return;
+		const dri = new DualRangeInput(thresholdLowEl, thresholdHighEl);
+		thresholdDri = dri;
+		return () => {
+			dri.destroy();
+			thresholdDri = undefined;
+		};
+	});
+
+	$effect(() => {
+		const dri = thresholdDri;
+		const bound = params.hatchThresholdLow + params.hatchThresholdHigh;
 		if (dri && Number.isFinite(bound)) dri.update();
 	});
 </script>
@@ -1891,6 +1913,46 @@
 						/>
 					</label>
 				{/each}
+				<div class="spacing-control" title={THRESHOLD_TIP}>
+					<div class="spacing-head">
+						<span>ink threshold</span>
+						<input
+							type="number"
+							min="0"
+							max="1"
+							step="0.01"
+							bind:value={params.hatchThresholdLow}
+							title="regions with less ink are left empty — the band's high-pass cut"
+						/>
+						<span class="spacing-dash">–</span>
+						<input
+							type="number"
+							min="0"
+							max="1"
+							step="0.01"
+							bind:value={params.hatchThresholdHigh}
+							title="regions with more ink are left empty — the band's low-pass cut (1 = no cut)"
+						/>
+					</div>
+					<div class="dual-range-input">
+						<input
+							bind:this={thresholdLowEl}
+							type="range"
+							min="0"
+							max="1"
+							step="0.01"
+							bind:value={params.hatchThresholdLow}
+						/>
+						<input
+							bind:this={thresholdHighEl}
+							type="range"
+							min="0"
+							max="1"
+							step="0.01"
+							bind:value={params.hatchThresholdHigh}
+						/>
+					</div>
+				</div>
 				<div class="spacing-control" title={SPACING_TIP}>
 					<div class="spacing-head">
 						<span>spacing (mm)</span>
@@ -2200,18 +2262,34 @@
 										step="0.05"
 									/>
 								</label>
+							</div>
+							<div class="layer-row">
 								<label
 									title="regions with less ink are left empty — empty inherits the global value"
 								>
-									threshold
+									threshold low
 									<input
 										type="number"
-										class:overridden={layer.threshold !== null}
-										bind:value={layer.threshold}
-										placeholder={String(params.hatchThreshold)}
+										class:overridden={layer.thresholdLow !== null}
+										bind:value={layer.thresholdLow}
+										placeholder={String(params.hatchThresholdLow)}
 										min="0"
 										max="1"
-										step="0.05"
+										step="0.01"
+									/>
+								</label>
+								<label
+									title="regions with more ink are left empty (1 = no cut) — empty inherits the global value"
+								>
+									threshold high
+									<input
+										type="number"
+										class:overridden={layer.thresholdHigh !== null}
+										bind:value={layer.thresholdHigh}
+										placeholder={String(params.hatchThresholdHigh)}
+										min="0"
+										max="1"
+										step="0.01"
 									/>
 								</label>
 							</div>

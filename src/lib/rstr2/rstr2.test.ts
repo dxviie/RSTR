@@ -438,6 +438,29 @@ describe('layer persistence', () => {
 		expect(parsed![0].angleMin).toBe(45);
 		expect(parsed![0].angleMax).toBe(45);
 	});
+
+	it('migrates a legacy single threshold override to the band low bound', () => {
+		const legacy = defaultCmyLayers().map((layer, index) => {
+			const l: Record<string, unknown> = { ...layer, threshold: index === 0 ? 0.3 : null };
+			delete l.thresholdLow;
+			delete l.thresholdHigh;
+			return l;
+		});
+		const parsed = parseStoredLayers(JSON.stringify(legacy));
+		expect(parsed).not.toBeNull();
+		expect(parsed![0].thresholdLow).toBe(0.3);
+		expect(parsed![0].thresholdHigh).toBeNull();
+		expect(parsed![1].thresholdLow).toBeNull();
+		expect(parsed!.every((layer) => !('threshold' in layer))).toBe(true);
+		// the even older concrete default becomes "inherit", as before
+		const olderStill = defaultCmyLayers().map((layer) => {
+			const l: Record<string, unknown> = { ...layer, threshold: 0.1 };
+			delete l.thresholdLow;
+			delete l.thresholdHigh;
+			return l;
+		});
+		expect(parseStoredLayers(JSON.stringify(olderStill))![0].thresholdLow).toBeNull();
+	});
 });
 
 describe('param persistence', () => {
@@ -467,6 +490,19 @@ describe('param persistence', () => {
 	it('falls back to defaults on corrupt storage', () => {
 		expect(parseStoredParams('{{{')).toEqual(defaultParams());
 		expect(parseStoredParams(null)).toEqual(defaultParams());
+	});
+
+	it('migrates a pre-band single hatchThreshold to the band low bound', () => {
+		const params = parseStoredParams(JSON.stringify({ hatchThreshold: 0.22 }));
+		expect(params.hatchThresholdLow).toBe(0.22);
+		expect(params.hatchThresholdHigh).toBe(1);
+		expect('hatchThreshold' in params).toBe(false);
+		// a settings file that already carries the band keeps it verbatim
+		const band = parseStoredParams(
+			JSON.stringify({ hatchThreshold: 0.22, hatchThresholdLow: 0.05, hatchThresholdHigh: 0.8 })
+		);
+		expect(band.hatchThresholdLow).toBe(0.05);
+		expect(band.hatchThresholdHigh).toBe(0.8);
 	});
 });
 
@@ -580,6 +616,8 @@ describe('settingsComment', () => {
 			expect(comment).toContain(label);
 		}
 		expect(comment).toContain('slic');
+		// the threshold band reads like the spacing range
+		expect(comment).toContain('0.1 to 1');
 		expect(comment).toContain('layer 1: Octopus Blue Sloth');
 		expect(comment).toContain('Cyan (1-R)');
 		expect(comment).toContain('#00BFE8');
@@ -590,12 +628,16 @@ describe('settingsComment', () => {
 		const layers = defaultCmyLayers();
 		layers[1].enabled = false;
 		layers[1].penWidthMm = 0.8;
+		layers[2].thresholdHigh = 0.7;
 		const comment = settingsComment({ params: defaultParams(), layers });
 		expect(comment).not.toContain('superpixel size');
 		expect(comment).toContain('layer 2: De Atramentis Magenta (disabled)');
 		expect(comment).toContain('0.8 mm');
+		expect(comment).toContain('ink threshold high');
+		expect(comment).toContain('0.7');
 		// inherited overrides stay silent
 		expect(comment).not.toContain('spacing min');
+		expect(comment).not.toContain('ink threshold low');
 	});
 
 	it('keeps user strings from breaking the xml comment', () => {

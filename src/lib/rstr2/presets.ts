@@ -39,7 +39,8 @@ export const builtinPresets = (): SettingsPreset[] => [
 				penWidthMm: 0.4,
 				spacingMinMm: 0.05,
 				spacingMaxMm: 4.15,
-				hatchThreshold: 0.1,
+				hatchThresholdLow: 0.1,
+				hatchThresholdHigh: 1,
 				hatchGamma: 1.8,
 				inkBoost: 1.5,
 				outputWidthMm: 200
@@ -62,7 +63,8 @@ export const builtinPresets = (): SettingsPreset[] => [
 				penWidthMm: 0.5,
 				spacingMinMm: 0.05,
 				spacingMaxMm: 4.15,
-				hatchThreshold: 0.1,
+				hatchThresholdLow: 0.1,
+				hatchThresholdHigh: 1,
 				hatchGamma: 1.8,
 				inkBoost: 1.7,
 				outputWidthMm: 200
@@ -85,7 +87,8 @@ export const builtinPresets = (): SettingsPreset[] => [
 				penWidthMm: 0.4,
 				spacingMinMm: 0.05,
 				spacingMaxMm: 3.4,
-				hatchThreshold: 0.2,
+				hatchThresholdLow: 0.2,
+				hatchThresholdHigh: 1,
 				hatchGamma: 1.5,
 				inkBoost: 1,
 				outputWidthMm: 200
@@ -108,7 +111,8 @@ export const builtinPresets = (): SettingsPreset[] => [
 				penWidthMm: 0.2,
 				spacingMinMm: 0.05,
 				spacingMaxMm: 3.4,
-				hatchThreshold: 0.15,
+				hatchThresholdLow: 0.15,
+				hatchThresholdHigh: 1,
 				hatchGamma: 1.5,
 				inkBoost: 1.1,
 				outputWidthMm: 200

@@ -238,7 +238,8 @@
 		'penWidthMm',
 		'spacingMinMm',
 		'spacingMaxMm',
-		'hatchThreshold',
+		'hatchThresholdLow',
+		'hatchThresholdHigh',
 		'hatchGamma',
 		'inkBoost'
 	] as const;
