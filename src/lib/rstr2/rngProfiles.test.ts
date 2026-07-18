@@ -16,6 +16,8 @@ import {
 	sanitizeRngProfile,
 	serializeRngProfile
 } from './rngProfiles';
+import { builtinRngProfiles, isBuiltinRngProfileId } from './rngBuiltinProfiles';
+import { ACCENT_RATE, HARMONY_SETS, INK_COLORS } from './inkColors';
 import { mulberry32 } from './rngSources';
 import { defaultParams } from './params';
 import { defaultCmyLayers } from './layers';
@@ -126,30 +128,35 @@ describe('sanitizeRngProfile', () => {
 });
 
 describe('rng setup storage', () => {
-	it('parses garbage to the default setup', () => {
+	const builtinIds = builtinRngProfiles().map((profile) => profile.id);
+
+	it('parses garbage to the default setup (all shipped profiles present)', () => {
 		for (const json of [null, '', 'nope', '[]', '{"profiles": 3}']) {
 			const setup = parseStoredRngSetup(json);
 			expect(setup.activeProfileId).toBe(DEFAULT_RNG_PROFILE_ID);
-			expect(setup.profiles).toHaveLength(1);
+			expect(setup.profiles.map((profile) => profile.id)).toEqual(builtinIds);
 			expect(setup.source.kind).toBe('math-random');
 		}
 	});
 
-	it('restores custom profiles and the active pick, keeping the built-in first', () => {
+	it('restores custom profiles and the active pick, keeping the shipped ones first', () => {
 		const custom = defaultRngProfile();
 		custom.id = 'custom-9';
 		custom.name = 'mine';
 		const stored = JSON.stringify({
 			activeProfileId: 'custom-9',
-			profiles: [custom, { id: DEFAULT_RNG_PROFILE_ID, name: 'evil override' }],
+			profiles: [
+				custom,
+				{ id: DEFAULT_RNG_PROFILE_ID, name: 'evil override' },
+				{ id: 'uniform-sweep', name: 'evil sweep override' }
+			],
 			source: { kind: 'mulberry32', seed: 7 }
 		});
 		const setup = parseStoredRngSetup(stored);
-		expect(setup.profiles.map((profile) => profile.id)).toEqual([
-			DEFAULT_RNG_PROFILE_ID,
-			'custom-9'
-		]);
+		expect(setup.profiles.map((profile) => profile.id)).toEqual([...builtinIds, 'custom-9']);
+		// the shipped profiles load pristine — storage can never shadow them
 		expect(setup.profiles[0].name).toBe('built-in');
+		expect(setup.profiles[1].name).toBe('uniform sweep');
 		expect(setup.activeProfileId).toBe('custom-9');
 		expect(setup.source).toEqual({ kind: 'mulberry32', seed: 7 });
 	});
@@ -159,9 +166,117 @@ describe('rng setup storage', () => {
 		expect(setup.activeProfileId).toBe(DEFAULT_RNG_PROFILE_ID);
 	});
 
+	it('a stored active pick of a shipped profile is kept', () => {
+		const setup = parseStoredRngSetup(
+			JSON.stringify({ activeProfileId: 'uniform-sweep', profiles: [] })
+		);
+		expect(setup.activeProfileId).toBe('uniform-sweep');
+	});
+
 	it('default setup starts on the built-in profile', () => {
 		const setup = defaultRngDebugSetup();
 		expect(setup.profiles[0].id).toBe(DEFAULT_RNG_PROFILE_ID);
+	});
+});
+
+describe('builtinRngProfiles', () => {
+	it('ships unique, stable ids with the default first', () => {
+		const profiles = builtinRngProfiles();
+		expect(profiles[0].id).toBe(DEFAULT_RNG_PROFILE_ID);
+		const ids = profiles.map((profile) => profile.id);
+		expect(new Set(ids).size).toBe(ids.length);
+		for (const profile of profiles) expect(isBuiltinRngProfileId(profile.id)).toBe(true);
+		expect(isBuiltinRngProfileId('profile-abc-1')).toBe(false);
+	});
+
+	it('every shipped profile survives its own sanitizer unchanged', () => {
+		for (const profile of builtinRngProfiles()) {
+			expect(sanitizeRngProfile(JSON.parse(JSON.stringify(profile)))).toEqual(profile);
+		}
+	});
+
+	it('every shipped profile rolls inside its own curve bounds', () => {
+		for (const profile of builtinRngProfiles()) {
+			for (let seed = 0; seed < 10; seed++) {
+				const { params } = randomizeSettings(currentSettings(), false, mulberry32(seed), profile);
+				expect(params.resolution).toBeGreaterThanOrEqual(profile.curves.resolution.min);
+				expect(params.resolution).toBeLessThanOrEqual(profile.curves.resolution.max);
+				expect(params.penWidthMm).toBeGreaterThanOrEqual(profile.curves.penWidthMm.min);
+				expect(params.penWidthMm).toBeLessThanOrEqual(profile.curves.penWidthMm.max);
+			}
+		}
+	});
+
+	it('the uniform sweep keeps the shipped bounds but flattens the shape', () => {
+		const sweep = builtinRngProfiles().find((profile) => profile.id === 'uniform-sweep');
+		expect(sweep).toBeDefined();
+		for (const key of RNG_CURVE_KEYS) {
+			expect(sweep?.curves[key]).toEqual({
+				kind: 'uniform',
+				min: RANDOM_CURVES[key].min,
+				max: RANDOM_CURVES[key].max,
+				step: RANDOM_CURVES[key].step
+			});
+		}
+	});
+});
+
+describe('profile colors', () => {
+	it('the default profile mirrors the shipped colour tables', () => {
+		const { colors } = defaultRngProfile();
+		expect(colors.accentRate).toBe(ACCENT_RATE);
+		expect(colors.harmonyWeights).toEqual(
+			HARMONY_SETS.map((set) => ({ value: set.name, weight: set.weight }))
+		);
+	});
+
+	it('sanitize clamps the accent rate and repairs harmony weights', () => {
+		const profile = sanitizeRngProfile({
+			id: 'x',
+			name: 'x',
+			colors: {
+				accentRate: 7,
+				harmonyWeights: [
+					{ value: 'blue / orange', weight: 9 },
+					{ value: 'not a set', weight: 5 }
+				]
+			}
+		});
+		expect(profile?.colors.accentRate).toBe(1);
+		expect(profile?.colors.harmonyWeights).toHaveLength(HARMONY_SETS.length);
+		expect(
+			profile?.colors.harmonyWeights.find((option) => option.value === 'blue / orange')?.weight
+		).toBe(9);
+		const missing = sanitizeRngProfile({ id: 'y', name: 'y' });
+		expect(missing?.colors).toEqual(defaultRngProfile().colors);
+	});
+
+	it('accent rate 0 rolls schemes without accent inks', () => {
+		const accents = new Set(INK_COLORS.filter((ink) => ink.accent === true).map((ink) => ink.hex));
+		const profile = defaultRngProfile();
+		profile.colors.accentRate = 0;
+		for (let seed = 0; seed < 25; seed++) {
+			const { layers } = randomizeSettings(currentSettings(), false, mulberry32(seed), profile);
+			for (const layer of layers) expect(accents.has(layer.color)).toBe(false);
+		}
+	});
+
+	it('harmony weights steer the whole stack into the chosen families', () => {
+		const profile = defaultRngProfile();
+		profile.colors.accentRate = 0;
+		profile.colors.harmonyWeights = profile.colors.harmonyWeights.map((option) => ({
+			value: option.value,
+			weight: option.value === 'neutral + red' ? 1 : 0
+		}));
+		const allowed = new Set(
+			INK_COLORS.filter((ink) => ink.family === 'neutral' || ink.family === 'red').map(
+				(ink) => ink.hex
+			)
+		);
+		for (let seed = 0; seed < 25; seed++) {
+			const { layers } = randomizeSettings(currentSettings(), false, mulberry32(seed), profile);
+			for (const layer of layers) expect(allowed.has(layer.color)).toBe(true);
+		}
 	});
 });
 
@@ -175,11 +290,17 @@ describe('profile files & code-gen', () => {
 		expect(parseRngProfileFile('{"format":"rstr-rng-profile"}')).toBeNull();
 	});
 
-	it('renders a pasteable TS constant', () => {
-		const profile: RngProfile = { ...defaultRngProfile(), name: 'safe & wild' };
+	it('renders a pasteable TS constant with a stable slugged id', () => {
+		const profile: RngProfile = {
+			...defaultRngProfile(),
+			id: 'profile-xyz-3',
+			name: 'safe & wild'
+		};
 		const code = rngProfileToCode(profile);
 		expect(code).toContain('export const SAFE_WILD_RNG_PROFILE: RngProfile =');
+		expect(code).toContain("id: 'safe-wild'");
+		expect(code).toContain('rngBuiltinProfiles.ts');
 		expect(code).toContain("kind: 'gaussian'");
-		expect(code).toContain('resolution:');
+		expect(code).toContain('accentRate:');
 	});
 });

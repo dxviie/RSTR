@@ -28,7 +28,12 @@
 import type { Rstr2Params, SegmentationAlgorithm } from './params';
 import { nextLayerId, type LayerChannel, type LayerConfig } from './layers';
 import { builtinPresets, type Rstr2Settings } from './presets';
-import { pickInkScheme, type InkColor } from './inkColors';
+import {
+	defaultColorOptions,
+	pickInkScheme,
+	type ColorRollOptions,
+	type InkColor
+} from './inkColors';
 import { sampleDistribution, type Distribution } from './distributions';
 import type { Rng } from './rngSources';
 
@@ -122,9 +127,11 @@ export type RandomCurveKey = keyof typeof RANDOM_CURVES;
 
 /**
  * A named, editable version of the dice: one distribution per rolled
- * parameter plus the algorithm/channel weights. The shipped tables above are
+ * parameter, the algorithm/channel weights, and the colour-scheme knobs
+ * (accent rate + harmony weights, see inkColors.ts). The shipped tables are
  * the built-in profile; extra profiles are authored in the studio's rng
- * debug panel and can be graduated into code once they earn it.
+ * debug panel and graduate into rngBuiltinProfiles.ts once they earn it —
+ * docs/rng-profiles.md walks through the whole workflow.
  */
 export interface RngProfile {
 	id: string;
@@ -132,6 +139,7 @@ export interface RngProfile {
 	curves: Record<RandomCurveKey, Distribution>;
 	algorithmWeights: WeightedOption<SegmentationAlgorithm>[];
 	channelWeights: WeightedOption<LayerChannel>[];
+	colors: ColorRollOptions;
 }
 
 export const DEFAULT_RNG_PROFILE_ID = 'built-in';
@@ -144,7 +152,8 @@ export const defaultRngProfile = (): RngProfile => ({
 		Object.entries(RANDOM_CURVES).map(([key, curve]) => [key, { kind: 'gaussian', ...curve }])
 	) as Record<RandomCurveKey, Distribution>,
 	algorithmWeights: ALGORITHM_WEIGHTS.map((option) => ({ ...option })),
-	channelWeights: CHANNEL_WEIGHTS.map((option) => ({ ...option }))
+	channelWeights: CHANNEL_WEIGHTS.map((option) => ({ ...option })),
+	colors: defaultColorOptions()
 });
 
 // ─── the roll itself ─────────────────────────────────────────────────────────
@@ -240,7 +249,7 @@ export const randomizeSettings = (
 		const count = Math.max(1, Math.round(sampleDistribution(curves.layerCount, rng)));
 		// pick a whole colour scheme first, then hand one ink to each layer, so
 		// the pens land on a deliberate harmony rather than random hues
-		const inks = pickInkScheme(count, rng);
+		const inks = pickInkScheme(count, rng, profile.colors);
 		const taken = new Set<LayerChannel>();
 		layers = Array.from({ length: count }, (_, i) => randomLayer(rng, taken, inks[i], profile));
 	}

@@ -7,11 +7,14 @@
 	const {
 		entries,
 		labelOf = (value: string) => value,
+		swatchesOf,
 		locked = false,
 		onchange
 	}: {
 		entries: WeightedOption<string>[];
 		labelOf?: (value: string) => string;
+		/** optional colour dots per option (e.g. harmony-set family swatches) */
+		swatchesOf?: (value: string) => string[];
 		locked?: boolean;
 		onchange: (value: string, weight: number) => void;
 	} = $props();
@@ -69,7 +72,16 @@
 <div class="weights" class:locked>
 	{#each entries as entry (entry.value)}
 		<div class="w-row">
-			<span class="w-label" title={entry.value}>{labelOf(entry.value)}</span>
+			<span class="w-label" title={entry.value}>
+				<span class="w-text">{labelOf(entry.value)}</span>
+				{#if swatchesOf}
+					<span class="w-swatches">
+						{#each swatchesOf(entry.value) as hex, i (i)}
+							<i style={`background:${hex}`}></i>
+						{/each}
+					</span>
+				{/if}
+			</span>
 			<div
 				class="w-track"
 				role="slider"
@@ -132,10 +144,30 @@
 	}
 
 	.w-label {
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+		min-width: 0;
+	}
+
+	.w-text {
 		font-size: 0.68rem;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+
+	.w-swatches {
+		display: flex;
+		gap: 2px;
+	}
+
+	.w-swatches i {
+		width: 8px;
+		height: 8px;
+		border-radius: 2px;
+		border: 1px solid rgba(26, 32, 44, 0.18);
+		box-sizing: border-box;
 	}
 
 	.w-track {

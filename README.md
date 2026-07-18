@@ -62,21 +62,22 @@ Each stage is wired to Svelte 5 runes as an independent `$effect` with its own d
 
 The engine (`src/lib/rstr2/`) is pure TypeScript with no framework imports, so it's fully unit-testable in isolation:
 
-| File                  | Responsibility                                                                               |
-| --------------------- | -------------------------------------------------------------------------------------------- |
-| `grid.ts`             | Downsample the source image to the working cell grid.                                        |
-| `imageAdjust.ts`      | Brightness / contrast / gamma / saturation / vibrance.                                       |
-| `segmentation.ts`     | Watershed / posterize / k-means / SLIC + shared post-processing.                             |
-| `regionTools.ts`      | Region contour tracing (with holes).                                                         |
-| `hatchTools.ts`       | Hatch-line generation and the ink→spacing curves.                                            |
-| `layers.ts`           | Layer model (channel + pen mapping), defaults, persistence.                                  |
-| `params.ts`           | Global parameter defaults and localStorage persistence.                                      |
-| `inkColors.ts`        | Curated real-ink palette and color harmonies for the dice.                                   |
-| `randomize.ts`        | The one-click randomize roll.                                                                |
-| `presets.ts`          | Built-in and user presets, JSON import/export.                                               |
-| `plotTime.ts`         | saxi-compatible plot-time estimation.                                                        |
-| `svgExport.ts`        | Standalone SVG document assembly (one group per pen).                                        |
-| `video.ts` · `zip.ts` | Video-frame sampling math and a dependency-free stored-ZIP writer for frame-sequence export. |
+| File                                                                              | Responsibility                                                                                                                                                                                                                       |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `grid.ts`                                                                         | Downsample the source image to the working cell grid.                                                                                                                                                                                |
+| `imageAdjust.ts`                                                                  | Brightness / contrast / gamma / saturation / vibrance.                                                                                                                                                                               |
+| `segmentation.ts`                                                                 | Watershed / posterize / k-means / SLIC + shared post-processing.                                                                                                                                                                     |
+| `regionTools.ts`                                                                  | Region contour tracing (with holes).                                                                                                                                                                                                 |
+| `hatchTools.ts`                                                                   | Hatch-line generation and the ink→spacing curves.                                                                                                                                                                                    |
+| `layers.ts`                                                                       | Layer model (channel + pen mapping), defaults, persistence.                                                                                                                                                                          |
+| `params.ts`                                                                       | Global parameter defaults and localStorage persistence.                                                                                                                                                                              |
+| `inkColors.ts`                                                                    | Curated real-ink palette and color harmonies for the dice.                                                                                                                                                                           |
+| `randomize.ts`                                                                    | The one-click randomize roll and the `RngProfile` model behind it.                                                                                                                                                                   |
+| `distributions.ts` · `rngSources.ts` · `rngProfiles.ts` · `rngBuiltinProfiles.ts` | The tunable randomness stack — sampling strategies, seeded rng streams, profile storage and the shipped-profile registry. Tuned visually in the studio's dev-only rng debug panel; see [docs/rng-profiles.md](docs/rng-profiles.md). |
+| `presets.ts`                                                                      | Built-in and user presets, JSON import/export.                                                                                                                                                                                       |
+| `plotTime.ts`                                                                     | saxi-compatible plot-time estimation.                                                                                                                                                                                                |
+| `svgExport.ts`                                                                    | Standalone SVG document assembly (one group per pen).                                                                                                                                                                                |
+| `video.ts` · `zip.ts`                                                             | Video-frame sampling math and a dependency-free stored-ZIP writer for frame-sequence export.                                                                                                                                         |
 
 Most of these are backed by `*.test.ts` unit tests in the same folder.
 

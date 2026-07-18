@@ -7,6 +7,8 @@
 	import CurveEditor from './CurveEditor.svelte';
 	import WeightsEditor from './WeightsEditor.svelte';
 	import { defaultRngProfile, DEFAULT_RNG_PROFILE_ID, type RngProfile } from '$lib/rstr2/randomize';
+	import { isBuiltinRngProfileId } from '$lib/rstr2/rngBuiltinProfiles';
+	import { harmonySetSwatches } from '$lib/rstr2/inkColors';
 	import {
 		CURVE_GROUPS,
 		CURVE_META,
@@ -40,7 +42,7 @@
 	hydrateRngDebug();
 
 	const profile = $derived(activeRngProfile());
-	const locked = $derived(profile.id === DEFAULT_RNG_PROFILE_ID);
+	const locked = $derived(isBuiltinRngProfileId(profile.id));
 	const seeded = $derived(isSeeded(rngDebug.setup.source.kind));
 
 	let notice = $state('');
@@ -114,9 +116,9 @@
 				note(`could not read ${file.name} — not an rng profile file?`);
 				return;
 			}
-			// imported files never collide with existing ids or the built-in
+			// imported files never collide with existing ids or the shipped ones
 			if (
-				parsed.id === DEFAULT_RNG_PROFILE_ID ||
+				isBuiltinRngProfileId(parsed.id) ||
 				rngDebug.setup.profiles.some((entry) => entry.id === parsed.id)
 			) {
 				parsed.id = nextProfileId();
@@ -133,7 +135,7 @@
 		const code = rngProfileToCode(JSON.parse(JSON.stringify(profile)));
 		navigator.clipboard
 			.writeText(code)
-			.then(() => note('TypeScript literal copied — paste next to RANDOM_CURVES'))
+			.then(() => note('TypeScript literal copied — register it in rngBuiltinProfiles.ts'))
 			.catch(() => note('clipboard blocked — export .json instead'));
 	};
 
@@ -179,6 +181,24 @@
 			persistRngDebug();
 		};
 
+	// ─── colors ──────────────────────────────────────────────────────────────
+
+	const setAccentRate = (event: Event) => {
+		if (locked) return;
+		const raw = (event.currentTarget as HTMLInputElement).valueAsNumber;
+		if (!Number.isFinite(raw)) return;
+		profile.colors.accentRate = Math.min(1, Math.max(0, raw));
+		persistRngDebug();
+	};
+
+	const setHarmonyWeight = (value: string, weight: number) => {
+		if (locked) return;
+		const entry = profile.colors.harmonyWeights.find((option) => option.value === value);
+		if (!entry) return;
+		entry.weight = weight;
+		persistRngDebug();
+	};
+
 	// summary of one logged roll, terse enough for a row
 	const rollSummary = (settings: Rstr2Settings): string =>
 		`${settings.params.algorithm} · ${settings.layers.length} layer${settings.layers.length === 1 ? '' : 's'} · res ${settings.params.resolution}`;
@@ -219,7 +239,7 @@
 				>
 					{#each rngDebug.setup.profiles as entry (entry.id)}
 						<option value={entry.id}
-							>{entry.name}{entry.id === DEFAULT_RNG_PROFILE_ID ? ' (shipped)' : ''}</option
+							>{entry.name}{isBuiltinRngProfileId(entry.id) ? ' (shipped)' : ''}</option
 						>
 					{/each}
 				</select>
@@ -267,8 +287,7 @@
 			/>
 			{#if locked}
 				<div class="hint">
-					the built-in profile mirrors RANDOM_CURVES and stays read-only — duplicate it to start
-					tweaking
+					shipped profiles (rngBuiltinProfiles.ts) stay read-only — duplicate one to start tweaking
 				</div>
 			{/if}
 			{#if notice}<div class="notice">{notice}</div>{/if}
@@ -419,6 +438,45 @@
 			/>
 		</section>
 
+		<!-- ─── colors ──────────────────────────────────────────────────── -->
+		<section>
+			<div class="s-title">colors — {profile.name}</div>
+			<div class="row accent-row">
+				<span class="lbl">accent rate</span>
+				<input
+					type="range"
+					min="0"
+					max="1"
+					step="0.05"
+					disabled={locked}
+					value={profile.colors.accentRate}
+					oninput={setAccentRate}
+					title="chance a roll reserves one layer for a vibrant accent-shelf ink"
+				/>
+				<input
+					type="number"
+					min="0"
+					max="1"
+					step="0.05"
+					disabled={locked}
+					value={profile.colors.accentRate}
+					oninput={setAccentRate}
+					title="chance a roll reserves one layer for a vibrant accent-shelf ink"
+				/>
+			</div>
+			<div class="hint">
+				share of rolls that give one layer a vibrant Diamine Forever accent ink (shipped: 0.75; 0
+				turns the accent shelf off)
+			</div>
+			<div class="g-title">harmony sets — the family combinations a palette can draw from</div>
+			<WeightsEditor
+				entries={profile.colors.harmonyWeights}
+				swatchesOf={harmonySetSwatches}
+				{locked}
+				onchange={setHarmonyWeight}
+			/>
+		</section>
+
 		<div class="foot">
 			profiles + source live in <code>localStorage["rstr:dev:rng"]</code> — the dice falls back to the
 			shipped defaults when that key is absent
@@ -544,8 +602,20 @@
 		flex: 0 0 auto;
 	}
 
-	.seed-row .lbl {
+	.seed-row .lbl,
+	.accent-row .lbl {
 		color: var(--muted, #60739f);
+		white-space: nowrap;
+	}
+
+	.accent-row input[type='range'] {
+		flex: 1;
+		min-width: 0;
+		accent-color: var(--ink, #1a202c);
+	}
+
+	.accent-row input[type='number'] {
+		flex: 0 0 4rem;
 	}
 
 	button:disabled {

@@ -238,6 +238,30 @@ const weightedIndex = (weights: number[], rng: Rng): number => {
  */
 export const ACCENT_RATE = 0.75;
 
+/**
+ * The colour knobs an rng profile can override (see randomize.ts). Harmony
+ * weights are keyed by HarmonySet.name; sets missing from the list keep their
+ * shipped weight, unknown names are ignored. Defaults mirror the tables above,
+ * so a default-valued options object rolls exactly like no options at all.
+ */
+export interface ColorRollOptions {
+	/** chance (0..1) that a roll reserves one layer for an accent-shelf ink */
+	accentRate: number;
+	harmonyWeights: { value: string; weight: number }[];
+}
+
+export const defaultColorOptions = (): ColorRollOptions => ({
+	accentRate: ACCENT_RATE,
+	harmonyWeights: HARMONY_SETS.map((set) => ({ value: set.name, weight: set.weight }))
+});
+
+/** representative swatch per family of a harmony set — for the debug panel */
+export const harmonySetSwatches = (name: string): string[] => {
+	const set = HARMONY_SETS.find((entry) => entry.name === name);
+	if (!set) return [];
+	return set.families.map((family) => familyInks(family)[0]?.hex ?? '#888888');
+};
+
 /** the vibrant accent-shelf inks (see `InkColor.accent`) */
 export const accentInks = (): InkColor[] =>
 	INK_COLORS.filter((ink) => ink.accent === true && ink.plottable !== false);
@@ -263,12 +287,17 @@ const pickFromFamily = (family: InkFamily, used: Set<string>, rng: Rng): InkColo
  * vibrant accent-shelf ink drawn from the set's families, so most stacks get
  * exactly one pop of colour. Returns the chosen inks in layer order — the
  * caller takes `hex` for the colour and `name` for the layer label.
+ *
+ * `colors` overrides the accent rate and harmony weights (rng profiles);
+ * omitted, the shipped tables apply. The rng consumption is identical either
+ * way, so a seeded roll stays comparable across option tweaks.
  */
-export const pickInkScheme = (count: number, rng: Rng): InkColor[] => {
+export const pickInkScheme = (count: number, rng: Rng, colors?: ColorRollOptions): InkColor[] => {
+	const weightOf = colors ? new Map(colors.harmonyWeights.map((o) => [o.value, o.weight])) : null;
 	const set =
 		HARMONY_SETS[
 			weightedIndex(
-				HARMONY_SETS.map((s) => s.weight),
+				HARMONY_SETS.map((s) => weightOf?.get(s.name) ?? s.weight),
 				rng
 			)
 		];
@@ -279,7 +308,7 @@ export const pickInkScheme = (count: number, rng: Rng): InkColor[] => {
 	// the vibrant accent layer — an accent ink from the set's own families keeps
 	// the scheme deliberate; only a set with no accent-covered family (none
 	// today) falls back to the whole shelf
-	if (count > 0 && rng() < ACCENT_RATE) {
+	if (count > 0 && rng() < (colors?.accentRate ?? ACCENT_RATE)) {
 		const shelf = accentInks();
 		const inSet = shelf.filter((ink) => set.families.includes(ink.family));
 		const pool = inSet.length > 0 ? inSet : shelf;

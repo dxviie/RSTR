@@ -5,6 +5,8 @@ import {
 	familyInks,
 	accentInks,
 	pickInkScheme,
+	defaultColorOptions,
+	harmonySetSwatches,
 	ACCENT_RATE,
 	type Rng
 } from './inkColors';
@@ -121,5 +123,60 @@ describe('pickInkScheme', () => {
 				expect(accents.length).toBeLessThanOrEqual(1);
 			}
 		}
+	});
+});
+
+describe('pickInkScheme with colour options (rng profiles)', () => {
+	it('default-valued options roll exactly like no options', () => {
+		for (let seed = 0; seed < 50; seed++) {
+			expect(pickInkScheme(3, seededRng(seed), defaultColorOptions())).toEqual(
+				pickInkScheme(3, seededRng(seed))
+			);
+		}
+	});
+
+	it('accent rate 0 never touches the accent shelf, 1 always does', () => {
+		const shelf = new Set(accentInks());
+		const off = { ...defaultColorOptions(), accentRate: 0 };
+		const on = { ...defaultColorOptions(), accentRate: 1 };
+		for (let seed = 0; seed < 200; seed++) {
+			expect(pickInkScheme(3, seededRng(seed), off).some((ink) => shelf.has(ink))).toBe(false);
+			expect(pickInkScheme(3, seededRng(seed), on).filter((ink) => shelf.has(ink))).toHaveLength(1);
+		}
+	});
+
+	it('harmony weights pin the whole stack to the chosen set', () => {
+		const options = {
+			accentRate: 0,
+			harmonyWeights: HARMONY_SETS.map((set) => ({
+				value: set.name,
+				weight: set.name === 'purple / yellow' ? 3 : 0
+			}))
+		};
+		for (let seed = 0; seed < 100; seed++) {
+			for (const ink of pickInkScheme(2, seededRng(seed), options)) {
+				expect(['purple', 'yellow']).toContain(ink.family);
+			}
+		}
+	});
+
+	it('unknown harmony names are ignored, missing ones keep shipped weights', () => {
+		const options = {
+			accentRate: 0,
+			harmonyWeights: [{ value: 'not a set', weight: 999 }]
+		};
+		// must not throw, and still pick a valid scheme from the shipped sets
+		for (let seed = 0; seed < 20; seed++) {
+			expect(pickInkScheme(3, seededRng(seed), options)).toHaveLength(3);
+		}
+	});
+
+	it('harmonySetSwatches yields one plottable swatch per family', () => {
+		for (const set of HARMONY_SETS) {
+			const swatches = harmonySetSwatches(set.name);
+			expect(swatches).toHaveLength(set.families.length);
+			for (const hex of swatches) expect(hex).toMatch(/^#[0-9A-F]{6}$/i);
+		}
+		expect(harmonySetSwatches('not a set')).toEqual([]);
 	});
 });

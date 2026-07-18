@@ -1,21 +1,24 @@
 // Storage + editor metadata for RNG profiles — named, editable versions of
-// the dice (per-parameter distributions plus algorithm/channel weights, see
-// randomize.ts). The built-in profile always mirrors the shipped RANDOM_CURVES;
-// extra profiles are a dev feature, authored in the studio's rng debug panel,
-// kept in localStorage under a dev key that end users never write. The active
-// profile is what the user-facing randomize button rolls along.
+// the dice (per-parameter distributions, algorithm/channel weights, colour
+// knobs — see randomize.ts). Shipped profiles come from rngBuiltinProfiles.ts
+// and always load pristine; extra profiles are a dev feature, authored in the
+// studio's rng debug panel, kept in localStorage under a dev key that end
+// users never write. The active profile is what the user-facing randomize
+// button rolls along. The full authoring/shipping workflow is documented in
+// docs/rng-profiles.md.
 
 import {
 	ALGORITHM_WEIGHTS,
 	CHANNEL_WEIGHTS,
 	defaultRngProfile,
-	DEFAULT_RNG_PROFILE_ID,
 	RANDOM_CURVES,
 	type RandomCurveKey,
 	type RngProfile,
 	type WeightedOption
 } from './randomize';
+import { builtinRngProfiles, isBuiltinRngProfileId } from './rngBuiltinProfiles';
 import { sanitizeDistribution, type Distribution } from './distributions';
+import { defaultColorOptions, type ColorRollOptions } from './inkColors';
 import { RNG_SOURCE_KINDS, type RngSourceConfig, type RngSourceKind } from './rngSources';
 
 export const RNG_CURVE_KEYS = Object.keys(RANDOM_CURVES) as RandomCurveKey[];
@@ -83,6 +86,19 @@ const sanitizeWeights = <T extends string>(
 	}));
 };
 
+const sanitizeColors = (value: unknown): ColorRollOptions => {
+	const defaults = defaultColorOptions();
+	if (typeof value !== 'object' || value === null) return defaults;
+	const { accentRate, harmonyWeights } = value as Record<string, unknown>;
+	return {
+		accentRate:
+			typeof accentRate === 'number' && Number.isFinite(accentRate)
+				? Math.min(1, Math.max(0, accentRate))
+				: defaults.accentRate,
+		harmonyWeights: sanitizeWeights(harmonyWeights, defaults.harmonyWeights)
+	};
+};
+
 /**
  * Validate a parsed profile. Curves fall back distribution-by-distribution to
  * the built-in ones; a value without a usable id/name is dropped entirely.
@@ -104,7 +120,8 @@ export const sanitizeRngProfile = (value: unknown): RngProfile | null => {
 		name: record.name,
 		curves,
 		algorithmWeights: sanitizeWeights(record.algorithmWeights, ALGORITHM_WEIGHTS),
-		channelWeights: sanitizeWeights(record.channelWeights, CHANNEL_WEIGHTS)
+		channelWeights: sanitizeWeights(record.channelWeights, CHANNEL_WEIGHTS),
+		colors: sanitizeColors(record.colors)
 	};
 };
 
@@ -113,18 +130,21 @@ export const sanitizeRngProfile = (value: unknown): RngProfile | null => {
 /** everything the rng debug panel persists, as one blob */
 export interface RngDebugSetup {
 	activeProfileId: string;
-	/** all profiles, the pristine built-in first — only custom ones are stored */
+	/** all profiles, the pristine shipped ones first — only custom ones are stored */
 	profiles: RngProfile[];
 	source: RngSourceConfig;
 }
 
 export const RNG_DEBUG_STORAGE_KEY = 'rstr:dev:rng';
 
-export const defaultRngDebugSetup = (): RngDebugSetup => ({
-	activeProfileId: DEFAULT_RNG_PROFILE_ID,
-	profiles: [defaultRngProfile()],
-	source: { kind: 'math-random', seed: 1 }
-});
+export const defaultRngDebugSetup = (): RngDebugSetup => {
+	const profiles = builtinRngProfiles();
+	return {
+		activeProfileId: profiles[0].id,
+		profiles,
+		source: { kind: 'math-random', seed: 1 }
+	};
+};
 
 const sanitizeSource = (value: unknown): RngSourceConfig => {
 	const fallback: RngSourceConfig = { kind: 'math-random', seed: 1 };
@@ -149,8 +169,8 @@ export const parseStoredRngSetup = (json: string | null): RngDebugSetup => {
 		if (Array.isArray(record.profiles)) {
 			for (const entry of record.profiles) {
 				const profile = sanitizeRngProfile(entry);
-				// the built-in is never stored — and never overridden by storage
-				if (profile && profile.id !== DEFAULT_RNG_PROFILE_ID) setup.profiles.push(profile);
+				// shipped profiles are never stored — and never overridden by storage
+				if (profile && !isBuiltinRngProfileId(profile.id)) setup.profiles.push(profile);
 			}
 		}
 		if (
@@ -176,7 +196,7 @@ export const saveRngDebugSetup = (setup: RngDebugSetup): void => {
 	if (typeof localStorage === 'undefined') return;
 	const stored = {
 		activeProfileId: setup.activeProfileId,
-		profiles: setup.profiles.filter((profile) => profile.id !== DEFAULT_RNG_PROFILE_ID),
+		profiles: setup.profiles.filter((profile) => !isBuiltinRngProfileId(profile.id)),
 		source: setup.source
 	};
 	localStorage.setItem(RNG_DEBUG_STORAGE_KEY, JSON.stringify(stored));
@@ -210,18 +230,29 @@ const constName = (name: string): string => {
 	return snake ? `${snake}_RNG_PROFILE` : 'CUSTOM_RNG_PROFILE';
 };
 
+const slugId = (name: string): string => {
+	const slug = name
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, '-')
+		.replace(/^-+|-+$/g, '');
+	return slug || 'custom-profile';
+};
+
 /**
- * Render a profile as a TypeScript literal, ready to paste next to
- * RANDOM_CURVES — the graduation path from "tuned in the debug panel" to
- * "shipped as a built-in".
+ * Render a profile as a TypeScript literal ready for rngBuiltinProfiles.ts —
+ * the graduation path from "tuned in the debug panel" to "shipped". The dev
+ * id (profile-<timestamp>) is swapped for a stable slug of the name, since
+ * shipped ids key the active-profile pick and must not churn. Workflow:
+ * docs/rng-profiles.md.
  */
 export const rngProfileToCode = (profile: RngProfile): string => {
-	const body = JSON.stringify(profile, null, '\t')
+	const body = JSON.stringify({ ...profile, id: slugId(profile.name) }, null, '\t')
 		.replace(/"([A-Za-z_$][\w$]*)":/g, '$1:')
 		.replace(/"/g, "'");
 	return [
 		`// RNG profile '${profile.name}' — generated by the studio rng debug panel.`,
-		`// Paste into randomize.ts (or a profiles module) and wire it up as a built-in.`,
+		`// Ship it: paste into rngBuiltinProfiles.ts, add it to builtinRngProfiles(),`,
+		`// run npm test. Full workflow: docs/rng-profiles.md.`,
 		`export const ${constName(profile.name)}: RngProfile = ${body};`,
 		``
 	].join('\n');
