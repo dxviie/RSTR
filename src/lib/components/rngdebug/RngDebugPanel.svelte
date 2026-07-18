@@ -8,12 +8,11 @@
 	import WeightsEditor from './WeightsEditor.svelte';
 	import {
 		defaultRngProfile,
-		DEFAULT_RNG_PROFILE_ID,
 		LAYER_OVERRIDE_KEYS,
 		type LayerOverrideKey,
 		type RngProfile
 	} from '$lib/rstr2/randomize';
-	import { isBuiltinRngProfileId } from '$lib/rstr2/rngBuiltinProfiles';
+	import { isBuiltinRngProfileId, shippedDefaultRngProfileId } from '$lib/rstr2/rngBuiltinProfiles';
 	import { harmonySetSwatches } from '$lib/rstr2/inkColors';
 	import {
 		CURVE_GROUPS,
@@ -83,9 +82,9 @@
 		if (locked) return;
 		const id = profile.id;
 		rngDebug.setup.profiles = rngDebug.setup.profiles.filter((entry) => entry.id !== id);
-		rngDebug.setup.activeProfileId = DEFAULT_RNG_PROFILE_ID;
+		rngDebug.setup.activeProfileId = shippedDefaultRngProfileId();
 		persistRngDebug();
-		note('profile deleted — back on built-in');
+		note('profile deleted — back on the shipped default');
 	};
 
 	const selectProfile = (event: Event) => {

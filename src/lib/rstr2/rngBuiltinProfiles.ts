@@ -321,12 +321,20 @@ const uniformSweepProfile = (): RngProfile => {
 	};
 };
 
-/** All shipped profiles, the default first. Fresh objects on every call. */
+/**
+ * All shipped profiles. THE FIRST ENTRY IS THE PRODUCTION DEFAULT — it is
+ * what every fresh session (no dev localStorage) rolls. Currently the tuned
+ * 'built-in copy'; the raw RANDOM_CURVES mirror stays available as
+ * 'built-in'. Fresh objects on every call.
+ */
 export const builtinRngProfiles = (): RngProfile[] => [
 	BUILT_IN_COPY_RNG_PROFILE,
 	defaultRngProfile(),
 	uniformSweepProfile()
 ];
+
+/** the id of the profile a fresh session rolls — the registry's first entry */
+export const shippedDefaultRngProfileId = (): string => builtinRngProfiles()[0].id;
 
 export const isBuiltinRngProfileId = (id: string): boolean =>
 	builtinRngProfiles().some((profile) => profile.id === id);

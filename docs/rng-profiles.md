@@ -9,8 +9,12 @@ the profile model, the debug panel that edits profiles visually, and the
 workflow for shipping a tuned profile to everyone.
 
 The cardinal rule of the whole system: **with no dev state present, the dice
-behaves exactly as it always did** — the shipped tables sampled through
-`Math.random`. Unit tests pin this bit-for-bit (see [Guarantees](#guarantees--tests)).
+rolls exactly the first entry of `rngBuiltinProfiles.ts`** — currently the
+tuned `'built-in copy'` profile — through `Math.random`. The raw
+`RANDOM_CURVES` tables stay available as the `'built-in'` profile (and as
+the sanitizer's fallback), and the profile machinery itself adds no drift:
+a default-profile roll is pinned bit-for-bit against a profile-less roll
+(see [Guarantees](#guarantees--tests)).
 
 ## Module map
 
@@ -249,9 +253,10 @@ Rules of the registry:
   localStorage and mark the profile read-only in the panel. The code
   generator slugs the profile name (`'moody wide'` → `'moody-wide'`) —
   don't reuse or rename ids once shipped.
-- The **default stays first**. Changing what everyone's dice does by default
-  means editing `RANDOM_CURVES` itself (or swapping the first entry — do
-  that deliberately).
+- **The first entry is the production default** — it is what every fresh
+  session rolls (`shippedDefaultRngProfileId()`), and a test pins its id so
+  a reorder is always a deliberate, reviewed change. The dice tooltip stays
+  plain on the default and names any other active profile.
 - Profiles can also be **authored directly in code** — see
   `uniformSweepProfile()` in the registry (every curve flattened to uniform;
   the profile to roll when hunting for combinations that break).

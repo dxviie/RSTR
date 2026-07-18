@@ -17,7 +17,11 @@ import {
 	sanitizeRngProfile,
 	serializeRngProfile
 } from './rngProfiles';
-import { builtinRngProfiles, isBuiltinRngProfileId } from './rngBuiltinProfiles';
+import {
+	builtinRngProfiles,
+	isBuiltinRngProfileId,
+	shippedDefaultRngProfileId
+} from './rngBuiltinProfiles';
 import { ACCENT_RATE, HARMONY_SETS, INK_COLORS } from './inkColors';
 import { mulberry32 } from './rngSources';
 import { defaultParams } from './params';
@@ -140,7 +144,7 @@ describe('rng setup storage', () => {
 	it('parses garbage to the default setup (all shipped profiles present)', () => {
 		for (const json of [null, '', 'nope', '[]', '{"profiles": 3}']) {
 			const setup = parseStoredRngSetup(json);
-			expect(setup.activeProfileId).toBe(DEFAULT_RNG_PROFILE_ID);
+			expect(setup.activeProfileId).toBe(shippedDefaultRngProfileId());
 			expect(setup.profiles.map((profile) => profile.id)).toEqual(builtinIds);
 			expect(setup.source.kind).toBe('math-random');
 		}
@@ -154,6 +158,7 @@ describe('rng setup storage', () => {
 			activeProfileId: 'custom-9',
 			profiles: [
 				custom,
+				{ id: shippedDefaultRngProfileId(), name: 'evil default override' },
 				{ id: DEFAULT_RNG_PROFILE_ID, name: 'evil override' },
 				{ id: 'uniform-sweep', name: 'evil sweep override' }
 			],
@@ -162,15 +167,16 @@ describe('rng setup storage', () => {
 		const setup = parseStoredRngSetup(stored);
 		expect(setup.profiles.map((profile) => profile.id)).toEqual([...builtinIds, 'custom-9']);
 		// the shipped profiles load pristine — storage can never shadow them
-		expect(setup.profiles[0].name).toBe('built-in');
-		expect(setup.profiles[1].name).toBe('uniform sweep');
+		expect(setup.profiles[0].name).toBe('built-in copy');
+		expect(setup.profiles[1].name).toBe('built-in');
+		expect(setup.profiles[2].name).toBe('uniform sweep');
 		expect(setup.activeProfileId).toBe('custom-9');
 		expect(setup.source).toEqual({ kind: 'mulberry32', seed: 7 });
 	});
 
 	it('never points the active id at a missing profile', () => {
 		const setup = parseStoredRngSetup(JSON.stringify({ activeProfileId: 'ghost', profiles: [] }));
-		expect(setup.activeProfileId).toBe(DEFAULT_RNG_PROFILE_ID);
+		expect(setup.activeProfileId).toBe(shippedDefaultRngProfileId());
 	});
 
 	it('a stored active pick of a shipped profile is kept', () => {
@@ -180,18 +186,25 @@ describe('rng setup storage', () => {
 		expect(setup.activeProfileId).toBe('uniform-sweep');
 	});
 
-	it('default setup starts on the built-in profile', () => {
+	it('default setup starts on the shipped default profile', () => {
 		const setup = defaultRngDebugSetup();
-		expect(setup.profiles[0].id).toBe(DEFAULT_RNG_PROFILE_ID);
+		expect(setup.profiles[0].id).toBe(shippedDefaultRngProfileId());
+		expect(setup.activeProfileId).toBe(shippedDefaultRngProfileId());
 	});
 });
 
 describe('builtinRngProfiles', () => {
-	it('ships unique, stable ids with the default first', () => {
+	it('the production default — what every fresh visitor rolls — is the tuned profile', () => {
+		// deliberate pin: reordering the registry changes what production
+		// rolls, so a reorder must come with this line
+		expect(shippedDefaultRngProfileId()).toBe('built-in-copy');
+	});
+
+	it('ships unique, stable ids and keeps the RANDOM_CURVES mirror available', () => {
 		const profiles = builtinRngProfiles();
-		expect(profiles[0].id).toBe(DEFAULT_RNG_PROFILE_ID);
 		const ids = profiles.map((profile) => profile.id);
 		expect(new Set(ids).size).toBe(ids.length);
+		expect(ids).toContain(DEFAULT_RNG_PROFILE_ID);
 		for (const profile of profiles) expect(isBuiltinRngProfileId(profile.id)).toBe(true);
 		expect(isBuiltinRngProfileId('profile-abc-1')).toBe(false);
 	});

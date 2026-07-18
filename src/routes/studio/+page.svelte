@@ -29,7 +29,7 @@
 		type Rstr2Settings,
 		type SettingsPreset
 	} from '$lib/rstr2/presets';
-	import { DEFAULT_RNG_PROFILE_ID } from '$lib/rstr2/randomize';
+	import { shippedDefaultRngProfileId } from '$lib/rstr2/rngBuiltinProfiles';
 	import {
 		activeRngProfile,
 		hydrateRngDebug,
@@ -911,7 +911,10 @@
 
 	const diceTitle = $derived.by(() => {
 		const profile = activeRngProfile();
-		const suffix = profile.id === DEFAULT_RNG_PROFILE_ID ? '' : ` — rng profile: ${profile.name}`;
+		// only flag a NON-default profile (a dev pick) — the shipped default,
+		// whichever profile the registry puts first, gets the plain tooltip
+		const suffix =
+			profile.id === shippedDefaultRngProfileId() ? '' : ` — rng profile: ${profile.name}`;
 		return `roll the dice — randomize all segmentation, lines and layer settings${suffix}`;
 	});
 
