@@ -29,7 +29,12 @@
 		type Rstr2Settings,
 		type SettingsPreset
 	} from '$lib/rstr2/presets';
-	import { randomizeSettings } from '$lib/rstr2/randomize';
+	import { DEFAULT_RNG_PROFILE_ID } from '$lib/rstr2/randomize';
+	import {
+		activeRngProfile,
+		hydrateRngDebug,
+		rollRandomSettings
+	} from '$lib/rstr2/rngRuntime.svelte';
 	import { segmentGrid } from '$lib/rstr2/segmentation';
 	import { buildRegionGeometries } from '$lib/rstr2/regionTools';
 	import { hatchPolygon, spacingForInk, type HatchSegments } from '$lib/rstr2/hatchTools';
@@ -885,13 +890,30 @@
 
 	const isUserPreset = $derived(userPresets.some((preset) => preset.name === selectedPreset));
 
-	// the dice — gaussian rolls, curves live in $lib/rstr2/randomize.ts
+	// the dice — gaussian rolls by default, curves live in $lib/rstr2/randomize.ts;
+	// the rng debug tool (see below) can swap in a custom profile and source
 	let stickToPresets = $state(false);
 
 	const randomize = () => {
-		applySettings(randomizeSettings(currentSettings(), stickToPresets));
+		applySettings(rollRandomSettings(currentSettings(), stickToPresets));
 		selectedPreset = '';
 	};
+
+	// ─── rng debug tool (dev only) ───
+	// Dev builds always offer the chip; a production build needs ?rngdebug in
+	// the URL. The panel itself is lazy-loaded on first open so none of it
+	// lands in the regular bundle path.
+	const rngDebugForced =
+		typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('rngdebug');
+	const rngDebugAvailable = rngDebugForced || import.meta.env.DEV;
+	let rngDebugOpen = $state(rngDebugForced);
+	hydrateRngDebug();
+
+	const diceTitle = $derived.by(() => {
+		const profile = activeRngProfile();
+		const suffix = profile.id === DEFAULT_RNG_PROFILE_ID ? '' : ` — rng profile: ${profile.name}`;
+		return `roll the dice — randomize all segmentation, lines and layer settings${suffix}`;
+	});
 
 	const applySelectedPreset = () => {
 		const preset =
@@ -1689,11 +1711,7 @@
 					>
 						browse image / video<span class="browse-sub">or drop one on the render</span>
 					</button>
-					<button
-						class="dice-btn"
-						onclick={randomize}
-						title="roll the dice — randomize all segmentation, lines and layer settings"
-					>
+					<button class="dice-btn" onclick={randomize} title={diceTitle}>
 						<svg viewBox="0 0 16 16" aria-hidden="true">
 							<rect
 								x="0.5"
@@ -2003,11 +2021,7 @@
 			<section class="panel-group">
 				<div class="group-title">presets</div>
 				<div class="randomize-row">
-					<button
-						class="randomize-btn"
-						onclick={randomize}
-						title="roll the dice — randomize all segmentation, lines and layer settings"
-					>
+					<button class="randomize-btn" onclick={randomize} title={diceTitle}>
 						<svg viewBox="0 0 16 16" aria-hidden="true">
 							<rect
 								x="1.5"
@@ -2698,6 +2712,29 @@
 			</div>
 		</div>
 	{/if}
+
+	{#if rngDebugAvailable}
+		<!-- rng debug (dev tool): chip + lazy-loaded panel, see $lib/components/rngdebug -->
+		<button
+			class="rng-debug-chip"
+			onclick={() => (rngDebugOpen = !rngDebugOpen)}
+			title="rng debug — dev tool: edit the dice's curves, strategies and profiles"
+		>
+			🎲 rng
+		</button>
+		{#if rngDebugOpen}
+			{#await import('$lib/components/rngdebug/RngDebugPanel.svelte') then Panel}
+				<Panel.default
+					onclose={() => (rngDebugOpen = false)}
+					onroll={randomize}
+					onapplysettings={(settings) => {
+						applySettings(settings);
+						selectedPreset = '';
+					}}
+				/>
+			{/await}
+		{/if}
+	{/if}
 </div>
 
 <svelte:window
@@ -3115,6 +3152,21 @@
 	}
 	.app :global(.dual-range-input input:last-child::-moz-range-track) {
 		border-right: 1px solid #b2b2b2;
+	}
+
+	/* ------------------------------------------------- rng debug (dev tool) */
+
+	.rng-debug-chip {
+		position: fixed;
+		left: 0.6rem;
+		bottom: 0.6rem;
+		z-index: 440;
+		border: 1px solid var(--border);
+		border-radius: 999px;
+		background: #fff;
+		padding: 0.25rem 0.6rem;
+		cursor: pointer;
+		box-shadow: 0 2px 8px rgba(26, 32, 44, 0.14);
 	}
 
 	/* ------------------------------------------------- randomize */
