@@ -11,7 +11,9 @@ import {
 	ALGORITHM_WEIGHTS,
 	CHANNEL_WEIGHTS,
 	defaultRngProfile,
+	LAYER_OVERRIDE_KEYS,
 	RANDOM_CURVES,
+	type LayerOverrideKey,
 	type RandomCurveKey,
 	type RngProfile,
 	type WeightedOption
@@ -58,6 +60,16 @@ export const CURVE_META: Record<RandomCurveKey, CurveMeta> = {
 
 export const CURVE_GROUPS: CurveGroup[] = ['segmentation', 'lines', 'layers'];
 
+/** panel labels for the per-layer override chance knobs */
+export const LAYER_OVERRIDE_LABELS: Record<LayerOverrideKey, string> = {
+	penWidthMm: 'pen width',
+	spacingMinMm: 'spacing min',
+	spacingMaxMm: 'spacing max',
+	threshold: 'ink threshold',
+	inkGamma: 'ink gamma',
+	inkBoost: 'ink boost'
+};
+
 // ─── profile ids & sanitizing ────────────────────────────────────────────────
 
 let profileCounter = 0;
@@ -84,6 +96,27 @@ const sanitizeWeights = <T extends string>(
 		value: option.value,
 		weight: seen.get(option.value) ?? option.weight
 	}));
+};
+
+const sanitizeOverrideChances = (
+	value: unknown,
+	defaults: Record<LayerOverrideKey, number>
+): Record<LayerOverrideKey, number> => {
+	const record = (typeof value === 'object' && value !== null ? value : {}) as Record<
+		string,
+		unknown
+	>;
+	return Object.fromEntries(
+		LAYER_OVERRIDE_KEYS.map((key) => {
+			const chance = record[key];
+			return [
+				key,
+				typeof chance === 'number' && Number.isFinite(chance)
+					? Math.min(1, Math.max(0, chance))
+					: defaults[key]
+			];
+		})
+	) as Record<LayerOverrideKey, number>;
 };
 
 const sanitizeColors = (value: unknown): ColorRollOptions => {
@@ -121,7 +154,11 @@ export const sanitizeRngProfile = (value: unknown): RngProfile | null => {
 		curves,
 		algorithmWeights: sanitizeWeights(record.algorithmWeights, ALGORITHM_WEIGHTS),
 		channelWeights: sanitizeWeights(record.channelWeights, CHANNEL_WEIGHTS),
-		colors: sanitizeColors(record.colors)
+		colors: sanitizeColors(record.colors),
+		layerOverrideChances: sanitizeOverrideChances(
+			record.layerOverrideChances,
+			base.layerOverrideChances
+		)
 	};
 };
 

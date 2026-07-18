@@ -6,12 +6,19 @@
 	// any UI an end user sees: it mounts in dev builds or behind ?rngdebug.
 	import CurveEditor from './CurveEditor.svelte';
 	import WeightsEditor from './WeightsEditor.svelte';
-	import { defaultRngProfile, DEFAULT_RNG_PROFILE_ID, type RngProfile } from '$lib/rstr2/randomize';
+	import {
+		defaultRngProfile,
+		DEFAULT_RNG_PROFILE_ID,
+		LAYER_OVERRIDE_KEYS,
+		type LayerOverrideKey,
+		type RngProfile
+	} from '$lib/rstr2/randomize';
 	import { isBuiltinRngProfileId } from '$lib/rstr2/rngBuiltinProfiles';
 	import { harmonySetSwatches } from '$lib/rstr2/inkColors';
 	import {
 		CURVE_GROUPS,
 		CURVE_META,
+		LAYER_OVERRIDE_LABELS,
 		nextProfileId,
 		parseRngProfileFile,
 		RNG_CURVE_KEYS,
@@ -26,7 +33,7 @@
 		restartRngSequence,
 		rngDebug
 	} from '$lib/rstr2/rngRuntime.svelte';
-	import { CHANNEL_LABELS, type LayerChannel } from '$lib/rstr2/layers';
+	import { CHANNEL_LABELS, type LayerChannel, type LayerConfig } from '$lib/rstr2/layers';
 	import type { Rstr2Settings } from '$lib/rstr2/presets';
 
 	const {
@@ -199,9 +206,27 @@
 		persistRngDebug();
 	};
 
+	// ─── layer overrides ─────────────────────────────────────────────────────
+
+	const setOverrideChance = (key: LayerOverrideKey) => (event: Event) => {
+		if (locked) return;
+		const raw = (event.currentTarget as HTMLInputElement).valueAsNumber;
+		if (!Number.isFinite(raw)) return;
+		profile.layerOverrideChances[key] = Math.min(1, Math.max(0, raw));
+		persistRngDebug();
+	};
+
 	// summary of one logged roll, terse enough for a row
 	const rollSummary = (settings: Rstr2Settings): string =>
 		`${settings.params.algorithm} · ${settings.layers.length} layer${settings.layers.length === 1 ? '' : 's'} · res ${settings.params.resolution}`;
+
+	// the non-null overrides of a logged layer, for the chip tooltip
+	const overrideSummary = (layer: LayerConfig): string => {
+		const parts = LAYER_OVERRIDE_KEYS.filter((key) => layer[key] !== null).map(
+			(key) => `${LAYER_OVERRIDE_LABELS[key]} ${layer[key]}`
+		);
+		return parts.length > 0 ? ` · ${parts.join(' · ')}` : '';
+	};
 
 	const ROLLED_PARAM_KEYS = [
 		'algorithm',
@@ -387,7 +412,7 @@
 									{#each entry.settings.layers as layer (layer.id)}
 										<span
 											class="chip"
-											title={`${layer.name} · ${layer.channel} · ${layer.angleMin}°–${layer.angleMax}°`}
+											title={`${layer.name} · ${layer.channel} · ${layer.angleMin}°–${layer.angleMax}°${overrideSummary(layer)}`}
 										>
 											<i style={`background:${layer.color}`}></i>{layer.channel}
 										</span>
@@ -441,7 +466,7 @@
 		<!-- ─── colors ──────────────────────────────────────────────────── -->
 		<section>
 			<div class="s-title">colors — {profile.name}</div>
-			<div class="row accent-row">
+			<div class="row chance-row">
 				<span class="lbl">accent rate</span>
 				<input
 					type="range"
@@ -475,6 +500,41 @@
 				{locked}
 				onchange={setHarmonyWeight}
 			/>
+		</section>
+
+		<!-- ─── layer overrides ─────────────────────────────────────────── -->
+		<section>
+			<div class="s-title">layer overrides — {profile.name}</div>
+			<div class="hint">
+				chance that a rolled layer gets its own value for a field instead of inheriting the global —
+				values sample the same curves as the globals; shipped: 0 (layers always inherit). only free
+				rolls — “stick to built-in presets” never rolls overrides
+			</div>
+			{#each LAYER_OVERRIDE_KEYS as key (key)}
+				<div class="row chance-row">
+					<span class="lbl">{LAYER_OVERRIDE_LABELS[key]}</span>
+					<input
+						type="range"
+						min="0"
+						max="1"
+						step="0.05"
+						disabled={locked}
+						value={profile.layerOverrideChances[key]}
+						oninput={setOverrideChance(key)}
+						title={`chance a layer rolls its own ${LAYER_OVERRIDE_LABELS[key]}`}
+					/>
+					<input
+						type="number"
+						min="0"
+						max="1"
+						step="0.05"
+						disabled={locked}
+						value={profile.layerOverrideChances[key]}
+						oninput={setOverrideChance(key)}
+						title={`chance a layer rolls its own ${LAYER_OVERRIDE_LABELS[key]}`}
+					/>
+				</div>
+			{/each}
 		</section>
 
 		<div class="foot">
@@ -603,18 +663,22 @@
 	}
 
 	.seed-row .lbl,
-	.accent-row .lbl {
+	.chance-row .lbl {
 		color: var(--muted, #60739f);
 		white-space: nowrap;
 	}
 
-	.accent-row input[type='range'] {
+	.chance-row .lbl {
+		flex: 0 0 6.2rem;
+	}
+
+	.chance-row input[type='range'] {
 		flex: 1;
 		min-width: 0;
 		accent-color: var(--ink, #1a202c);
 	}
 
-	.accent-row input[type='number'] {
+	.chance-row input[type='number'] {
 		flex: 0 0 4rem;
 	}
 

@@ -131,13 +131,37 @@ export const weightedPick = <T>(options: WeightedOption<T>[], rng: Rng): T => {
 
 export type RandomCurveKey = keyof typeof RANDOM_CURVES;
 
+/** the per-layer override fields the dice can roll (null = inherit global) */
+export const LAYER_OVERRIDE_KEYS = [
+	'penWidthMm',
+	'spacingMinMm',
+	'spacingMaxMm',
+	'threshold',
+	'inkGamma',
+	'inkBoost'
+] as const;
+
+export type LayerOverrideKey = (typeof LAYER_OVERRIDE_KEYS)[number];
+
+// the profile curve an override samples when it rolls — the same physical
+// quantity as its global, so the same curve applies
+const OVERRIDE_VALUE_CURVES: Record<LayerOverrideKey, RandomCurveKey> = {
+	penWidthMm: 'penWidthMm',
+	spacingMinMm: 'spacingMinMm',
+	spacingMaxMm: 'spacingMaxMm',
+	threshold: 'hatchThreshold',
+	inkGamma: 'hatchGamma',
+	inkBoost: 'inkBoost'
+};
+
 /**
  * A named, editable version of the dice: one distribution per rolled
- * parameter, the algorithm/channel weights, and the colour-scheme knobs
- * (accent rate + harmony weights, see inkColors.ts). The shipped tables are
- * the built-in profile; extra profiles are authored in the studio's rng
- * debug panel and graduate into rngBuiltinProfiles.ts once they earn it —
- * docs/rng-profiles.md walks through the whole workflow.
+ * parameter, the algorithm/channel weights, the colour-scheme knobs
+ * (accent rate + harmony weights, see inkColors.ts) and the per-layer
+ * override chances. The shipped tables are the built-in profile; extra
+ * profiles are authored in the studio's rng debug panel and graduate into
+ * rngBuiltinProfiles.ts once they earn it — docs/rng-profiles.md walks
+ * through the whole workflow.
  */
 export interface RngProfile {
 	id: string;
@@ -146,6 +170,13 @@ export interface RngProfile {
 	algorithmWeights: WeightedOption<SegmentationAlgorithm>[];
 	channelWeights: WeightedOption<LayerChannel>[];
 	colors: ColorRollOptions;
+	/**
+	 * chance (0..1) per field that a rolled layer gets its own value instead
+	 * of inheriting the global — values sample the field's curve above.
+	 * All zeros (the shipped default) rolls no overrides and consumes no
+	 * extra randomness.
+	 */
+	layerOverrideChances: Record<LayerOverrideKey, number>;
 }
 
 export const DEFAULT_RNG_PROFILE_ID = 'built-in';
@@ -159,7 +190,11 @@ export const defaultRngProfile = (): RngProfile => ({
 	) as Record<RandomCurveKey, Distribution>,
 	algorithmWeights: ALGORITHM_WEIGHTS.map((option) => ({ ...option })),
 	channelWeights: CHANNEL_WEIGHTS.map((option) => ({ ...option })),
-	colors: defaultColorOptions()
+	colors: defaultColorOptions(),
+	layerOverrideChances: Object.fromEntries(LAYER_OVERRIDE_KEYS.map((key) => [key, 0])) as Record<
+		LayerOverrideKey,
+		number
+	>
 });
 
 // ─── the roll itself ─────────────────────────────────────────────────────────
@@ -173,11 +208,51 @@ const randomAngles = (
 	return { angleMin, angleMax: Math.min(angleMin + spread, 360) };
 };
 
+/**
+ * Per-layer overrides for one rolled layer. Each field rolls its own value
+ * (from the same curve as its global) with the profile's chance for that
+ * field, and inherits (null) otherwise. A zero chance consumes no
+ * randomness, so the shipped all-zeros default stays bit-identical to the
+ * pre-override dice and seeded sessions stay comparable.
+ */
+const rolledOverrides = (
+	rng: Rng,
+	profile: RngProfile,
+	globals: Rstr2Params
+): Record<LayerOverrideKey, number | null> => {
+	const overrides = {} as Record<LayerOverrideKey, number | null>;
+	for (const key of LAYER_OVERRIDE_KEYS) {
+		const chance = profile.layerOverrideChances[key];
+		overrides[key] =
+			chance > 0 && rng() < chance
+				? sampleDistribution(profile.curves[OVERRIDE_VALUE_CURVES[key]], rng)
+				: null;
+	}
+	// keep the layer's EFFECTIVE spacing pair (override ?? global, the same
+	// resolution the hatcher uses) ordered, whichever side rolled
+	const effectiveMin = overrides.spacingMinMm ?? globals.spacingMinMm;
+	const effectiveMax = overrides.spacingMaxMm ?? globals.spacingMaxMm;
+	if (effectiveMin > effectiveMax) {
+		if (overrides.spacingMinMm !== null && overrides.spacingMaxMm !== null) {
+			[overrides.spacingMinMm, overrides.spacingMaxMm] = [
+				overrides.spacingMaxMm,
+				overrides.spacingMinMm
+			];
+		} else if (overrides.spacingMinMm !== null) {
+			overrides.spacingMinMm = effectiveMax;
+		} else {
+			overrides.spacingMaxMm = effectiveMin;
+		}
+	}
+	return overrides;
+};
+
 const randomLayer = (
 	rng: Rng,
 	taken: Set<LayerChannel>,
 	ink: InkColor,
-	profile: RngProfile
+	profile: RngProfile,
+	globals: Rstr2Params
 ): LayerConfig => {
 	// The channel pick prefers, in order: a whole new information axis (see
 	// CHANNEL_AXES — guarantees min(count, 4) distinct axes per stack), then
@@ -213,13 +288,9 @@ const randomLayer = (
 		channel,
 		color: ink.hex,
 		...randomAngles(rng, profile.curves),
-		// per-layer overrides stay inherited — the roll works the globals
-		penWidthMm: null,
-		spacingMinMm: null,
-		spacingMaxMm: null,
-		threshold: null,
-		inkGamma: null,
-		inkBoost: null,
+		// per-layer overrides inherit (null) unless the profile gives a field
+		// a roll chance — see rolledOverrides
+		...rolledOverrides(rng, profile, globals),
 		enabled: true
 	};
 };
@@ -279,7 +350,9 @@ export const randomizeSettings = (
 		// the pens land on a deliberate harmony rather than random hues
 		const inks = pickInkScheme(count, rng, profile.colors);
 		const taken = new Set<LayerChannel>();
-		layers = Array.from({ length: count }, (_, i) => randomLayer(rng, taken, inks[i], profile));
+		layers = Array.from({ length: count }, (_, i) =>
+			randomLayer(rng, taken, inks[i], profile, params)
+		);
 	}
 
 	return { params, layers };

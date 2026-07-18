@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
 	defaultRngProfile,
 	DEFAULT_RNG_PROFILE_ID,
+	LAYER_OVERRIDE_KEYS,
 	RANDOM_CURVES,
 	randomizeSettings,
 	type RngProfile
@@ -20,7 +21,13 @@ import { builtinRngProfiles, isBuiltinRngProfileId } from './rngBuiltinProfiles'
 import { ACCENT_RATE, HARMONY_SETS, INK_COLORS } from './inkColors';
 import { mulberry32 } from './rngSources';
 import { defaultParams } from './params';
-import { CHANNEL_AXES, defaultCmyLayers, type LayerChannel, type LayerConfig } from './layers';
+import {
+	CHANNEL_AXES,
+	defaultCmyLayers,
+	sanitizeLayers,
+	type LayerChannel,
+	type LayerConfig
+} from './layers';
 
 const currentSettings = () => ({ params: defaultParams(), layers: defaultCmyLayers() });
 
@@ -330,6 +337,107 @@ describe('channel axis coverage', () => {
 			expect(new Set(channels).size).toBe(4);
 			expect(new Set(channels.map((channel) => CHANNEL_AXES[channel])).size).toBe(3);
 		}
+	});
+});
+
+describe('layer override chances', () => {
+	it('default profile: all chances 0, rolled layers always inherit', () => {
+		const profile = defaultRngProfile();
+		for (const key of LAYER_OVERRIDE_KEYS) expect(profile.layerOverrideChances[key]).toBe(0);
+		for (let seed = 0; seed < 15; seed++) {
+			const { layers } = randomizeSettings(currentSettings(), false, mulberry32(seed));
+			for (const layer of layers) {
+				for (const key of LAYER_OVERRIDE_KEYS) expect(layer[key]).toBeNull();
+			}
+		}
+	});
+
+	it('chance 1 rolls every override inside its curve bounds, effective spacing pair ordered', () => {
+		const profile = defaultRngProfile();
+		for (const key of LAYER_OVERRIDE_KEYS) profile.layerOverrideChances[key] = 1;
+		for (let seed = 0; seed < 30; seed++) {
+			const { params, layers } = randomizeSettings(
+				currentSettings(),
+				false,
+				mulberry32(seed),
+				profile
+			);
+			for (const layer of layers) {
+				expect(layer.penWidthMm).toBeGreaterThanOrEqual(RANDOM_CURVES.penWidthMm.min);
+				expect(layer.penWidthMm).toBeLessThanOrEqual(RANDOM_CURVES.penWidthMm.max);
+				expect(layer.threshold).toBeGreaterThanOrEqual(RANDOM_CURVES.hatchThreshold.min);
+				expect(layer.threshold).toBeLessThanOrEqual(RANDOM_CURVES.hatchThreshold.max);
+				expect(layer.inkGamma).toBeGreaterThanOrEqual(RANDOM_CURVES.hatchGamma.min);
+				expect(layer.inkGamma).toBeLessThanOrEqual(RANDOM_CURVES.hatchGamma.max);
+				expect(layer.inkBoost).toBeGreaterThanOrEqual(RANDOM_CURVES.inkBoost.min);
+				expect(layer.inkBoost).toBeLessThanOrEqual(RANDOM_CURVES.inkBoost.max);
+				// the pair the hatcher resolves (override ?? global) stays ordered
+				const effectiveMin = layer.spacingMinMm ?? params.spacingMinMm;
+				const effectiveMax = layer.spacingMaxMm ?? params.spacingMaxMm;
+				expect(effectiveMin).toBeLessThanOrEqual(effectiveMax);
+			}
+			// overridden layers survive the same validation as storage / imports
+			expect(sanitizeLayers(JSON.parse(JSON.stringify(layers)))).not.toBeNull();
+		}
+	});
+
+	it('a partial chance rolls some layers and inherits others — only the flagged field', () => {
+		const profile = defaultRngProfile();
+		profile.layerOverrideChances.inkBoost = 0.5;
+		let rolled = 0;
+		let inherited = 0;
+		for (let seed = 0; seed < 60; seed++) {
+			const { layers } = randomizeSettings(currentSettings(), false, mulberry32(seed), profile);
+			for (const layer of layers) {
+				if (layer.inkBoost === null) inherited++;
+				else rolled++;
+				expect(layer.penWidthMm).toBeNull();
+				expect(layer.spacingMinMm).toBeNull();
+				expect(layer.threshold).toBeNull();
+			}
+		}
+		expect(rolled).toBeGreaterThan(20);
+		expect(inherited).toBeGreaterThan(20);
+	});
+
+	it('a lone spacing-min override is clamped under the effective (global) max', () => {
+		const profile = defaultRngProfile();
+		profile.layerOverrideChances.spacingMinMm = 1;
+		for (let seed = 0; seed < 30; seed++) {
+			const { params, layers } = randomizeSettings(
+				currentSettings(),
+				false,
+				mulberry32(seed),
+				profile
+			);
+			for (const layer of layers) {
+				expect(layer.spacingMinMm).not.toBeNull();
+				expect(layer.spacingMinMm).toBeLessThanOrEqual(params.spacingMaxMm);
+			}
+		}
+	});
+
+	it('stick-to-presets never rolls overrides, even at chance 1', () => {
+		const profile = defaultRngProfile();
+		for (const key of LAYER_OVERRIDE_KEYS) profile.layerOverrideChances[key] = 1;
+		for (let seed = 0; seed < 10; seed++) {
+			const { layers } = randomizeSettings(currentSettings(), true, mulberry32(seed), profile);
+			for (const layer of layers) {
+				for (const key of LAYER_OVERRIDE_KEYS) expect(layer[key]).toBeNull();
+			}
+		}
+	});
+
+	it('sanitize clamps chances into 0..1 and defaults missing or broken ones', () => {
+		const profile = sanitizeRngProfile({
+			id: 'x',
+			name: 'x',
+			layerOverrideChances: { inkBoost: 7, penWidthMm: 'lots', spacingMaxMm: -2 }
+		});
+		expect(profile?.layerOverrideChances.inkBoost).toBe(1);
+		expect(profile?.layerOverrideChances.penWidthMm).toBe(0);
+		expect(profile?.layerOverrideChances.spacingMaxMm).toBe(0);
+		expect(profile?.layerOverrideChances.threshold).toBe(0);
 	});
 });
 
