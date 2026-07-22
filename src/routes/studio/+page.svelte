@@ -3258,7 +3258,8 @@
 		color: var(--muted);
 		font-size: 0.68rem;
 		cursor: pointer;
-		line-height: 1.25;
+		line-height: 1.7;
+		margin-top: .5rem;
 	}
 
 	.select-row {
