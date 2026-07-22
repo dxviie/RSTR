@@ -3,6 +3,7 @@
 	import '@stanko/dual-range-input/dist/index.css';
 	import { inkRange } from '$lib/inkRange';
 	import BrandFooter from '$lib/components/BrandFooter.svelte';
+	import InkSwatchPicker from '$lib/components/InkSwatchPicker.svelte';
 	import TopBar from '$lib/components/TopBar.svelte';
 	import { computeCellGrid, type CellGrid } from '$lib/rstr2/grid';
 	import { adjustColors, isNeutralAdjustment } from '$lib/rstr2/imageAdjust';
@@ -2315,11 +2316,14 @@
 								bind:checked={layer.enabled}
 								title="include this layer in the render and export"
 							/>
-							<input
-								class="layer-color"
-								type="color"
-								bind:value={layer.color}
-								title="pen color, used in the render and the exported SVG"
+							<InkSwatchPicker
+								color={layer.color}
+								onpick={(hex, ink) => {
+									layer.color = hex;
+									// a layer is named after the pen that draws it (same
+									// convention as the dice) — a custom hex has no pen name
+									if (ink) layer.name = ink.name;
+								}}
 							/>
 							<input
 								class="layer-name"
@@ -3659,15 +3663,6 @@
 	.layer-name {
 		flex: 1;
 		min-width: 0;
-	}
-
-	.layer-color {
-		width: 1.7rem;
-		height: 1.7rem;
-		padding: 0;
-		border: none;
-		background: none;
-		cursor: pointer;
 	}
 
 	.icon-btn {

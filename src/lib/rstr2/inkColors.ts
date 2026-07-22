@@ -170,6 +170,44 @@ export const INK_COLORS: InkColor[] = [
 	{ name: 'Diamine Forever Raven', hex: '#22211C', family: 'neutral' }
 ];
 
+// ─── ink sets ────────────────────────────────────────────────────────────────
+
+/** one product line of the palette — a section in the studio's swatch picker */
+export interface InkSet {
+	label: string;
+	inks: InkColor[];
+}
+
+// Product lines in display order, matched against ink names by prefix (the
+// longest matching prefix wins, so 'R&K Sketch' beats 'R&K'). A new brand in
+// INK_COLORS needs a row here — the tests fail if an ink lands in no set.
+const INK_SET_DEFS: { label: string; prefix: string }[] = [
+	{ label: 'De Atramentis Artist', prefix: 'De Atramentis' },
+	{ label: 'Octopus Write & Draw', prefix: 'Octopus' },
+	{ label: 'R&K Zeichentusche', prefix: 'R&K' },
+	{ label: 'R&K Sketch INK', prefix: 'R&K Sketch' },
+	{ label: 'Diamine Forever', prefix: 'Diamine Forever' }
+];
+
+/** the whole palette grouped by product line, inks in INK_COLORS order */
+export const inkSets = (): InkSet[] => {
+	const sets = INK_SET_DEFS.map((def) => ({ ...def, inks: [] as InkColor[] }));
+	for (const ink of INK_COLORS) {
+		const home = sets
+			.filter((set) => ink.name.startsWith(set.prefix))
+			.reduce<(typeof sets)[number] | null>(
+				(best, set) => (set.prefix.length > (best?.prefix.length ?? -1) ? set : best),
+				null
+			);
+		home?.inks.push(ink);
+	}
+	return sets.filter((set) => set.inks.length > 0).map(({ label, inks }) => ({ label, inks }));
+};
+
+/** the palette ink with this hex (case-insensitive), or null for a custom colour */
+export const inkByHex = (hex: string): InkColor | null =>
+	INK_COLORS.find((ink) => ink.hex.toUpperCase() === hex.toUpperCase()) ?? null;
+
 // ─── colour harmonies ────────────────────────────────────────────────────────
 
 /**
