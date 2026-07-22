@@ -189,3 +189,88 @@
 		@apply bg-background text-foreground;
 	}
 }
+
+/*
+  Chrome-look range sliders, opted into via the inkRange action ($lib/inkRange),
+  which adds this class and drives --ink-range-fill (0..1). Native
+  `accent-color` sliders render differently per engine — gray thumbs in
+  Firefox, white pills on iOS — so the control is drawn fully custom: light
+  gray gutter with a 1px outline, ink fill up to the thumb, round ink thumb.
+  The numbers mirror the @stanko/dual-range-input theme in the studio so
+  single and dual sliders read as one control.
+
+  WebKit and Gecko rules must stay separate — a selector list containing a
+  pseudo-element the engine doesn't know is dropped as a whole.
+*/
+input[type='range'].ink-range {
+	-webkit-appearance: none;
+	appearance: none;
+	height: 1.3rem;
+	margin: 0;
+	padding: 0;
+	background: transparent;
+	--ink-range-fill: 0;
+}
+
+input[type='range'].ink-range:disabled {
+	opacity: 0.45;
+}
+
+/* track: gutter + ink fill; the fill's edge lands on the thumb center, which
+   travels between half a thumb in from either end (hence the 0.94rem terms) */
+input[type='range'].ink-range::-webkit-slider-runnable-track {
+	box-sizing: border-box;
+	height: 0.5rem;
+	border: 1px solid #b2b2b2;
+	border-radius: 999px;
+	background-color: #efefef;
+	background-image: linear-gradient(var(--ink, #1a202c), var(--ink, #1a202c));
+	background-origin: border-box;
+	background-clip: border-box;
+	background-repeat: no-repeat;
+	background-size: calc(0.47rem + (100% - 0.94rem) * var(--ink-range-fill)) 100%;
+}
+
+input[type='range'].ink-range::-moz-range-track {
+	box-sizing: border-box;
+	height: 0.5rem;
+	border: 1px solid #b2b2b2;
+	border-radius: 999px;
+	background-color: #efefef;
+	background-image: linear-gradient(var(--ink, #1a202c), var(--ink, #1a202c));
+	background-origin: border-box;
+	background-clip: border-box;
+	background-repeat: no-repeat;
+	background-size: calc(0.47rem + (100% - 0.94rem) * var(--ink-range-fill)) 100%;
+}
+
+input[type='range'].ink-range::-webkit-slider-thumb {
+	-webkit-appearance: none;
+	appearance: none;
+	width: 0.94rem;
+	height: 0.94rem;
+	/* WebKit tops the thumb at the track's content edge: center it on the
+	   0.5rem border-box track (1px = the track border above the content) */
+	margin-top: calc((0.5rem - 0.94rem) / 2 - 1px);
+	border: none;
+	border-radius: 999px;
+	background: var(--ink, #1a202c);
+}
+
+input[type='range'].ink-range::-moz-range-thumb {
+	width: 0.94rem;
+	height: 0.94rem;
+	border: none;
+	border-radius: 999px;
+	background: var(--ink, #1a202c);
+}
+
+input[type='range'].ink-range:hover:not(:disabled)::-webkit-slider-thumb,
+input[type='range'].ink-range:active:not(:disabled)::-webkit-slider-thumb {
+	background: var(--ink-soft, #2d3748);
+}
+
+input[type='range'].ink-range:hover:not(:disabled)::-moz-range-thumb,
+input[type='range'].ink-range:active:not(:disabled)::-moz-range-thumb {
+	background: var(--ink-soft, #2d3748);
+}

@@ -3,3 +3,9 @@
   Referrer-Policy: strict-origin-when-cross-origin
   X-Frame-Options: DENY
   Permissions-Policy: camera=(), microphone=(), geolocation=()
+
+# The UI fonts are public assets; CORS lets other origins @font-face them —
+# browsers require it for cross-origin font loads. Needed so the Tally order
+# form can render in the same IBM Plex faces as the studio.
+/fonts/*
+  Access-Control-Allow-Origin: *

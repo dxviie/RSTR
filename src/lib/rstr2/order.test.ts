@@ -118,20 +118,49 @@ describe('quoteOrder', () => {
 		expect(quote!.penFeeEur).toBe(2 * PRICING.extraPenEur);
 		expect(quote!.timeFeeEur).toBe(0);
 		expect(quote!.totalEur).toBe(
-			PRICING.tiers.A4.base + 2 * PRICING.extraPenEur + PRICING.shippingEur
+			PRICING.tiers.A4.base + 2 * PRICING.extraPenEur + PRICING.tiers.A4.shippingEur
 		);
 		expect(quote!.capped).toBe(false);
 	});
 
 	it('bills plot time beyond the included window', () => {
 		const billableMin = 42; // arbitrary overtime, derived from the constants
-		const quote = quoteOrder(supportedCheck(), (PRICING.includedPlotMin + billableMin) * 60);
+		const quote = quoteOrder(
+			supportedCheck(),
+			(PRICING.tiers.A4.includedPlotMin + billableMin) * 60
+		);
 		expect(quote!.timeFeeEur).toBe(Math.round(billableMin * PRICING.plotMinEur));
 	});
 
-	it('caps the time fee', () => {
-		const quote = quoteOrder(supportedCheck(), 100 * 60 * 60);
-		expect(quote!.timeFeeEur).toBe(PRICING.plotTimeFeeCapEur);
+	it('starts a one-pen A6 inside its plot window at €19', () => {
+		const { params, layers } = presetSettings('Black classic');
+		params.outputWidthMm = 80;
+		const check = checkOrder(params, layers, 1); // 80×80 -> A6
+		const quote = quoteOrder(check, PRICING.tiers.A6.includedPlotMin * 60)!;
+		expect(quote.tier).toBe('A6');
+		expect(quote.penFeeEur).toBe(0);
+		expect(quote.timeFeeEur).toBe(0);
+		expect(quote.totalEur).toBe(19);
+	});
+
+	it('scales the included plot window with the sheet', () => {
+		// the same 50-minute plot is free time on A4 but 30' of overtime on A6
+		expect(quoteOrder(supportedCheck(), 50 * 60)!.timeFeeEur).toBe(0);
+		expect(quoteOrder(supportedCheck(80, 1), 50 * 60)!.timeFeeEur).toBe(
+			Math.round((50 - PRICING.tiers.A6.includedPlotMin) * PRICING.plotMinEur)
+		);
+	});
+
+	it('ramps the starting price gradually across the tiers', () => {
+		const { params, layers } = presetSettings('Black classic');
+		const startingPrice = (widthMm: number) => {
+			params.outputWidthMm = widthMm;
+			return quoteOrder(checkOrder(params, layers, 1), 0)!;
+		};
+		// square designs sized so each lands on the next sheet up
+		const quotes = [80, 120, 180, 260].map(startingPrice);
+		expect(quotes.map((quote) => quote.tier)).toEqual(['A6', 'A5', 'A4', 'A3']);
+		expect(quotes.map((quote) => quote.totalEur)).toEqual([19, 30, 45, 70]);
 	});
 
 	it('clamps the total at the tier cap', () => {
@@ -140,6 +169,15 @@ describe('quoteOrder', () => {
 		expect(quote!.tier).toBe('A6');
 		expect(quote!.totalEur).toBe(PRICING.tiers.A6.cap);
 		expect(quote!.capped).toBe(true);
+	});
+
+	it('lets a marathon A3 run up to its cap instead of a flat time ceiling', () => {
+		// 12h+ plots used to flatten out at a global time-fee cap; now only the
+		// tier cap bounds them, so the longest A3s got a bit more expensive
+		const quote = quoteOrder(supportedCheck(260, 1), 12 * 60 * 60)!;
+		expect(quote.tier).toBe('A3');
+		expect(quote.totalEur).toBe(PRICING.tiers.A3.cap);
+		expect(quote.capped).toBe(true);
 	});
 
 	it('returns null for unsupported designs', () => {
@@ -171,7 +209,7 @@ describe('orderHiddenFields', () => {
 		expect(fields.lines).toBe('12345');
 		expect(fields.image).toBe('bbrasa-imp');
 		expect(fields.design).toBe('abc123def456');
-		expect(fields.v).toBe('1');
+		expect(fields.v).toBe('2');
 		expect('preset' in fields).toBe(false);
 		// no confirmed upload -> no upload field, the form keeps its attach step
 		expect('upload' in fields).toBe(false);

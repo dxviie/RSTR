@@ -1,6 +1,7 @@
 <script lang="ts">
 	import BrandFooter from '$lib/components/BrandFooter.svelte';
 	import TopBar from '$lib/components/TopBar.svelte';
+	import { inkRange } from '$lib/inkRange';
 	import { buildCalibrationBlock } from '$lib/prep/calibration';
 	import {
 		PAGE_LABELS,
@@ -628,7 +629,14 @@ ${wrapRotation(artworkInner)}
 				</label>
 				<label class="slider-row" title="extra room around the outlined size (mm)">
 					<span>+ margin</span>
-					<input type="range" min="1" max="50" step="0.5" bind:value={paperMargin} />
+					<input
+						type="range"
+						min="1"
+						max="50"
+						step="0.5"
+						bind:value={paperMargin}
+						use:inkRange={paperMargin}
+					/>
 					<input type="number" min="1" max="50" step="0.5" bind:value={paperMargin} />
 				</label>
 				{#if paperOutlineSize !== 'artwork' && paperOutlineSize !== 'custom'}
@@ -643,12 +651,26 @@ ${wrapRotation(artworkInner)}
 				{#if paperOutlineSize === 'custom'}
 					<label class="slider-row" title="custom paper width (mm)">
 						<span>width (mm)</span>
-						<input type="range" min="10" max="1200" step="1" bind:value={paperOutlineW} />
+						<input
+							type="range"
+							min="10"
+							max="1200"
+							step="1"
+							bind:value={paperOutlineW}
+							use:inkRange={paperOutlineW}
+						/>
 						<input type="number" min="1" step="1" bind:value={paperOutlineW} />
 					</label>
 					<label class="slider-row" title="custom paper height (mm)">
 						<span>height (mm)</span>
-						<input type="range" min="10" max="1200" step="1" bind:value={paperOutlineH} />
+						<input
+							type="range"
+							min="10"
+							max="1200"
+							step="1"
+							bind:value={paperOutlineH}
+							use:inkRange={paperOutlineH}
+						/>
 						<input type="number" min="1" step="1" bind:value={paperOutlineH} />
 					</label>
 				{/if}
@@ -661,7 +683,14 @@ ${wrapRotation(artworkInner)}
 					title="how many pens the plot uses — one calibration line pair per pen"
 				>
 					<span>pens/layers</span>
-					<input type="range" min="1" max="8" step="1" bind:value={penCount} />
+					<input
+						type="range"
+						min="1"
+						max="8"
+						step="1"
+						bind:value={penCount}
+						use:inkRange={penCount}
+					/>
 					<input type="number" min="1" max="8" step="1" bind:value={penCount} />
 				</label>
 				<label class="toggle-row" title="rotate the calibration block 90° into a wide layout">
@@ -682,12 +711,12 @@ ${wrapRotation(artworkInner)}
 				<div class="group-title">artwork position</div>
 				<label class="slider-row" title="horizontal offset from the page center (mm)">
 					<span>offset X</span>
-					<input type="range" min="-200" max="200" step="0.5" bind:value={ox} />
+					<input type="range" min="-200" max="200" step="0.5" bind:value={ox} use:inkRange={ox} />
 					<input type="number" step="0.5" bind:value={ox} />
 				</label>
 				<label class="slider-row" title="vertical offset from the page center (mm)">
 					<span>offset Y</span>
-					<input type="range" min="-200" max="200" step="0.5" bind:value={oy} />
+					<input type="range" min="-200" max="200" step="0.5" bind:value={oy} use:inkRange={oy} />
 					<input type="number" step="0.5" bind:value={oy} />
 				</label>
 				<div class="position-actions">
