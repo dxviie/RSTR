@@ -26,7 +26,7 @@
 				src="/help/studio-sections.webp"
 				alt="the RSTR studio on desktop, its sections outlined and numbered — 1 source & adjustments, 2 video, 3 segmentation and 4 lines on the left, 5 presets, 6 layers, 7 export and 8 stats on the right, the render in the middle"
 				width="2000"
-				height="1250"
+				height="1405"
 			/>
 		</a>
 	</figure>
