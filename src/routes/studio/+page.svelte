@@ -2708,9 +2708,9 @@
 					<button
 						class="plotter-reset"
 						onclick={resetPlotter}
-						title="restore saxi's default AxiDraw profile"
+						title="restore the default plotter profile"
 					>
-						↺ saxi defaults
+						↺ default profile
 					</button>
 				</details>
 				<div class="order-block">
@@ -3259,7 +3259,7 @@
 		font-size: 0.68rem;
 		cursor: pointer;
 		line-height: 1.7;
-		margin-top: .5rem;
+		margin-top: 0.5rem;
 	}
 
 	.select-row {
