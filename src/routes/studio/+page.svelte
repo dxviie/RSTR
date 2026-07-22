@@ -3926,8 +3926,8 @@
 	   the iframe flexes to fill, so the only scrollbar is the form's own.
 	   The blocked fallback has no frame to fill and shrinks back to fit. */
 	.order-dialog-form {
-		width: min(480px, 100%);
-		height: min(760px, calc(100dvh - 2rem));
+		width: min(42rem, 100%);
+		height: min(50rem, calc(100dvh - 2rem));
 		overflow: hidden;
 	}
 
