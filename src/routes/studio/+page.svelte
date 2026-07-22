@@ -1,6 +1,7 @@
 <script lang="ts">
 	import DualRangeInput from '@stanko/dual-range-input';
 	import '@stanko/dual-range-input/dist/index.css';
+	import { inkRange } from '$lib/inkRange';
 	import BrandFooter from '$lib/components/BrandFooter.svelte';
 	import TopBar from '$lib/components/TopBar.svelte';
 	import { computeCellGrid, type CellGrid } from '$lib/rstr2/grid';
@@ -1198,7 +1199,7 @@
 	let orderUploaded = $state(false);
 	let orderTimer = 0;
 
-	const ORDER_FROM_EUR = PRICING.tiers.A6.base + PRICING.shippingEur;
+	const ORDER_FROM_EUR = PRICING.tiers.A6.base + PRICING.tiers.A6.shippingEur;
 
 	// live quote for the order-button subtext: the same math the order dialog
 	// runs, recomputed as the design changes. null (falling back to the
@@ -1863,6 +1864,7 @@
 							max={slider.max}
 							step={slider.step}
 							bind:value={params[slider.id]}
+							use:inkRange={params[slider.id]}
 							onpointerdown={noteAdjust}
 							oninput={noteAdjust}
 						/>
@@ -1886,7 +1888,14 @@
 						title="output frame rate the video is sampled at — fewer frames per second means fewer, smaller files"
 					>
 						<span>output fps</span>
-						<input type="range" min="1" max="30" step="1" bind:value={video.fps} />
+						<input
+							type="range"
+							min="1"
+							max="30"
+							step="1"
+							bind:value={video.fps}
+							use:inkRange={video.fps}
+						/>
 						<input type="number" min="1" max="60" step="1" bind:value={video.fps} />
 					</label>
 					<div
@@ -1974,6 +1983,7 @@
 							max={slider.max}
 							step={slider.step}
 							bind:value={params[slider.id]}
+							use:inkRange={params[slider.id]}
 						/>
 						<input
 							type="number"
@@ -1997,6 +2007,7 @@
 							max={slider.max}
 							step={slider.step}
 							bind:value={params[slider.id]}
+							use:inkRange={params[slider.id]}
 						/>
 						<input
 							type="number"
@@ -2101,6 +2112,7 @@
 								max={slider.max}
 								step={slider.step}
 								bind:value={params[slider.id]}
+								use:inkRange={params[slider.id]}
 							/>
 							<input
 								type="number"
@@ -2184,6 +2196,7 @@
 							max={videoTotalFrames - 1}
 							step="1"
 							bind:value={currentFrame}
+							use:inkRange={[currentFrame, videoTotalFrames]}
 							disabled={exporting.running}
 						/>
 					</div>
@@ -2492,7 +2505,14 @@
 					title="target output width in millimeters — the height follows the image aspect"
 				>
 					<span>width (mm)</span>
-					<input type="range" min="10" max="1000" step="1" bind:value={params.outputWidthMm} />
+					<input
+						type="range"
+						min="10"
+						max="1000"
+						step="1"
+						bind:value={params.outputWidthMm}
+						use:inkRange={params.outputWidthMm}
+					/>
 					<input type="number" min="10" max="1000" step="1" bind:value={params.outputWidthMm} />
 				</label>
 				<div
@@ -2517,7 +2537,14 @@
 					title="margin kept clear on every edge of the page when fitting the art to a paper size"
 				>
 					<span>margin (mm)</span>
-					<input type="range" min="5" max="50" step="1" bind:value={params.fitMarginMm} />
+					<input
+						type="range"
+						min="5"
+						max="50"
+						step="1"
+						bind:value={params.fitMarginMm}
+						use:inkRange={params.fitMarginMm}
+					/>
 					<input type="number" min="5" max="50" step="1" bind:value={params.fitMarginMm} />
 				</label>
 				<div class="export-actions">
@@ -2575,6 +2602,7 @@
 									max="1"
 									step="0.05"
 									bind:value={video.rasterQuality}
+									use:inkRange={video.rasterQuality}
 									disabled={video.rasterFormat === 'png'}
 								/>
 								<input
@@ -2591,7 +2619,14 @@
 								title="image size relative to the video resolution — the main filesize lever"
 							>
 								<span>scale</span>
-								<input type="range" min="0.1" max="1" step="0.05" bind:value={video.rasterScale} />
+								<input
+									type="range"
+									min="0.1"
+									max="1"
+									step="0.05"
+									bind:value={video.rasterScale}
+									use:inkRange={video.rasterScale}
+								/>
 								<input type="number" min="0.1" max="1" step="0.05" bind:value={video.rasterScale} />
 							</label>
 						{/if}
@@ -3011,7 +3046,8 @@
 		outline: var(--muted) dashed 1px;
 	}
 
-	/* neutral thumbs for all single-value sliders and checkboxes */
+	/* neutral checkboxes; single-value sliders are custom-drawn via the
+	   inkRange action (app.css) — accent-color stays as a fallback */
 	.app input[type='range'],
 	.app input[type='checkbox'] {
 		accent-color: var(--ink);
@@ -3363,6 +3399,14 @@
 	}
 	.app :global(.dual-range-input input:last-child::-moz-range-track) {
 		border-right: 1px solid #b2b2b2;
+	}
+
+	/* The two halves get fractional widths (the split follows the values), and
+	   Firefox can leave a subpixel hairline where their tracks abut. Slide the
+	   right half 1px under the left one: both sides of the junction are always
+	   painted the same color, so the overlap itself is invisible. */
+	.app :global(.dual-range-input input:last-child) {
+		margin-inline-start: -1px;
 	}
 
 	/* ------------------------------------------------- rng debug (dev tool) */
@@ -3882,8 +3926,8 @@
 	   the iframe flexes to fill, so the only scrollbar is the form's own.
 	   The blocked fallback has no frame to fill and shrinks back to fit. */
 	.order-dialog-form {
-		width: min(480px, 100%);
-		height: min(760px, calc(100dvh - 2rem));
+		width: min(42rem, 100%);
+		height: min(50rem, calc(100dvh - 2rem));
 		overflow: hidden;
 	}
 

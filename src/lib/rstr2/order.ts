@@ -135,27 +135,27 @@ export const checkOrder = (
 //***************************************************************
 
 // All prices in whole euros. Tune freely — the shape of the formula is
-// base(tier) + extra pens + plot time above the included window, everything
-// clamped by the tier cap, with flat shipping folded in so the shop can say
-// "shipping included".
+// base(tier) + extra pens + plot time above the tier's included window,
+// everything clamped by the tier cap, with the tier's shipping folded in so
+// the shop can say "shipping included". Base, included minutes, shipping and
+// cap all scale with the sheet: an A6 is a postcard (cheap to plot AND to
+// ship), an A3 hogs the machine for hours and ships tracked in a flat-pack.
 export const PRICING = {
-	/** per-tier base (first pen + included plot time) and total cap */
+	/** per-tier: base (first pen + the included plot window), included plot
+	 *  minutes, shipping folded into the advertised total, and the all-in cap */
 	tiers: {
-		A6: { base: 20, cap: 55 },
-		A5: { base: 30, cap: 75 },
-		A4: { base: 50, cap: 125 },
-		A3: { base: 80, cap: 250 }
-	} as Record<OrderTier, { base: number; cap: number }>,
+		A6: { base: 15, includedPlotMin: 20, shippingEur: 4, cap: 45 },
+		A5: { base: 24, includedPlotMin: 40, shippingEur: 6, cap: 75 },
+		A4: { base: 36, includedPlotMin: 60, shippingEur: 9, cap: 130 },
+		A3: { base: 55, includedPlotMin: 90, shippingEur: 15, cap: 280 }
+	} as Record<
+		OrderTier,
+		{ base: number; includedPlotMin: number; shippingEur: number; cap: number }
+	>,
 	/** every pen after the first: swap, registration, cleaning */
 	extraPenEur: 10,
-	/** plot minutes covered by the base price */
-	includedPlotMin: 60,
-	/** per minute beyond the included window */
-	plotMinEur: 0.5,
-	/** the time component stops growing here */
-	plotTimeFeeCapEur: 150,
-	/** flat-pack tracked shipping, folded into the advertised total */
-	shippingEur: 15
+	/** per minute beyond the included window — unbounded, the tier cap clamps */
+	plotMinEur: 0.5
 } as const;
 
 export interface OrderQuote {
@@ -173,21 +173,18 @@ export interface OrderQuote {
 /** Price a supported design. Returns null when the check is unsupported. */
 export const quoteOrder = (check: OrderCheck, plotSeconds: number): OrderQuote | null => {
 	if (!check.supported || check.tier === null) return null;
-	const { base, cap } = PRICING.tiers[check.tier];
+	const { base, includedPlotMin, shippingEur, cap } = PRICING.tiers[check.tier];
 	const penFeeEur = PRICING.extraPenEur * Math.max(0, check.pens.length - 1);
-	const billableMin = Math.max(0, plotSeconds / 60 - PRICING.includedPlotMin);
-	const timeFeeEur = Math.min(
-		Math.round(billableMin * PRICING.plotMinEur),
-		PRICING.plotTimeFeeCapEur
-	);
-	const raw = Math.ceil(base + penFeeEur + timeFeeEur + PRICING.shippingEur);
+	const billableMin = Math.max(0, plotSeconds / 60 - includedPlotMin);
+	const timeFeeEur = Math.round(billableMin * PRICING.plotMinEur);
+	const raw = Math.ceil(base + penFeeEur + timeFeeEur + shippingEur);
 	const totalEur = Math.min(raw, cap);
 	return {
 		tier: check.tier,
 		baseEur: base,
 		penFeeEur,
 		timeFeeEur,
-		shippingEur: PRICING.shippingEur,
+		shippingEur,
 		totalEur,
 		capped: raw > cap
 	};
@@ -200,8 +197,9 @@ export const quoteOrder = (check: OrderCheck, plotSeconds: number): OrderQuote |
 /**
  * Version marker sent with every order payload, so submissions remain
  * interpretable when the pricing model changes later.
+ * v2: per-tier included minutes/shipping/caps, gentler ramp (A6 from €19).
  */
-export const ORDER_PAYLOAD_VERSION = '1';
+export const ORDER_PAYLOAD_VERSION = '2';
 
 export interface OrderContext {
 	plotSeconds: number;
