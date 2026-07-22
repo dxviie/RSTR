@@ -39,16 +39,20 @@ export interface PlotterConfig {
 	pathJoinRadiusMm: number;
 }
 
-/** saxi's defaultPlanOptions for an AxiDraw v3. */
+/**
+ * The shipped default profile: saxi's AxiDraw v3 plan options with a slower,
+ * harder-accelerating pen-down profile and path joining off — tuned for
+ * clean ink lines over raw speed.
+ */
 export const defaultPlotterConfig = (): PlotterConfig => ({
-	penDownAcceleration: 200,
-	penDownMaxVelocity: 50,
+	penDownAcceleration: 2000,
+	penDownMaxVelocity: 10,
 	penDownCorneringFactor: 0.127,
 	penUpAcceleration: 400,
 	penUpMaxVelocity: 200,
 	penDropDuration: 0.12,
 	penLiftDuration: 0.12,
-	pathJoinRadiusMm: 0.5
+	pathJoinRadiusMm: 0
 });
 
 export const PLOTTER_STORAGE_KEY = 'rstr:v2:plotter';

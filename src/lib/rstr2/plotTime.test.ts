@@ -102,14 +102,15 @@ describe('estimateLayerPlotTime', () => {
 	});
 
 	it('joining nearby lines saves pen lifts and time', () => {
-		// parallel hatch lines 0.4mm apart, drawn boustrophedon
+		// parallel hatch lines 0.4mm apart, drawn boustrophedon; the join radius
+		// is set explicitly — the shipped default profile keeps joining off
 		const segments: number[] = [];
 		for (let i = 0; i < 50; i++) {
 			const y = i * 0.4;
 			if (i % 2 === 0) segments.push(0, y, 30, y);
 			else segments.push(30, y, 0, y);
 		}
-		const joined = estimateLayerPlotTime([segments], 1, config);
+		const joined = estimateLayerPlotTime([segments], 1, { ...config, pathJoinRadiusMm: 0.5 });
 		const lifted = estimateLayerPlotTime([segments], 1, { ...config, pathJoinRadiusMm: 0 });
 		expect(joined.penPaths).toBe(1);
 		expect(lifted.penPaths).toBe(50);

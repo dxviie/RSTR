@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { pageDims, parseMm, svgDimensions } from './pages';
 import { reversePathData, reversePoints } from './reverse';
 import { buildCalibrationBlock } from './calibration';
+import { handDrawnPolylines, polylinesToSvgPath } from '../rstr2/handDrawn';
 
 describe('parseMm', () => {
 	it('converts units to mm', () => {
@@ -85,6 +86,39 @@ describe('reversePathData', () => {
 		expect(reversePathData(reversePathData(d))).toBe(reversePathData(reversePathData(d)));
 		// endpoints of the double reversal match the original
 		expect(reversePathData(reversePathData(d)).startsWith('M1.5 2.25')).toBe(true);
+	});
+});
+
+// The studio's hand-drawn mode exports each hatch line as a many-point
+// polyline with implicitly repeated LineTos ("M x y L x y x y …") instead of
+// a plain two-point segment — make sure the reversed-layer feature handles
+// exactly that shape.
+describe('reversePathData × hand-drawn hatch paths', () => {
+	/** every coordinate pair in a path string, in order */
+	const points = (d: string): string[] => d.match(/-?[\d.]+ -?[\d.]+/g) ?? [];
+
+	it('reverses implicitly repeated LineTos', () => {
+		expect(reversePathData('M0 1L2 3 4 5 6 7')).toBe('M6 7L4 5L2 3L0 1');
+	});
+
+	it('reverses multiple wobbly subpaths including their order', () => {
+		expect(reversePathData('M0 0L1 0.5 2 0M10 0L11 -0.5 12 0')).toBe(
+			'M12 0L11 -0.5L10 0M2 0L1 0.5L0 0'
+		);
+	});
+
+	it('reverses a real hand-drawn export line point for point', () => {
+		const lines = handDrawnPolylines([12.5, 30, 180.25, 95.75], {
+			amplitudePx: 3,
+			wavelengthPx: 25,
+			seed: 7
+		});
+		const d = polylinesToSvgPath(lines);
+		expect(points(d).length).toBeGreaterThan(4); // the line actually wobbles
+		const reversed = reversePathData(d);
+		expect(points(reversed)).toEqual(points(d).reverse());
+		// reversing again restores the original point order
+		expect(points(reversePathData(reversed))).toEqual(points(d));
 	});
 });
 

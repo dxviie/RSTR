@@ -14,16 +14,16 @@ RSTR splits a picture into regions of similar tone and refills each one with par
 
 ![The RSTR studio, its sections outlined and numbered](static/help/studio-sections.webp)
 
-| #   | Section          | What it does                                                                                            |
-| --- | ---------------- | ------------------------------------------------------------------------------------------------------- |
-| 1   | **image**        | Load a picture or video and tune it (brightness, contrast, gamma, saturation, vibrance) before tracing. |
-| 2   | **video**        | Frame rate and export window — shown while a video is loaded.                                           |
-| 3   | **segmentation** | How the image is carved into tonal regions (watershed, posterize, k-means, SLIC).                       |
-| 4   | **lines**        | Pen width, the ink threshold band (low/high pass) and how ink intensity turns into line spacing.        |
-| 5   | **presets**      | Randomize everything, or save and share complete looks as JSON.                                         |
-| 6   | **layers**       | One pen per layer: color, image channel, hatch angles, per-layer overrides.                             |
-| 7   | **export**       | Output width (or fit-to-page A6–A3 with a margin) and the SVG / PNG / frame-sequence downloads.         |
-| 8   | **stats**        | Render numbers and the estimated plot time.                                                             |
+| #   | Section          | What it does                                                                                                                       |
+| --- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **image**        | Load a picture or video and tune it (brightness, contrast, gamma, saturation, vibrance) before tracing.                            |
+| 2   | **video**        | Frame rate and export window — shown while a video is loaded.                                                                      |
+| 3   | **segmentation** | How the image is carved into tonal regions (watershed, posterize, k-means, SLIC).                                                  |
+| 4   | **lines**        | Pen width, the ink threshold band (low/high pass), how ink intensity turns into line spacing — and the optional hand-drawn wobble. |
+| 5   | **presets**      | Randomize everything, or save and share complete looks as JSON.                                                                    |
+| 6   | **layers**       | One pen per layer: color, image channel, hatch angles, per-layer overrides.                                                        |
+| 7   | **export**       | Output width (or fit-to-page A6–A3 with a margin) and the SVG / PNG / frame-sequence downloads.                                    |
+| 8   | **stats**        | Render numbers and the estimated plot time.                                                                                        |
 
 > This README covers **how RSTR is built**. For what each setting _does_, see the [help page](https://rstr.d17e.dev/help) (`src/routes/(site)/help/+page.svelte`) — it mirrors the in-app tooltips.
 
@@ -38,6 +38,7 @@ image → pixels → cell grid → color adjust → per-layer channel extract
       → segmentation (watershed | posterize | k-means | SLIC)
       → region geometry (contour tracing, holes included)
       → hatching (ink-driven line spacing per region)
+      → optional hand-drawn wobble (deterministic per-line value noise)
       → preview (canvas) + export (SVG per pen / PNG / frame-sequence zip)
 ```
 
@@ -54,6 +55,10 @@ Each stage is wired to Svelte 5 runes as an independent `$effect` with its own d
 
 **Hatching** fills each region's contours (holes included) with parallel lines whose spacing is driven by the region's mean ink, through a configurable gamma/boost curve. An ink threshold band acts as a low/high pass filter: regions below its low bound (too faint) or above its high bound (too dense) are left empty, so a band narrowed from both ends isolates the midtones. Each region picks its own angle within the layer's range based on its shape, so a single pen never looks mechanical.
 
+**Hand-drawn wobble** (off by default) post-processes the straight hatch segments into polylines that meander like real pen strokes: two octaves of value noise displace interior points perpendicular to the ideal line, tapered to zero at the (exactly preserved) endpoints, with per-line "pressure" variance. Three controls shape it — squiggle (amplitude, mm), wave (wavelength, mm) and a variation seed. The wobble is a pure function of a line's endpoints and the seed, so preview, exports and the plot-time estimate always agree — and when it's off, that code path isn't touched at all and the output stays byte-identical to the classic straight hatching.
+
+![The same render region with hand-drawn off (ruler-straight lines) and on (organic wavy lines)](static/help/hand-drawn.webp)
+
 **Plot-time estimation** is a duration-only port of [saxi](https://github.com/nornagon/saxi)'s constant-acceleration motion planner (which itself derives from [fogleman/axi](https://github.com/fogleman/axi)): per-segment cornering velocities, trapezoidal velocity profiles, pen lift/drop pauses and pen-up travel. Match the plotter profile to saxi's options and the estimate lines up with what saxi reports for the exported file.
 
 ---
@@ -69,6 +74,7 @@ The engine (`src/lib/rstr2/`) is pure TypeScript with no framework imports, so i
 | `segmentation.ts`                                                                 | Watershed / posterize / k-means / SLIC + shared post-processing.                                                                                                                                                                     |
 | `regionTools.ts`                                                                  | Region contour tracing (with holes).                                                                                                                                                                                                 |
 | `hatchTools.ts`                                                                   | Hatch-line generation and the ink→spacing curves.                                                                                                                                                                                    |
+| `handDrawn.ts`                                                                    | The hand-drawn wobble: deterministic, seeded value-noise polylines over the straight hatch segments.                                                                                                                                 |
 | `layers.ts`                                                                       | Layer model (channel + pen mapping), defaults, persistence.                                                                                                                                                                          |
 | `params.ts`                                                                       | Global parameter defaults and localStorage persistence.                                                                                                                                                                              |
 | `inkColors.ts`                                                                    | Curated real-ink palette and color harmonies for the dice.                                                                                                                                                                           |
