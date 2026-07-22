@@ -2839,11 +2839,6 @@
 							<span>price</span>
 							<span><b>{orderQuote.totalEur} €</b> — shipping included</span>
 						</div>
-						{#if orderQuote.capped}
-							<div class="order-fine">
-								long plot — the {orderQuote.tier} price cap kicked in, lucky you
-							</div>
-						{/if}
 					</div>
 					{#if videoSrc}
 						<p class="order-note">
