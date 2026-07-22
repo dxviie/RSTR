@@ -462,13 +462,19 @@
 		aria-label={lightbox.alt}
 		tabindex="-1"
 		transition:fade={{ duration: 200 }}
-		onclick={(e) => e.target === e.currentTarget && closeLightbox()}
+		onclick={closeLightbox}
 	>
 		<button class="lightbox-close" type="button" aria-label="close" onclick={closeLightbox}>
 			×
 		</button>
 		<img src={lightbox.full} srcset={lightbox.srcset} sizes="100vw" alt={lightbox.alt} />
-		<a class="lightbox-full" href={lightbox.full} target="_blank" rel="noopener">
+		<a
+			class="lightbox-full"
+			href={lightbox.full}
+			target="_blank"
+			rel="noopener"
+			onclick={(e) => e.stopPropagation()}
+		>
 			open full size ↗
 		</a>
 	</div>
@@ -1051,12 +1057,15 @@
 		cursor: zoom-out;
 	}
 
+	/* Fill the padded box and letterbox the picture inside it. Sizing the
+	   element (not the content) sidesteps the srcset intrinsic-size trap:
+	   some -1920w renditions are narrower than their descriptor claims, so
+	   the browser under-computes the natural CSS size and max-width/height
+	   alone would show them tiny. Tapping anywhere (image included) closes. */
 	.lightbox img {
-		max-width: 100%;
-		max-height: 100%;
+		width: 100%;
+		height: 100%;
 		object-fit: contain;
-		cursor: default;
-		box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
 	}
 
 	.lightbox-close {
