@@ -47,7 +47,10 @@
 		</li>
 		<li style="--c: #00b4d8">
 			<span class="map-dot">4</span>
-			<span><strong>lines</strong> — pen width and how ink turns into line spacing.</span>
+			<span
+				><strong>lines</strong> — pen width, how ink turns into line spacing, and the optional hand-drawn
+				wobble.</span
+			>
 		</li>
 		<li style="--c: #fb8500">
 			<span class="map-dot">5</span>
@@ -163,6 +166,39 @@
 				Nominal min–max line spacing. Each region lands somewhere in this range based on its ink:
 				dense lines where the image is dark, sparse where it's light.
 			</dd>
+		</dl>
+		<figure class="shot">
+			<a href="/help/hand-drawn.webp" target="_blank" rel="noopener">
+				<img
+					src="/help/hand-drawn.webp"
+					alt="the same render region twice — hand-drawn off with perfectly straight hatch lines on the left, hand-drawn on with organic wavy lines on the right"
+					width="2000"
+					height="1250"
+					loading="lazy"
+				/>
+			</a>
+		</figure>
+		<dl>
+			<dt>hand-drawn lines</dt>
+			<dd>
+				Swap the perfectly straight hatch lines for organic, hand-drawn-looking ones. Off by default
+				— and off means untouched: the classic ruler-straight output stays exactly as it was. When
+				on, the same wobble flows through everything consistently — preview, SVG and PNG exports,
+				frame sequences and the plot-time estimate (squiggly lines are longer, so plots take a bit
+				more time). The wobble is deterministic: the same settings always draw the same squiggles.
+			</dd>
+			<dt>squiggle (mm)</dt>
+			<dd>
+				How far a line may wander from perfectly straight — the squiggliness. Lines keep their exact
+				endpoints and short strokes stay steadier, so regions keep their shape.
+			</dd>
+			<dt>wave (mm)</dt>
+			<dd>
+				Distance between direction changes along a line — short makes a nervous scribble, long makes
+				lazy waves.
+			</dd>
+			<dt>variation</dt>
+			<dd>Rerolls the wobble pattern without changing its character.</dd>
 		</dl>
 	</section>
 
@@ -301,7 +337,8 @@
 			<dt>add reversed layers</dt>
 			<dd>
 				Duplicates every artwork layer with the same lines running in the opposite direction — each
-				line gets plotted twice for denser ink.
+				line gets plotted twice for denser ink. Works on the studio's hand-drawn wobbly lines too:
+				every squiggle is retraced point for point, just backwards.
 			</dd>
 			<dt>export SVG</dt>
 			<dd>Downloads the decorated SVG with everything on its own (Inkscape-compatible) layer.</dd>

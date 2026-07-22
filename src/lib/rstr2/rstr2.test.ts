@@ -594,6 +594,27 @@ describe('buildSvgDocument', () => {
 		expect(svg).toContain('https://rstr.d17e.dev');
 		expect(svg.indexOf('-->')).toBeLessThan(svg.indexOf('<svg'));
 	});
+
+	it('exports hand-drawn polylines instead of the segments when present', () => {
+		const [cyan] = defaultCmyLayers();
+		const svg = buildSvgDocument(
+			[
+				{
+					layer: cyan,
+					penWidthPx: 2,
+					segments: [[0, 0, 10, 0]],
+					polylines: [[[0, 0, 5, 1, 10, 0]], []]
+				}
+			],
+			1000,
+			500,
+			200
+		);
+		expect(svg).toContain('<path d="M0 0L5 1 10 0" />');
+		expect(svg).not.toContain('"M0 0L10 0"');
+		// the empty region list is skipped, so exactly one path element
+		expect(svg.match(/<path /g)).toHaveLength(1);
+	});
 });
 
 describe('settingsComment', () => {
@@ -647,6 +668,20 @@ describe('settingsComment', () => {
 		const body = comment.slice('<!--'.length, comment.lastIndexOf('-->'));
 		expect(body).not.toContain('--');
 		expect(comment.endsWith('-->\n')).toBe(true);
+	});
+
+	it('documents the hand-drawn wobble only while it is on', () => {
+		const off = settingsComment({ params: defaultParams(), layers: defaultCmyLayers() });
+		expect(off).not.toContain('hand-drawn');
+		const on = settingsComment({
+			params: { ...defaultParams(), handDrawn: true, wobbleAmplitudeMm: 0.6 },
+			layers: defaultCmyLayers()
+		});
+		expect(on).toContain('hand-drawn');
+		expect(on).toContain('squiggle');
+		expect(on).toContain('0.6 mm');
+		expect(on).toContain('wave length');
+		expect(on).toContain('variation');
 	});
 });
 

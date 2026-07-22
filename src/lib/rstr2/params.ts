@@ -29,6 +29,15 @@ export interface Rstr2Params {
 	hatchThresholdHigh: number;
 	hatchGamma: number;
 	inkBoost: number;
+	// hand-drawn wobble (off by default — straight lines stay exactly as-is)
+	/** replace the perfectly straight hatch lines with hand-drawn-looking ones */
+	handDrawn: boolean;
+	/** squiggliness: peak sideways deviation from the ideal line (mm) */
+	wobbleAmplitudeMm: number;
+	/** distance between direction changes along a line (mm) */
+	wobbleWavelengthMm: number;
+	/** variation seed — rerolls the wobble pattern without moving any line */
+	wobbleSeed: number;
 	// export
 	outputWidthMm: number;
 	// margin (mm) kept clear around the art when fitting it to a paper size
@@ -55,6 +64,10 @@ export const defaultParams = (): Rstr2Params => ({
 	hatchThresholdHigh: 1,
 	hatchGamma: 1.8,
 	inkBoost: 1,
+	handDrawn: false,
+	wobbleAmplitudeMm: 0.4,
+	wobbleWavelengthMm: 4,
+	wobbleSeed: 1,
 	outputWidthMm: 200,
 	fitMarginMm: 10
 });

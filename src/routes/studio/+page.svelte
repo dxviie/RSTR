@@ -38,6 +38,12 @@
 	import { segmentGrid } from '$lib/rstr2/segmentation';
 	import { buildRegionGeometries } from '$lib/rstr2/regionTools';
 	import { hatchPolygon, spacingForInk, type HatchSegments } from '$lib/rstr2/hatchTools';
+	import {
+		handDrawnPolylines,
+		polylinesToSegments,
+		type HandDrawnOptions,
+		type HatchPolyline
+	} from '$lib/rstr2/handDrawn';
 	import { buildSvgDocument, type ExportLayer } from '$lib/rstr2/svgExport';
 	import {
 		defaultPlotterConfig,
@@ -97,6 +103,8 @@
 		boundsW: number;
 		boundsH: number;
 		hatchSegments?: HatchSegments;
+		/** hand-drawn variants of the same lines — only set while wobble is on */
+		hatchPolylines?: HatchPolyline[];
 	}
 
 	interface LayerResult {
@@ -567,6 +575,19 @@
 		}
 	};
 
+	// Hand-drawn wobble options in pixel space — null while the effect is off,
+	// so every consumer keeps the untouched straight-line path. Shared by the
+	// interactive hatch pass and the off-screen frame exporter so preview and
+	// export wobble identically.
+	const wobbleOptions = (pxPerMm: number): HandDrawnOptions | null =>
+		params.handDrawn
+			? {
+					amplitudePx: params.wobbleAmplitudeMm * pxPerMm,
+					wavelengthPx: params.wobbleWavelengthMm * pxPerMm,
+					seed: params.wobbleSeed
+				}
+			: null;
+
 	// Per-layer overrides fall back to the global parameters
 	const effectiveHatch = (layer: LayerConfig) => ({
 		penWidthMm: layer.penWidthMm ?? params.penWidthMm,
@@ -653,6 +674,10 @@
 		void params.hatchThresholdHigh;
 		void params.hatchGamma;
 		void params.inkBoost;
+		void params.handDrawn;
+		void params.wobbleAmplitudeMm;
+		void params.wobbleWavelengthMm;
+		void params.wobbleSeed;
 		const results = layerResults;
 		if (results.length === 0 || !imgWidth || !hatchCanvas) return;
 		recomputeHatching(results);
@@ -686,6 +711,7 @@
 		ctx.globalAlpha = 0.85; // translucent-ink simulation
 
 		const pxPerMm = imgWidth / params.outputWidthMm;
+		const wobble = wobbleOptions(pxPerMm);
 		let totalLines = 0;
 
 		for (const layer of layers) {
@@ -713,6 +739,7 @@
 			ctx.beginPath();
 			for (const region of result.regions) {
 				region.hatchSegments = undefined;
+				region.hatchPolylines = undefined;
 				if (region.ink < hatch.thresholdLow || region.ink > thresholdHigh) continue;
 				const spacing = spacingForInk(
 					region.ink,
@@ -729,9 +756,18 @@
 				);
 				region.hatchSegments = segments;
 				totalLines += segments.length / 4;
-				for (let k = 0; k < segments.length; k += 4) {
-					ctx.moveTo(segments[k], segments[k + 1]);
-					ctx.lineTo(segments[k + 2], segments[k + 3]);
+				if (wobble) {
+					const polylines = handDrawnPolylines(segments, wobble);
+					region.hatchPolylines = polylines;
+					for (const line of polylines) {
+						ctx.moveTo(line[0], line[1]);
+						for (let k = 2; k + 1 < line.length; k += 2) ctx.lineTo(line[k], line[k + 1]);
+					}
+				} else {
+					for (let k = 0; k < segments.length; k += 4) {
+						ctx.moveTo(segments[k], segments[k + 1]);
+						ctx.lineTo(segments[k + 2], segments[k + 3]);
+					}
 				}
 			}
 			ctx.stroke();
@@ -785,7 +821,14 @@
 			.filter((layer) => layer.enabled)
 			.map((layer) => {
 				const result = layerResults.find((res) => res.layerId === layer.id);
-				const segmentLists = result?.regions.map((region) => region.hatchSegments ?? []) ?? [];
+				// wobbled lines are estimated on their real polyline geometry —
+				// longer path, more corners, honest plot time
+				const segmentLists =
+					result?.regions.map((region) =>
+						region.hatchPolylines
+							? polylinesToSegments(region.hatchPolylines)
+							: (region.hatchSegments ?? [])
+					) ?? [];
 				return {
 					name: layer.name,
 					seconds: estimateLayerPlotTime(segmentLists, pxPerMm, config).seconds
@@ -1039,7 +1082,10 @@
 				return {
 					layer,
 					penWidthPx: effectiveHatch(layer).penWidthMm * pxPerMm,
-					segments: result?.regions.map((region) => region.hatchSegments ?? []) ?? []
+					segments: result?.regions.map((region) => region.hatchSegments ?? []) ?? [],
+					polylines: params.handDrawn
+						? (result?.regions.map((region) => region.hatchPolylines ?? []) ?? [])
+						: undefined
 				};
 			});
 		return buildSvgDocument(exportLayers, imgWidth, imgHeight, params.outputWidthMm, {
@@ -1270,6 +1316,7 @@
 			? grid
 			: { ...grid, ...adjustColors(grid.r, grid.g, grid.b, adjustments) };
 		const pxPerMm = w / params.outputWidthMm;
+		const wobble = wobbleOptions(pxPerMm);
 		return layers
 			.filter((layer) => layer.enabled)
 			.map((layer) => {
@@ -1316,7 +1363,14 @@
 					});
 					return hatchPolygon(geometry.loops, angle, spacing, penWidthPx);
 				});
-				return { layer, penWidthPx, segments };
+				return {
+					layer,
+					penWidthPx,
+					segments,
+					polylines: wobble
+						? segments.map((segmentList) => handDrawnPolylines(segmentList, wobble))
+						: undefined
+				};
 			});
 	};
 
@@ -1337,14 +1391,23 @@
 		ctx.lineCap = 'round';
 		ctx.globalCompositeOperation = 'multiply';
 		ctx.globalAlpha = 0.85;
-		for (const { layer, penWidthPx, segments } of exportLayers) {
+		for (const { layer, penWidthPx, segments, polylines } of exportLayers) {
 			ctx.strokeStyle = layer.color;
 			ctx.lineWidth = penWidthPx;
 			ctx.beginPath();
-			for (const segmentList of segments) {
-				for (let k = 0; k < segmentList.length; k += 4) {
-					ctx.moveTo(segmentList[k], segmentList[k + 1]);
-					ctx.lineTo(segmentList[k + 2], segmentList[k + 3]);
+			if (polylines) {
+				for (const lineList of polylines) {
+					for (const line of lineList) {
+						ctx.moveTo(line[0], line[1]);
+						for (let k = 2; k + 1 < line.length; k += 2) ctx.lineTo(line[k], line[k + 1]);
+					}
+				}
+			} else {
+				for (const segmentList of segments) {
+					for (let k = 0; k < segmentList.length; k += 4) {
+						ctx.moveTo(segmentList[k], segmentList[k + 1]);
+						ctx.lineTo(segmentList[k + 2], segmentList[k + 3]);
+					}
 				}
 			}
 			ctx.stroke();
@@ -1572,6 +1635,37 @@
 			max: 4,
 			step: 0.05,
 			tip: 'coverage multiplier — above 1 pushes dark regions into overlapping lines'
+		}
+	];
+
+	const HAND_DRAWN_TIP =
+		'swap the perfectly straight hatch lines for organic, hand-drawn-looking ones — off keeps the classic ruler-straight output untouched';
+
+	// only shown while hand-drawn is on
+	const HAND_DRAWN_SLIDERS: SliderDef[] = [
+		{
+			id: 'wobbleAmplitudeMm',
+			label: 'squiggle (mm)',
+			min: 0.05,
+			max: 2,
+			step: 0.05,
+			tip: 'how far a line may wander from perfectly straight — the squiggliness'
+		},
+		{
+			id: 'wobbleWavelengthMm',
+			label: 'wave (mm)',
+			min: 1,
+			max: 20,
+			step: 0.5,
+			tip: 'distance between direction changes — short = nervous scribble, long = lazy waves'
+		},
+		{
+			id: 'wobbleSeed',
+			label: 'variation',
+			min: 1,
+			max: 99,
+			step: 1,
+			tip: 'reroll the wobble pattern without changing its character'
 		}
 	];
 
@@ -1993,6 +2087,31 @@
 						/>
 					</div>
 				</div>
+				<label class="check-row" title={HAND_DRAWN_TIP}>
+					<input type="checkbox" bind:checked={params.handDrawn} />
+					<span>hand-drawn lines</span>
+				</label>
+				{#if params.handDrawn}
+					{#each HAND_DRAWN_SLIDERS as slider (slider.id)}
+						<label class="slider-row" title={slider.tip}>
+							<span>{slider.label}</span>
+							<input
+								type="range"
+								min={slider.min}
+								max={slider.max}
+								step={slider.step}
+								bind:value={params[slider.id]}
+							/>
+							<input
+								type="number"
+								min={slider.min}
+								max={slider.max}
+								step={slider.step}
+								bind:value={params[slider.id]}
+							/>
+						</label>
+					{/each}
+				{/if}
 			</section>
 		</aside>
 
@@ -3130,6 +3249,16 @@
 		color: var(--ink);
 		font-family: 'mono-light', monospace;
 		font-size: 0.68rem;
+	}
+
+	.check-row {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+		color: var(--muted);
+		font-size: 0.68rem;
+		cursor: pointer;
+		line-height: 1.25;
 	}
 
 	.select-row {

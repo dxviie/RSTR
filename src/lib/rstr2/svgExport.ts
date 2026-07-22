@@ -8,6 +8,7 @@
 
 import { CHANNEL_LABELS, type LayerConfig } from './layers';
 import { segmentsToSvgPath, type HatchSegments } from './hatchTools';
+import { polylinesToSvgPath, type HatchPolyline } from './handDrawn';
 import type { Rstr2Settings } from './presets';
 
 export interface ExportLayer {
@@ -16,6 +17,9 @@ export interface ExportLayer {
 	penWidthPx: number;
 	/** hatch segment lists of the layer's regions (empty ones are skipped) */
 	segments: HatchSegments[];
+	/** hand-drawn variants of the same regions — when present (wobble on),
+	 *  these are exported instead of the straight segments */
+	polylines?: HatchPolyline[][];
 }
 
 const escapeAttr = (value: string): string =>
@@ -66,6 +70,12 @@ export const settingsComment = (settings: Rstr2Settings): string => {
 	line('ink threshold', `${params.hatchThresholdLow} to ${params.hatchThresholdHigh}`);
 	line('ink gamma', params.hatchGamma);
 	line('ink boost', params.inkBoost);
+	if (params.handDrawn) {
+		line('hand-drawn', 'on');
+		line('squiggle', mm(params.wobbleAmplitudeMm));
+		line('wave length', mm(params.wobbleWavelengthMm));
+		line('variation', params.wobbleSeed);
+	}
 	lines.push('');
 	lines.push('  export');
 	line('output width', mm(params.outputWidthMm));
@@ -90,11 +100,18 @@ export const settingsComment = (settings: Rstr2Settings): string => {
 };
 
 export const layerGroupSvg = (exportLayer: ExportLayer): string => {
-	const { layer, penWidthPx, segments } = exportLayer;
+	const { layer, penWidthPx, segments, polylines } = exportLayer;
 	let svg = `<g id="hatch-${escapeAttr(layer.id)}" inkscape:groupmode="layer" inkscape:label="${escapeAttr(layer.name)}" stroke="${escapeAttr(layer.color)}" stroke-width="${penWidthPx.toFixed(3)}" fill="none" stroke-linecap="round" opacity="0.85" style="mix-blend-mode: multiply;">\n`;
-	for (const segmentList of segments) {
-		if (segmentList.length === 0) continue;
-		svg += `<path d="${segmentsToSvgPath(segmentList)}" />\n`;
+	if (polylines) {
+		for (const lineList of polylines) {
+			if (lineList.length === 0) continue;
+			svg += `<path d="${polylinesToSvgPath(lineList)}" />\n`;
+		}
+	} else {
+		for (const segmentList of segments) {
+			if (segmentList.length === 0) continue;
+			svg += `<path d="${segmentsToSvgPath(segmentList)}" />\n`;
+		}
 	}
 	svg += '</g>\n';
 	return svg;
