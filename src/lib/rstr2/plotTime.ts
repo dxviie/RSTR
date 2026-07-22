@@ -41,14 +41,14 @@ export interface PlotterConfig {
 
 /** saxi's defaultPlanOptions for an AxiDraw v3. */
 export const defaultPlotterConfig = (): PlotterConfig => ({
-	penDownAcceleration: 200,
-	penDownMaxVelocity: 50,
+	penDownAcceleration: 2000,
+	penDownMaxVelocity: 10,
 	penDownCorneringFactor: 0.127,
 	penUpAcceleration: 400,
 	penUpMaxVelocity: 200,
 	penDropDuration: 0.12,
 	penLiftDuration: 0.12,
-	pathJoinRadiusMm: 0.5
+	pathJoinRadiusMm: 0
 });
 
 export const PLOTTER_STORAGE_KEY = 'rstr:v2:plotter';

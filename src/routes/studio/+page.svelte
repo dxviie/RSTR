@@ -2517,8 +2517,8 @@
 					title="margin kept clear on every edge of the page when fitting the art to a paper size"
 				>
 					<span>margin (mm)</span>
-					<input type="range" min="0" max="50" step="1" bind:value={params.fitMarginMm} />
-					<input type="number" min="0" max="50" step="1" bind:value={params.fitMarginMm} />
+					<input type="range" min="5" max="50" step="1" bind:value={params.fitMarginMm} />
+					<input type="number" min="5" max="50" step="1" bind:value={params.fitMarginMm} />
 				</label>
 				<div class="export-actions">
 					<button
