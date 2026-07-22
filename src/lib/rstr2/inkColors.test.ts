@@ -4,6 +4,8 @@ import {
 	HARMONY_SETS,
 	familyInks,
 	accentInks,
+	inkByHex,
+	inkSets,
 	pickInkScheme,
 	defaultColorOptions,
 	harmonySetSwatches,
@@ -40,6 +42,43 @@ describe('INK_COLORS', () => {
 		for (const family of families) {
 			expect(familyInks(family).length).toBeGreaterThan(0);
 		}
+	});
+});
+
+describe('inkSets', () => {
+	it('every ink lands in exactly one set', () => {
+		const grouped = inkSets().flatMap((set) => set.inks);
+		expect(grouped).toHaveLength(INK_COLORS.length);
+		expect(new Set(grouped.map((ink) => ink.hex)).size).toBe(INK_COLORS.length);
+	});
+
+	it('the longest prefix wins: Sketch INKs stay out of the Zeichentusche set', () => {
+		const byLabel = new Map(inkSets().map((set) => [set.label, set.inks]));
+		const sketch = byLabel.get('R&K Sketch INK') ?? [];
+		const tusche = byLabel.get('R&K Zeichentusche') ?? [];
+		expect(sketch.length).toBeGreaterThan(0);
+		expect(tusche.length).toBeGreaterThan(0);
+		for (const ink of sketch) expect(ink.name).toMatch(/^R&K Sketch /);
+		for (const ink of tusche) expect(ink.name).not.toMatch(/^R&K Sketch /);
+	});
+
+	it('keeps the palette order inside each set', () => {
+		const order = new Map(INK_COLORS.map((ink, index) => [ink.hex, index]));
+		for (const set of inkSets()) {
+			const indexes = set.inks.map((ink) => order.get(ink.hex) ?? -1);
+			expect(indexes).toEqual([...indexes].sort((a, b) => a - b));
+		}
+	});
+});
+
+describe('inkByHex', () => {
+	it('finds an ink regardless of hex case', () => {
+		expect(inkByHex('#D22730')?.name).toBe('De Atramentis Red');
+		expect(inkByHex('#d22730')?.name).toBe('De Atramentis Red');
+	});
+
+	it('returns null for a custom colour', () => {
+		expect(inkByHex('#123456')).toBeNull();
 	});
 });
 
