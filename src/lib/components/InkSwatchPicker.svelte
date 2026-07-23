@@ -7,8 +7,12 @@
 	//
 	// The panel is a native Popover (top layer): the sidebar pane clips
 	// overflow, and on mobile its backdrop-filter would trap position: fixed
-	// descendants — the top layer escapes both. Engines without the Popover
-	// API get the old behavior: the chip opens the native color input.
+	// descendants — the top layer escapes both. On desktop it is a dropdown
+	// anchored under the chip; on small screens (the page's stacked layout)
+	// it is a bottom sheet instead — anchoring and close-on-scroll don't
+	// survive phone scrolling (chrome collapse, momentum, chained touch
+	// scrolls all fire scroll events). Engines without the Popover API get
+	// the old behavior: the chip opens the native color input.
 	import { inkByHex, inkSets, type InkColor } from '$lib/rstr2/inkColors';
 
 	const {
@@ -38,6 +42,12 @@
 	const popoverSupported =
 		typeof HTMLElement !== 'undefined' && typeof HTMLElement.prototype.showPopover === 'function';
 
+	// Bottom-sheet presentation below the page's stacked-layout breakpoint.
+	// Decided per open (not per mount) so rotation between opens just works.
+	const SHEET_QUERY = '(max-width: 900px)';
+	const isSheet = () => window.matchMedia(SHEET_QUERY).matches;
+	let sheet = $state(false);
+
 	// Top-layer popovers don't anchor natively (CSS anchor positioning isn't
 	// everywhere yet): place the panel under the chip by hand, clamped to the
 	// viewport, flipped above the chip when there's more room up than down.
@@ -57,27 +67,52 @@
 		pop.style.top = `${y}px`;
 	};
 
-	// A pane scroll under the open panel would leave it floating detached from
-	// its chip — close it instead. Scrolling inside the panel itself is fine.
+	// Desktop only: a pane scroll under the open panel would leave it floating
+	// detached from its chip — close it instead. Scrolling inside the panel
+	// itself is fine. The sheet never does this: it is pinned, not anchored,
+	// and on touch screens scroll events also come from browser-chrome
+	// collapse, momentum settling and scrolls chained through the panel —
+	// closing on those snaps the panel shut mid-interaction.
 	const onScroll = (event: Event) => {
 		if (event.target instanceof Node && pop?.contains(event.target)) return;
 		pop?.hidePopover();
+	};
+
+	// Crossing the breakpoint while open (rotation, window resize) would need
+	// a live presentation swap — close instead and let the next tap reopen.
+	const onResize = () => {
+		if (isSheet() !== sheet) pop?.hidePopover();
+		else if (!sheet) place();
+	};
+
+	// beforetoggle fires synchronously before the panel first paints — the
+	// sheet class and any stale inline left/top from a desktop open must be
+	// settled by then, or the panel flashes in the wrong place.
+	const onBeforeToggle = (event: Event) => {
+		if ((event as ToggleEvent).newState !== 'open' || !pop) return;
+		sheet = isSheet();
+		if (sheet) {
+			pop.style.left = '';
+			pop.style.top = '';
+		}
 	};
 
 	const onToggle = (event: Event) => {
 		open = (event as ToggleEvent).newState === 'open';
 		if (open) {
 			hovered = null;
-			place();
-			window.addEventListener('scroll', onScroll, true);
-			window.addEventListener('resize', place);
+			if (!sheet) {
+				place();
+				window.addEventListener('scroll', onScroll, true);
+			}
+			window.addEventListener('resize', onResize);
 			(
 				pop?.querySelector<HTMLElement>('.swatch.selected') ??
 				pop?.querySelector<HTMLElement>('.swatch')
 			)?.focus();
 		} else {
 			window.removeEventListener('scroll', onScroll, true);
-			window.removeEventListener('resize', place);
+			window.removeEventListener('resize', onResize);
 		}
 	};
 
@@ -136,9 +171,11 @@
 		bind:this={pop}
 		id={popoverId}
 		class="ink-popover"
+		class:sheet
 		popover="auto"
 		role="dialog"
 		aria-label="pick a pen color"
+		onbeforetoggle={onBeforeToggle}
 		ontoggle={onToggle}
 	>
 		<div class="sets">
@@ -213,12 +250,20 @@
 		transition: box-shadow 0.1s ease;
 	}
 
-	.chip:hover,
 	.chip.open {
 		box-shadow:
 			inset 0 0 0 1px rgba(255, 255, 255, 0.25),
 			0 0 0 2px var(--muted-light, #eef1f6),
 			0 0 0 3px var(--muted, #60739f);
+	}
+
+	@media (hover: hover) {
+		.chip:hover {
+			box-shadow:
+				inset 0 0 0 1px rgba(255, 255, 255, 0.25),
+				0 0 0 2px var(--muted-light, #eef1f6),
+				0 0 0 3px var(--muted, #60739f);
+		}
 	}
 
 	.chip:focus-visible,
@@ -254,10 +299,31 @@
 		flex-direction: column;
 	}
 
+	/* the mobile presentation: pinned to the bottom edge (no anchoring math,
+	   immune to browser-chrome resizes), centered and capped on tablets */
+	.ink-popover.sheet {
+		inset: auto 0 0 0;
+		width: min(100%, 30rem);
+		margin: 0 auto;
+		max-height: 80dvh;
+		border-bottom: none;
+		border-radius: 12px 12px 0 0;
+		box-shadow: 0 -12px 32px rgba(26, 32, 44, 0.25);
+	}
+
+	/* the dim reads as "panel on top, tap outside to close" — only the sheet
+	   is modal-flavored enough to want it */
+	.ink-popover.sheet::backdrop {
+		background: rgba(26, 32, 44, 0.28);
+	}
+
 	.sets {
 		flex: 1;
 		min-height: 0;
 		overflow-y: auto;
+		/* a touch scroll that hits the list's edge must die here, not chain
+		   on to the page behind the panel */
+		overscroll-behavior: contain;
 		display: flex;
 		flex-direction: column;
 		gap: 0.55rem;
@@ -293,8 +359,12 @@
 		transition: transform 0.08s ease;
 	}
 
-	.swatch:hover {
-		transform: scale(1.12);
+	/* hover-capable pointers only — on touch screens :hover sticks to the
+	   last-tapped swatch and leaves it stuck enlarged */
+	@media (hover: hover) {
+		.swatch:hover {
+			transform: scale(1.12);
+		}
 	}
 
 	.swatch.selected {
@@ -358,8 +428,10 @@
 		white-space: nowrap;
 	}
 
-	.custom:hover {
-		background: var(--muted-light, #eef1f6);
+	@media (hover: hover) {
+		.custom:hover {
+			background: var(--muted-light, #eef1f6);
+		}
 	}
 
 	/* the real native input, invisible over the whole button, so a click opens
@@ -389,9 +461,20 @@
 		pointer-events: none;
 	}
 
+	/* home-indicator clearance when the sheet sits on the screen's bottom edge */
+	.ink-popover.sheet .foot {
+		padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+	}
+
 	@media (pointer: coarse) {
 		.swatches {
 			gap: 5px;
+		}
+
+		/* the custom-color row is the panel's smallest target — give fingers
+		   more to land on than the desktop's text-sized button */
+		.custom {
+			padding: 0.45rem 0.6rem;
 		}
 	}
 </style>
