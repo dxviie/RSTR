@@ -318,7 +318,13 @@
 	}
 
 	.sets {
-		flex: 1;
+		/* flex-basis auto, not 0 (`flex: 1`): the panel's height is content-
+		   based with only a max-height cap, and WebKit sizes such a flex
+		   column from its items' flex base sizes — basis 0 collapses the
+		   list to a sliver on iOS/Safari. With basis auto the list keeps its
+		   content height until max-height bites; min-height: 0 then lets it
+		   shrink into a scroller. */
+		flex: auto;
 		min-height: 0;
 		overflow-y: auto;
 		/* a touch scroll that hits the list's edge must die here, not chain
@@ -375,6 +381,9 @@
 	}
 
 	.foot {
+		/* the panel's fixed part — when max-height bites, only the ink list
+		   above shrinks */
+		flex-shrink: 0;
 		border-top: 1px solid var(--border, #e1e4e8);
 		padding: 0.45rem 0.6rem 0.5rem;
 		display: grid;
