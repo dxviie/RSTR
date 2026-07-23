@@ -24,10 +24,10 @@ describe('allowedPens', () => {
 		const pens = allowedPens();
 		const keys = pens.map((pen) => `${pen.color}@${pen.widthMm}`);
 		// CMY exists at 0.4 (classic) and 0.5 (space), black at 0.4 and 0.2
-		expect(keys).toContain('#00bfe8@0.4');
-		expect(keys).toContain('#00bfe8@0.5');
+		expect(keys).toContain('#1d8cba@0.4');
+		expect(keys).toContain('#1d8cba@0.5');
 		expect(keys).toContain('#ff2aa6@0.4');
-		expect(keys).toContain('#ffb000@0.5');
+		expect(keys).toContain('#f5c518@0.5');
 		expect(keys).toContain('#000000@0.4');
 		expect(keys).toContain('#000000@0.2');
 		expect(pens).toHaveLength(8);

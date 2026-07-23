@@ -53,6 +53,8 @@ export interface InkColor {
 export const INK_COLORS: InkColor[] = [
 	// De Atramentis Artist Ink — the primary, mixable, lightfast range.
 	{ name: 'De Atramentis Red', hex: '#D22730', family: 'red' },
+	// also the d17e.dev brand magenta — the default CMY stack's magenta pen
+	{ name: 'De Atramentis Magenta', hex: '#FF2AA6', family: 'pink' },
 	{ name: 'De Atramentis Yellow', hex: '#F5C518', family: 'yellow' },
 	{ name: 'De Atramentis Green', hex: '#2E7D4F', family: 'green' },
 	{ name: 'De Atramentis Blue', hex: '#1F5FA8', family: 'blue' },
@@ -87,7 +89,7 @@ export const INK_COLORS: InkColor[] = [
 	// Blues
 	{ name: 'Octopus Blue Koi', hex: '#1B4F9C', family: 'blue' },
 	{ name: 'Octopus Blue Chameleon', hex: '#2A6BB0', family: 'blue' },
-	{ name: 'Octopus Blue Sloth', hex: '#3A5A8C', family: 'blue' },
+	{ name: 'Octopus Blue Sloth', hex: '#1D8CBA', family: 'blue' },
 	{ name: 'Octopus Blue Lynx', hex: '#2456C8', family: 'blue' },
 	// Violets / purples
 	{ name: 'Octopus Violet Raccoon', hex: '#5B2A83', family: 'purple' },
