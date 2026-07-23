@@ -641,7 +641,7 @@ describe('settingsComment', () => {
 		expect(comment).toContain('0.1 to 1');
 		expect(comment).toContain('layer 1: Octopus Blue Sloth');
 		expect(comment).toContain('Cyan (1-R)');
-		expect(comment).toContain('#00BFE8');
+		expect(comment).toContain('#1D8CBA');
 		expect(comment).toContain('15 to 105 deg');
 	});
 

@@ -99,12 +99,14 @@ const inheritedHatchSettings = () => ({
 });
 
 export const defaultCmyLayers = (): LayerConfig[] => [
-	// Default pen colors are the d17e.dev brand accents.
+	// Colors are the named inks' palette hexes (inkColors.ts) so the swatch
+	// picker recognizes each pen — the magenta doubles as the d17e.dev brand
+	// accent.
 	{
 		id: 'cyan',
 		name: 'Octopus Blue Sloth',
 		channel: 'c',
-		color: '#00BFE8',
+		color: '#1D8CBA',
 		angleMin: 15,
 		angleMax: 105,
 		...inheritedHatchSettings(),
@@ -124,7 +126,7 @@ export const defaultCmyLayers = (): LayerConfig[] => [
 		id: 'yellow',
 		name: 'De Atramentis Yellow',
 		channel: 'y',
-		color: '#FFB000',
+		color: '#F5C518',
 		angleMin: 135,
 		angleMax: 225,
 		...inheritedHatchSettings(),
