@@ -411,11 +411,45 @@ describe('extractChannel', () => {
 		);
 		expect(dark[0]).toBeCloseTo(0.8);
 	});
+
+	it('ink channel with pure CMY pens reduces exactly to the c/m/y channels', () => {
+		expect(extractChannel(r, g, b, 'ink', '#00FFFF')).toEqual(extractChannel(r, g, b, 'c'));
+		expect(extractChannel(r, g, b, 'ink', '#FF00FF')).toEqual(extractChannel(r, g, b, 'm'));
+		expect(extractChannel(r, g, b, 'ink', '#FFFF00')).toEqual(extractChannel(r, g, b, 'y'));
+	});
+
+	it('ink channel measures how much of the pen color a cell needs', () => {
+		// Octopus Blue Sloth, the default cyan pen
+		const [ir, ig, ib] = [0x1d / 255, 0x8c / 255, 0xba / 255];
+		const t = 0.4; // a 40% tint of the ink on white paper
+		const cells = (v: number) => new Float32Array([v, 1, 1 - t * (1 - v), 0]);
+		const out = extractChannel(cells(ir), cells(ig), cells(ib), 'ink', '#1D8CBA');
+		expect(out[0]).toBeCloseTo(1); // the ink color itself: full coverage
+		expect(out[1]).toBeCloseTo(0); // white paper: no ink
+		expect(out[2]).toBeCloseTo(t); // a 40% tint wants 40% coverage
+		expect(out[3]).toBeCloseTo(1); // black clamps to full coverage
+	});
+
+	it('a white pen never inks', () => {
+		expect(Array.from(extractChannel(r, g, b, 'ink', '#FFFFFF'))).toEqual([0, 0]);
+	});
+
+	it('an unparseable pen color separates like black ink (mean density)', () => {
+		const out = extractChannel(r, g, b, 'ink', 'not-a-hex');
+		expect(out[0]).toBeCloseTo(0.5);
+		expect(out[1]).toBeCloseTo(0.5);
+	});
 });
 
 describe('layer persistence', () => {
 	it('round-trips the default CMY stack', () => {
 		const layers = defaultCmyLayers();
+		expect(parseStoredLayers(JSON.stringify(layers))).toEqual(layers);
+	});
+
+	it('round-trips a pen-matched (ink channel) layer', () => {
+		const layers = defaultCmyLayers();
+		layers[0].channel = 'ink';
 		expect(parseStoredLayers(JSON.stringify(layers))).toEqual(layers);
 	});
 

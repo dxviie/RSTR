@@ -5,14 +5,14 @@
 // Each layer corresponds to one physical pen on the plotter. CMY is just the
 // default stack.
 
-export type LayerChannel = 'c' | 'm' | 'y' | 'k' | 'r' | 'g' | 'b' | 'luma' | 'luma-inv';
+export type LayerChannel = 'ink' | 'c' | 'm' | 'y' | 'k' | 'r' | 'g' | 'b' | 'luma' | 'luma-inv';
 
 export interface LayerConfig {
 	id: string;
 	name: string;
 	/** which image channel drives this layer's ink amount (0..1) */
 	channel: LayerChannel;
-	/** display + export stroke color */
+	/** display + export stroke color — the 'ink' channel also separates against it */
 	color: string;
 	/** hatch direction range in degrees — each region picks an angle in
 	 *  [angleMin, angleMax] based on its own shape */
@@ -38,6 +38,7 @@ export interface LayerConfig {
 }
 
 export const CHANNEL_LABELS: Record<LayerChannel, string> = {
+	ink: 'Match pen color',
 	c: 'Cyan (1-R)',
 	m: 'Magenta (1-G)',
 	y: 'Yellow (1-B)',
@@ -54,10 +55,15 @@ export const CHANNEL_LABELS: Record<LayerChannel, string> = {
  * r/g/b, and k/luma/luma-inv all track lightness — two channels on one axis
  * carry (nearly) the same separation, or its negative. The dice spreads a
  * stack across distinct axes first (see randomLayer in randomize.ts).
+ *
+ * 'ink' (match pen color) reads a color-dependent mix of the fixed axes, so
+ * it is its own axis: a pen-matched layer neither blocks nor aliases any of
+ * them, and the roll's taken-channel set already keeps it to one per stack.
  */
-export type ChannelAxis = 'red' | 'green' | 'blue' | 'lightness';
+export type ChannelAxis = 'red' | 'green' | 'blue' | 'lightness' | 'ink';
 
 export const CHANNEL_AXES: Record<LayerChannel, ChannelAxis> = {
+	ink: 'ink',
 	c: 'red',
 	r: 'red',
 	m: 'green',
@@ -72,7 +78,8 @@ export const CHANNEL_AXES: Record<LayerChannel, ChannelAxis> = {
 /**
  * Exact-negative channel pairs (v = 1 − inverse). Two layers holding both
  * sides of a pair ink to a constant between them — the pair carries the
- * information of one channel. k has no exact negative among the channels.
+ * information of one channel. k and ink have no exact negative among the
+ * channels.
  */
 export const CHANNEL_INVERSES: Partial<Record<LayerChannel, LayerChannel>> = {
 	c: 'r',
@@ -160,19 +167,53 @@ export const createLayer = (): LayerConfig => ({
 	enabled: true
 });
 
+/** #RGB / #RRGGBB (leading # optional) → [r, g, b] each 0..1, or null */
+const parseHexColor = (hex: string): [number, number, number] | null => {
+	const match = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex.trim());
+	if (!match) return null;
+	const digits = match[1];
+	const wide = digits.length === 6;
+	const part = (i: number): number =>
+		parseInt(wide ? digits.slice(i * 2, i * 2 + 2) : digits[i] + digits[i], 16) / 255;
+	return [part(0), part(1), part(2)];
+};
+
 /**
  * Extract the per-cell ink amount (0..1) for a channel from per-cell RGB
- * arrays (each 0..1).
+ * arrays (each 0..1). The 'ink' channel separates against `inkHex` — the
+ * layer's own pen color; the other channels ignore it.
  */
 export const extractChannel = (
 	r: Float32Array,
 	g: Float32Array,
 	b: Float32Array,
-	channel: LayerChannel
+	channel: LayerChannel,
+	inkHex?: string
 ): Float32Array => {
 	const n = r.length;
 	const values = new Float32Array(n);
 	switch (channel) {
+		case 'ink': {
+			// Single-ink separation in density space (density = 1 − RGB): the
+			// least-squares amount of THIS ink that best rebuilds each cell,
+			// a = (D·d)/(d·d) clamped to 0..1. For a pure cyan/magenta/yellow
+			// pen this reduces exactly to the c/m/y channels; a cell of the pen
+			// color itself gets 1 and a tint of it gets the tint fraction —
+			// precisely the area coverage the 'coverage' spacing curve expects,
+			// so ink gamma and ink boost keep their meaning unchanged.
+			const [ir, ig, ib] = parseHexColor(inkHex ?? '') ?? [0, 0, 0];
+			const dr = 1 - ir;
+			const dg = 1 - ig;
+			const db = 1 - ib;
+			const dd = dr * dr + dg * dg + db * db;
+			// an (essentially) white pen can't rebuild anything — no ink at all
+			if (dd < 1e-4) break;
+			for (let i = 0; i < n; i++) {
+				const a = ((1 - r[i]) * dr + (1 - g[i]) * dg + (1 - b[i]) * db) / dd;
+				values[i] = a <= 0 ? 0 : a >= 1 ? 1 : a;
+			}
+			break;
+		}
 		case 'c':
 			for (let i = 0; i < n; i++) values[i] = 1 - r[i];
 			break;

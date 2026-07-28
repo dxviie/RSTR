@@ -52,7 +52,10 @@ a default-profile roll is pinned bit-for-bit against a profile-less roll
    and wrap to a second shade only after every family in the set has had a
    turn — the accent layer counts as its own family's turn — so a stack is
    **guaranteed to span min(layerCount, set families) distinct families**;
-   a roll can never collapse onto a single family.
+   a roll can never collapse onto a single family. The `ink` channel
+   ("match pen color" — the separation follows the rolled ink) ships with
+   weight `0`, so it stays out of default rolls; a custom profile can weight
+   it up, and the taken-channel set keeps it to at most one per stack.
 4. Optionally rolls **per-layer overrides** (pen width, spacings,
    threshold low/high, gamma, boost) along `profile.layerOverrideChances` —
    by default the chances are all 0 and every layer inherits the globals
