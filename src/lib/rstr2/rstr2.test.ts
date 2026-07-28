@@ -412,10 +412,26 @@ describe('extractChannel', () => {
 		expect(dark[0]).toBeCloseTo(0.8);
 	});
 
-	it('ink channel with pure CMY pens reduces exactly to the c/m/y channels', () => {
-		expect(extractChannel(r, g, b, 'ink', '#00FFFF')).toEqual(extractChannel(r, g, b, 'c'));
-		expect(extractChannel(r, g, b, 'ink', '#FF00FF')).toEqual(extractChannel(r, g, b, 'm'));
-		expect(extractChannel(r, g, b, 'ink', '#FFFF00')).toEqual(extractChannel(r, g, b, 'y'));
+	it('ink channel is hue-selective: pens ignore strongly mismatched patches', () => {
+		// cell 0: a saturated cyan patch, cell 1: a strong red patch
+		const rr = new Float32Array([0, 1]);
+		const gg = new Float32Array([1, 0.15]);
+		const bb = new Float32Array([1, 0.19]);
+		const redPen = extractChannel(rr, gg, bb, 'ink', '#D22730');
+		const bluePen = extractChannel(rr, gg, bb, 'ink', '#1F5FA8');
+		// the red pen inks the red patch, and all but skips the cyan one
+		expect(redPen[1]).toBeGreaterThan(0.9);
+		expect(redPen[0]).toBeLessThan(0.05);
+		// the blue pen takes real ink to the cyan patch — the pens divide the image
+		expect(bluePen[0]).toBeGreaterThan(0.3);
+	});
+
+	it('a gray ramp under a black pen reads as mean density', () => {
+		const v = new Float32Array([0.2, 0.5, 0.8]);
+		const out = extractChannel(v, v, v, 'ink', '#000000');
+		expect(out[0]).toBeCloseTo(0.8);
+		expect(out[1]).toBeCloseTo(0.5);
+		expect(out[2]).toBeCloseTo(0.2);
 	});
 
 	it('ink channel measures how much of the pen color a cell needs', () => {
@@ -434,10 +450,10 @@ describe('extractChannel', () => {
 		expect(Array.from(extractChannel(r, g, b, 'ink', '#FFFFFF'))).toEqual([0, 0]);
 	});
 
-	it('an unparseable pen color separates like black ink (mean density)', () => {
-		const out = extractChannel(r, g, b, 'ink', 'not-a-hex');
-		expect(out[0]).toBeCloseTo(0.5);
-		expect(out[1]).toBeCloseTo(0.5);
+	it('an unparseable pen color separates like a black pen', () => {
+		expect(extractChannel(r, g, b, 'ink', 'not-a-hex')).toEqual(
+			extractChannel(r, g, b, 'ink', '#000000')
+		);
 	});
 });
 

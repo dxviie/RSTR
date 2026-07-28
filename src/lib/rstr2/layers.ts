@@ -194,13 +194,23 @@ export const extractChannel = (
 	const values = new Float32Array(n);
 	switch (channel) {
 		case 'ink': {
-			// Single-ink separation in density space (density = 1 − RGB): the
-			// least-squares amount of THIS ink that best rebuilds each cell,
-			// a = (D·d)/(d·d) clamped to 0..1. For a pure cyan/magenta/yellow
-			// pen this reduces exactly to the c/m/y channels; a cell of the pen
-			// color itself gets 1 and a tint of it gets the tint fraction —
-			// precisely the area coverage the 'coverage' spacing curve expects,
-			// so ink gamma and ink boost keep their meaning unchanged.
+			// Hue-selective single-ink separation in density space (density
+			// D = 1 − RGB, pen density d = 1 − pen RGB): the least-squares
+			// amount of this ink, (D·d)/(d·d), weighted by how well the cell's
+			// density DIRECTION matches the pen's, cos²∠(D,d) — together
+			// a = (D·d)³ / ((d·d)² · (D·D)), clamped to 0..1.
+			//
+			// The bare projection alone is hue-blind where it matters: every
+			// saturated or dark cell needs ink from EVERY pen (and real inks'
+			// density vectors all sit near the gray axis), so swapping pens
+			// barely changed the picture. The cos² weight makes the pen color
+			// decide WHAT gets inked: hue-matched cells keep full strength,
+			// unrelated hues fall toward zero, neutrals split across the stack
+			// by how neutral each pen is. Along the pen's own hue nothing
+			// changes — a cell of the pen color still gets exactly 1 and a
+			// tint of it the tint fraction, which is the area coverage the
+			// 'coverage' spacing curve expects, so ink gamma and ink boost
+			// keep their meaning unchanged.
 			const [ir, ig, ib] = parseHexColor(inkHex ?? '') ?? [0, 0, 0];
 			const dr = 1 - ir;
 			const dg = 1 - ig;
@@ -208,9 +218,16 @@ export const extractChannel = (
 			const dd = dr * dr + dg * dg + db * db;
 			// an (essentially) white pen can't rebuild anything — no ink at all
 			if (dd < 1e-4) break;
+			const inv = 1 / (dd * dd);
 			for (let i = 0; i < n; i++) {
-				const a = ((1 - r[i]) * dr + (1 - g[i]) * dg + (1 - b[i]) * db) / dd;
-				values[i] = a <= 0 ? 0 : a >= 1 ? 1 : a;
+				const Dr = 1 - r[i];
+				const Dg = 1 - g[i];
+				const Db = 1 - b[i];
+				const dot = Dr * dr + Dg * dg + Db * db;
+				if (dot <= 0) continue; // white cell (or float noise): no ink
+				const DD = Dr * Dr + Dg * Dg + Db * Db;
+				const a = (dot * dot * dot * inv) / DD;
+				values[i] = a >= 1 ? 1 : a;
 			}
 			break;
 		}

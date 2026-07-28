@@ -214,9 +214,10 @@
 			<dd>
 				Which part of the image drives the layer's ink: cyan / magenta / yellow (the print
 				channels), key / darkness, red / green / blue, or (inverted) luminance. "Match pen color"
-				instead derives the channel from the layer's own color — the layer inks where, and as
-				densely as, its pen is needed to rebuild the image — so any set of pens becomes a color
-				separation. Ink gamma, boost and the thresholds treat it like any other channel.
+				instead derives the channel from the layer's own color — the layer inks where the image
+				needs this pen's hue: matching colors and their tints at full strength, unrelated hues
+				barely at all — so a set of pens divides the image among themselves like a color separation.
+				Ink gamma, boost and the thresholds treat it like any other channel.
 			</dd>
 			<dt>angle min / max</dt>
 			<dd>
