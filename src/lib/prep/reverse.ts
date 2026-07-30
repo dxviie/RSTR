@@ -220,7 +220,7 @@ export const reversePoints = (points: string): string => {
 
 // ─── DOM helpers (browser only) ──────────────────────────────────────────────
 
-const INKSCAPE_NS = 'http://www.inkscape.org/namespaces/inkscape';
+export const INKSCAPE_NS = 'http://www.inkscape.org/namespaces/inkscape';
 
 /** reverse every drawable inside `el` (including el itself), in place */
 export const reverseElementGeometry = (el: Element): void => {
@@ -251,18 +251,26 @@ export const reverseElementGeometry = (el: Element): void => {
 	// twice still doubles the ink, which is the point
 };
 
-const layerLabel = (el: Element, fallback: string): string =>
+export const layerLabel = (el: Element, fallback: string): string =>
 	el.getAttribute('inkscape:label') ||
 	el.getAttributeNS(INKSCAPE_NS, 'label') ||
 	el.getAttribute('id') ||
 	fallback;
 
-const isLayerGroup = (el: Element): boolean =>
+export const isLayerGroup = (el: Element): boolean =>
 	el.localName === 'g' &&
 	(el.getAttribute('inkscape:groupmode') === 'layer' ||
 		el.getAttributeNS(INKSCAPE_NS, 'groupmode') === 'layer');
 
-const NON_DRAWABLE = new Set(['defs', 'metadata', 'title', 'desc', 'style', 'namedview', 'script']);
+export const NON_DRAWABLE = new Set([
+	'defs',
+	'metadata',
+	'title',
+	'desc',
+	'style',
+	'namedview',
+	'script'
+]);
 
 /**
  * Duplicate each top-level layer of `root` (an <svg> element) as a

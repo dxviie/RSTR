@@ -3,6 +3,17 @@
 	import TopBar from '$lib/components/TopBar.svelte';
 	import { inkRange } from '$lib/inkRange';
 	import { buildCalibrationBlock } from '$lib/prep/calibration';
+	import { hersheyPathData } from '$lib/prep/hershey';
+	import {
+		cellPosition,
+		commonBase,
+		compareFrameNames,
+		frameLabel,
+		gridLayout,
+		mergeFrameLayers,
+		type PlacedFrame
+	} from '$lib/prep/multi';
+	import { OUTLINE_STYLE_LABELS, outlineMarks, type OutlineStyle } from '$lib/prep/outline';
 	import {
 		PAGE_LABELS,
 		PAGES,
@@ -12,6 +23,8 @@
 		type PageId
 	} from '$lib/prep/pages';
 	import { addReversedLayers } from '$lib/prep/reverse';
+	import { readZip, zipSvgEntries } from '$lib/prep/zipRead';
+	import { buildZip, type ZipEntry } from '$lib/rstr2/zip';
 
 	//***************************************************************
 	// 														STATE
@@ -34,6 +47,28 @@
 	/** 0/1/2/3 × 90° CW */
 	let artRotation = $state(0);
 
+	// multi-SVG frame sequence — 2+ same-size SVGs laid out as a grid over
+	// as many pages as needed (single SVGs keep the state above)
+	interface PrepFrame {
+		name: string;
+		/** frame number printed next to the frame */
+		label: string;
+		root: Element;
+		inner: string;
+		wMm: number;
+		hMm: number;
+		viewBox: [number, number, number, number];
+	}
+	let frames: PrepFrame[] = $state.raw([]);
+	/** margin around each frame, mm — part of the frame's cell */
+	let frameMargin = $state(5);
+	/** extra space between neighbouring cells, mm */
+	let gridGap = $state(5);
+	/** clearance kept from the page edges, mm */
+	let edgeMargin = $state(10);
+	let previewPage = $state(0);
+	let multiBlobUrl = $state('');
+
 	// calibration block position (page mm) — null = top-right default
 	let calibX: number | null = $state(null);
 	let calibY: number | null = $state(null);
@@ -47,6 +82,7 @@
 	let layCalib = $state(true);
 	let layPage = $state(true);
 	let addReversed = $state(false);
+	let outlineStyle: OutlineStyle = $state('full');
 	let paperOutlineSize: 'artwork' | 'custom' | PageId = $state('artwork');
 	let paperMargin = $state(5);
 	let paperOutlineOrient: Orientation = $state('landscape');
@@ -62,6 +98,7 @@
 	let footerH = $state(0);
 	let previewSvgEl: SVGSVGElement | undefined = $state();
 	let fileInput: HTMLInputElement | undefined = $state();
+	let folderInput: HTMLInputElement | undefined = $state();
 	let dragActive = $state(false);
 	let isDragging = $state(false);
 
@@ -72,6 +109,32 @@
 	const hasSvg = $derived(!!svgText);
 	const page = $derived(pageDims(pageSize, orient));
 	const pens = $derived(Math.max(1, Math.min(8, Math.round(penCount) || 2)));
+
+	// multi-frame grid
+	const multi = $derived(frames.length > 0);
+	const hasAny = $derived(hasSvg || multi);
+	const frameW = $derived(frames[0]?.wMm ?? 0);
+	const frameH = $derived(frames[0]?.hMm ?? 0);
+	const grid = $derived(
+		gridLayout({
+			pageW: page[0],
+			pageH: page[1],
+			cellW: frameW + 2 * frameMargin,
+			cellH: frameH + 2 * frameMargin,
+			gap: gridGap,
+			edge: edgeMargin
+		})
+	);
+	const pageTotal = $derived(multi ? Math.ceil(frames.length / grid.perPage) : 1);
+	const curPage = $derived(Math.max(0, Math.min(previewPage, pageTotal - 1)));
+	const framesOnPage = $derived(
+		multi ? frames.slice(curPage * grid.perPage, (curPage + 1) * grid.perPage) : []
+	);
+	/** frame number cap height — fits the cell's bottom margin strip */
+	const labelH = $derived(Math.min(2.5, frameMargin * 0.55));
+	const showLabels = $derived(multi && labelH >= 0.7);
+	/** baseline of the frame number, local to the cell top-left */
+	const labelBaseY = $derived(frameMargin + frameH + (frameMargin + labelH) / 2);
 
 	const scale = $derived.by(() => {
 		const [pageW, pageH] = page;
@@ -86,39 +149,121 @@
 	// 														FILE INPUT
 	//***************************************************************
 
-	const loadFile = (file: File) => {
-		const reader = new FileReader();
-		reader.onload = () => {
-			const text = reader.result as string;
-			const doc = new DOMParser().parseFromString(text, 'image/svg+xml');
-			const root = doc.documentElement;
-			if (root.querySelector('parsererror') || root.localName !== 'svg') {
-				alert(`Could not parse ${file.name} as SVG.`);
-				return;
-			}
-			const dims = svgDimensions(
-				root.getAttribute('viewBox'),
-				root.getAttribute('width'),
-				root.getAttribute('height')
-			);
-			svgText = text;
-			sourceRoot = root;
-			filename = file.name;
-			wMm = dims.wMm;
-			hMm = dims.hMm;
-			viewBox = dims.viewBox;
-			// innerHTML preserves Inkscape layers, defs, everything
-			inner = root.innerHTML;
-			ox = 0;
-			oy = 0;
-			artRotation = 0;
-		};
-		reader.readAsText(file);
+	interface SvgSource {
+		name: string;
+		text: string;
+	}
+
+	const parseSvgSource = (src: SvgSource): PrepFrame | null => {
+		const doc = new DOMParser().parseFromString(src.text, 'image/svg+xml');
+		const root = doc.documentElement;
+		if (root.querySelector('parsererror') || root.localName !== 'svg') return null;
+		const dims = svgDimensions(
+			root.getAttribute('viewBox'),
+			root.getAttribute('width'),
+			root.getAttribute('height')
+		);
+		// innerHTML preserves Inkscape layers, defs, everything
+		return { name: src.name, label: '', root, inner: root.innerHTML, ...dims };
 	};
 
-	const openFile = (files: FileList | null | undefined) => {
-		const file = files?.[0];
-		if (file && file.name.toLowerCase().endsWith('.svg')) loadFile(file);
+	const loadSingle = (src: SvgSource) => {
+		const parsed = parseSvgSource(src);
+		if (!parsed) {
+			alert(`Could not parse ${src.name} as SVG.`);
+			return;
+		}
+		frames = [];
+		svgText = src.text;
+		sourceRoot = parsed.root;
+		filename = src.name;
+		wMm = parsed.wMm;
+		hMm = parsed.hMm;
+		viewBox = parsed.viewBox;
+		inner = parsed.inner;
+		ox = 0;
+		oy = 0;
+		artRotation = 0;
+	};
+
+	const loadSources = (sources: SvgSource[]) => {
+		if (sources.length === 0) {
+			alert('No SVG files found in the selection.');
+			return;
+		}
+		sources.sort((a, b) => compareFrameNames(a.name, b.name));
+		if (sources.length === 1) {
+			loadSingle(sources[0]);
+			return;
+		}
+		const parsed: PrepFrame[] = [];
+		for (const src of sources) {
+			const frame = parseSvgSource(src);
+			if (!frame) {
+				alert(`Could not parse ${src.name} as SVG.`);
+				return;
+			}
+			parsed.push(frame);
+		}
+		// the grid needs one uniform frame size — refuse mixed sets
+		const first = parsed[0];
+		for (const frame of parsed) {
+			if (Math.abs(frame.wMm - first.wMm) > 0.05 || Math.abs(frame.hMm - first.hMm) > 0.05) {
+				alert(
+					`SVGs with different sizes aren't supported: ${first.name} is ` +
+						`${numFmt(first.wMm, 1)} × ${numFmt(first.hMm, 1)} mm but ${frame.name} is ` +
+						`${numFmt(frame.wMm, 1)} × ${numFmt(frame.hMm, 1)} mm.`
+				);
+				return;
+			}
+		}
+		parsed.forEach((frame, index) => (frame.label = frameLabel(frame.name, index)));
+		svgText = null;
+		sourceRoot = null;
+		filename = '';
+		inner = '';
+		frames = parsed;
+		previewPage = 0;
+	};
+
+	/** expand the picked/dropped files: .svg directly, .zip via the reader;
+	 *  null = a zip failed to read (already reported) */
+	const collectSources = async (files: File[]): Promise<SvgSource[] | null> => {
+		const sources: SvgSource[] = [];
+		for (const file of files) {
+			const rel = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
+			if (
+				rel
+					.split('/')
+					.filter(Boolean)
+					.some((segment) => segment.startsWith('.'))
+			) {
+				continue; // hidden files/folders from a folder selection
+			}
+			const lower = file.name.toLowerCase();
+			if (lower.endsWith('.zip')) {
+				try {
+					const entries = await readZip(new Uint8Array(await file.arrayBuffer()));
+					const decoder = new TextDecoder();
+					for (const entry of zipSvgEntries(entries)) {
+						const name = entry.name.replaceAll('\\', '/').split('/').pop() ?? entry.name;
+						sources.push({ name, text: decoder.decode(entry.data) });
+					}
+				} catch (error) {
+					alert(`Could not read ${file.name}: ${error instanceof Error ? error.message : error}`);
+					return null;
+				}
+			} else if (lower.endsWith('.svg')) {
+				sources.push({ name: file.name, text: await file.text() });
+			}
+		}
+		return sources;
+	};
+
+	const openInput = async (files: File[] | FileList | null | undefined) => {
+		if (!files || files.length === 0) return;
+		const sources = await collectSources(Array.from(files));
+		if (sources) loadSources(sources);
 	};
 
 	const clearSvg = () => {
@@ -129,13 +274,51 @@
 		ox = 0;
 		oy = 0;
 		artRotation = 0;
+		frames = [];
+		previewPage = 0;
 		if (fileInput) fileInput.value = '';
+		if (folderInput) folderInput.value = '';
+	};
+
+	/** flatten dropped items — directories are walked recursively */
+	const filesFromEntries = async (entries: FileSystemEntry[]): Promise<File[]> => {
+		const files: File[] = [];
+		const walk = async (entry: FileSystemEntry): Promise<void> => {
+			if (entry.name.startsWith('.')) return;
+			if (entry.isFile) {
+				const file = await new Promise<File>((resolve, reject) =>
+					(entry as FileSystemFileEntry).file(resolve, reject)
+				);
+				files.push(file);
+			} else if (entry.isDirectory) {
+				const reader = (entry as FileSystemDirectoryEntry).createReader();
+				let batch: FileSystemEntry[];
+				do {
+					batch = await new Promise<FileSystemEntry[]>((resolve, reject) =>
+						reader.readEntries(resolve, reject)
+					);
+					for (const child of batch) await walk(child);
+				} while (batch.length > 0);
+			}
+		};
+		for (const entry of entries) await walk(entry);
+		return files;
 	};
 
 	const onDrop = (event: DragEvent) => {
 		event.preventDefault();
 		dragActive = false;
-		openFile(event.dataTransfer?.files);
+		const dt = event.dataTransfer;
+		if (!dt) return;
+		// webkitGetAsEntry only works synchronously inside the drop handler —
+		// grab the entries (folders included) before anything awaits
+		const entries = Array.from(dt.items ?? [])
+			.map((item) => item.webkitGetAsEntry?.())
+			.filter((entry): entry is FileSystemEntry => !!entry);
+		const plain = Array.from(dt.files ?? []);
+		void (async () => {
+			await openInput(entries.length > 0 ? await filesFromEntries(entries) : plain);
+		})();
 	};
 
 	//***************************************************************
@@ -186,6 +369,32 @@
       viewBox="${nvx} ${nvy} ${nvw} ${nvh}">${wrapRotation(inner)}</svg>`;
 		const url = URL.createObjectURL(new Blob([svgStr], { type: 'image/svg+xml' }));
 		artBlobUrl = url;
+		return () => URL.revokeObjectURL(url);
+	});
+
+	// multi-frame preview blob — the whole current page rasterises once
+	$effect(() => {
+		if (!multi) {
+			multiBlobUrl = '';
+			return;
+		}
+		const [pageW, pageH] = page;
+		let content = '';
+		for (const [index, frame] of framesOnPage.entries()) {
+			const cell = cellPosition(grid, index);
+			const [vx, vy, vw, vh] = frame.viewBox;
+			const sx = frame.wMm / (vw || 1);
+			const sy = frame.hMm / (vh || 1);
+			const tx = cell.x + frameMargin - vx * sx;
+			const ty = cell.y + frameMargin - vy * sy;
+			content += `<g transform="translate(${tx},${ty}) scale(${sx},${sy})">${frame.inner}</g>`;
+		}
+		const svgStr = `<svg xmlns="http://www.w3.org/2000/svg"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      width="${pageW}mm" height="${pageH}mm"
+      viewBox="0 0 ${pageW} ${pageH}">${content}</svg>`;
+		const url = URL.createObjectURL(new Blob([svgStr], { type: 'image/svg+xml' }));
+		multiBlobUrl = url;
 		return () => URL.revokeObjectURL(url);
 	});
 
@@ -254,12 +463,34 @@
         stroke-width="${isDragging ? 0.5 : 0.35}" stroke-dasharray="2 1.5"/>`;
 		}
 
+		// multi-frame cells + frame numbers
+		if (multi) {
+			for (const [index, frame] of framesOnPage.entries()) {
+				const cell = cellPosition(grid, index);
+				html += `<rect x="${cell.x}" y="${cell.y}" width="${grid.cellW}" height="${grid.cellH}"
+          fill="none" stroke="#a8b3c9" stroke-width="0.35" stroke-dasharray="2 1.5"/>`;
+				if (showLabels) {
+					const { d } = hersheyPathData(frame.label, labelH);
+					if (d) {
+						html += `<path d="${d}" transform="translate(${cell.x + frameMargin},${cell.y + labelBaseY})"
+            fill="none" stroke="#60739f" stroke-width="0.3" stroke-linecap="round" stroke-linejoin="round"/>`;
+					}
+				}
+			}
+		}
+
 		// paper outline layer
 		if (layPaper) {
-			const pr = paperOutlineRect(pageW, pageH);
-			if (pr) {
-				html += `<rect x="${pr.x}" y="${pr.y}" width="${pr.w}" height="${pr.h}"
-          fill="none" stroke="#00BFE8" stroke-width="0.55" stroke-dasharray="3 2"/>`;
+			const attrs = `fill="none" stroke="#00BFE8" stroke-width="0.55" stroke-dasharray="3 2"`;
+			if (multi && paperOutlineSize === 'artwork') {
+				// one outline per frame cell — cut guides around each frame
+				for (const [index] of framesOnPage.entries()) {
+					const cell = cellPosition(grid, index);
+					html += outlineMarks(cell.x, cell.y, grid.cellW, grid.cellH, outlineStyle, attrs);
+				}
+			} else {
+				const pr = paperOutlineRect(pageW, pageH);
+				if (pr) html += outlineMarks(pr.x, pr.y, pr.w, pr.h, outlineStyle, attrs);
 			}
 		}
 
@@ -296,9 +527,9 @@
       font-family="monospace" fill="#60739f" transform="rotate(-90,${-PAD + 3.5},${pageH / 2})">${numFmt(pageH, 0)} mm</text>`;
 
 		// empty state
-		if (!hasSvg) {
+		if (!hasAny) {
 			html += `<text x="${pageW / 2}" y="${pageH / 2 - 4}" font-size="5" text-anchor="middle"
-        font-family="monospace" fill="#60739f" opacity="0.4">drop SVG to begin</text>`;
+        font-family="monospace" fill="#60739f" opacity="0.4">drop SVGs, a folder or a zip to begin</text>`;
 			html += `<text x="${pageW / 2}" y="${pageH / 2 + 4}" font-size="3" text-anchor="middle"
         font-family="monospace" fill="#60739f" opacity="0.3">${pageSize} ${orient} · ${numFmt(pageW, 0)} × ${numFmt(pageH, 0)} mm</text>`;
 		}
@@ -335,6 +566,14 @@
 			`width:${t.effW * scale}px;height:${t.effH * scale}px`
 		);
 	});
+
+	// the multi blob covers the whole page, so it just tracks the page rect
+	const multiImgStyle = $derived(
+		multi && multiBlobUrl
+			? `left:${PAD * scale}px;top:${PAD * scale}px;` +
+					`width:${page[0] * scale}px;height:${page[1] * scale}px`
+			: 'display:none'
+	);
 
 	//***************************************************************
 	// 												DRAG TO REPOSITION
@@ -426,7 +665,21 @@
 	// 														EXPORT
 	//***************************************************************
 
-	const doExport = () => {
+	const downloadBlob = (blob: Blob, name: string) => {
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = name;
+		a.click();
+		URL.revokeObjectURL(url);
+	};
+
+	const escapeXml = (value: string): string =>
+		value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;');
+
+	const EXPORT_OUTLINE_ATTRS = 'fill="none" stroke="black" stroke-width="0.5"';
+
+	const exportSingle = () => {
 		if (!svgText) return;
 		const [pageW, pageH] = page;
 		const t = artworkTransform(pageW, pageH);
@@ -460,11 +713,9 @@ ${wrapRotation(artworkInner)}
 		if (layPaper) {
 			const pr = paperOutlineRect(pageW, pageH);
 			if (pr) {
-				out += `  <!-- ═══ Paper outline: place paper within this rectangle ═══ -->
+				out += `  <!-- ═══ Paper outline: place paper within these marks ═══ -->
   <g inkscape:label="paper-outline" inkscape:groupmode="layer" id="layer-paper-outline">
-    <rect x="${pr.x.toFixed(4)}" y="${pr.y.toFixed(4)}"
-          width="${pr.w.toFixed(4)}" height="${pr.h.toFixed(4)}"
-          fill="none" stroke="black" stroke-width="0.5"/>
+    ${outlineMarks(pr.x, pr.y, pr.w, pr.h, outlineStyle, EXPORT_OUTLINE_ATTRS)}
   </g>
 
 `;
@@ -501,13 +752,148 @@ ${wrapRotation(artworkInner)}
 
 		out += `</svg>`;
 
-		const blob = new Blob([out], { type: 'image/svg+xml' });
-		const url = URL.createObjectURL(blob);
-		const a = document.createElement('a');
-		a.href = url;
-		a.download = filename.replace(/\.svg$/i, '') + '_plotprep.svg';
-		a.click();
-		URL.revokeObjectURL(url);
+		downloadBlob(
+			new Blob([out], { type: 'image/svg+xml' }),
+			filename.replace(/\.svg$/i, '') + '_plotprep.svg'
+		);
+	};
+
+	/** one output page of the multi-frame export, as a full SVG document */
+	const buildPageSvg = (pageIndex: number): string => {
+		const [pageW, pageH] = page;
+		const pageFrames = frames.slice(pageIndex * grid.perPage, (pageIndex + 1) * grid.perPage);
+		const placed: PlacedFrame[] = pageFrames.map((frame, index) => {
+			const cell = cellPosition(grid, index);
+			return {
+				root: frame.root,
+				viewBox: frame.viewBox,
+				wMm: frame.wMm,
+				hMm: frame.hMm,
+				x: cell.x + frameMargin,
+				y: cell.y + frameMargin
+			};
+		});
+		const layers = mergeFrameLayers(placed, { addReversed });
+
+		let out = `<?xml version="1.0" encoding="UTF-8"?>
+<!-- Generated by RSTR plot prep — ${pageFrames.length} frames, page ${pageIndex + 1}/${pageTotal} -->
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+     xmlns:xlink="http://www.w3.org/1999/xlink"
+     xmlns:svg="http://www.w3.org/2000/svg"
+     width="${pageW}mm" height="${pageH}mm"
+     viewBox="0 0 ${pageW} ${pageH}">
+
+  <!-- ═══ Artwork (matching layers of all frames combined${addReversed ? ', plus reversed duplicates' : ''}) ═══ -->
+`;
+		const usedIds: string[] = [];
+		for (const layer of layers) {
+			let id = `layer-${
+				layer.label
+					.toLowerCase()
+					.replace(/[^a-z0-9]+/g, '-')
+					.replace(/^-+|-+$/g, '') || 'artwork'
+			}`;
+			while (usedIds.includes(id)) id += '-2';
+			usedIds.push(id);
+			out += `  <g inkscape:label="${escapeXml(layer.label)}" inkscape:groupmode="layer" id="${id}">
+${layer.content}
+  </g>
+
+`;
+		}
+
+		if (showLabels) {
+			out += `  <!-- ═══ Frame numbers (Hershey single-stroke digits) ═══ -->
+  <g inkscape:label="frame-labels" inkscape:groupmode="layer" id="layer-frame-labels"
+     fill="none" stroke="black" stroke-width="0.3" stroke-linecap="round" stroke-linejoin="round">
+`;
+			for (const [index, frame] of pageFrames.entries()) {
+				const cell = cellPosition(grid, index);
+				const { d } = hersheyPathData(frame.label, labelH);
+				if (d) {
+					out += `    <path transform="translate(${(cell.x + frameMargin).toFixed(4)},${(cell.y + labelBaseY).toFixed(4)})" d="${d}"/>\n`;
+				}
+			}
+			out += `  </g>
+
+`;
+		}
+
+		if (layPaper) {
+			let marks = '';
+			if (paperOutlineSize === 'artwork') {
+				for (const [index] of pageFrames.entries()) {
+					const cell = cellPosition(grid, index);
+					marks += `    ${outlineMarks(cell.x, cell.y, grid.cellW, grid.cellH, outlineStyle, EXPORT_OUTLINE_ATTRS)}\n`;
+				}
+			} else {
+				const pr = paperOutlineRect(pageW, pageH);
+				if (pr) {
+					marks = `    ${outlineMarks(pr.x, pr.y, pr.w, pr.h, outlineStyle, EXPORT_OUTLINE_ATTRS)}\n`;
+				}
+			}
+			if (marks) {
+				out += `  <!-- ═══ Paper outline: place paper within these marks ═══ -->
+  <g inkscape:label="paper-outline" inkscape:groupmode="layer" id="layer-paper-outline">
+${marks}  </g>
+
+`;
+			}
+		}
+
+		if (layCalib) {
+			out += `  <!-- ═══ Calibration markers ═══ -->
+  ${
+		buildCalibrationBlock({
+			pageW,
+			pageH,
+			penCount: pens,
+			forExport: true,
+			rotated: calibRotated,
+			compact: calibCompact,
+			x: calibX,
+			y: calibY
+		}).svg
+	}
+
+`;
+		}
+
+		if (layPage) {
+			out += `  <!-- ═══ Page boundary ═══ -->
+  <g inkscape:label="page-boundary" inkscape:groupmode="layer" id="layer-page-boundary">
+    <rect x="0" y="0" width="${pageW}" height="${pageH}"
+          fill="none" stroke="black" stroke-width="0.5"/>
+  </g>
+
+`;
+		}
+
+		out += `</svg>`;
+		return out;
+	};
+
+	const exportMultiZip = () => {
+		const encoder = new TextEncoder();
+		const base = commonBase(frames.map((frame) => frame.name));
+		const pad = Math.max(2, String(pageTotal).length);
+		const entries: ZipEntry[] = [];
+		for (let p = 0; p < pageTotal; p++) {
+			entries.push({
+				name: `${base}_page-${String(p + 1).padStart(pad, '0')}.svg`,
+				data: encoder.encode(buildPageSvg(p))
+			});
+		}
+		downloadBlob(
+			new Blob([buildZip(entries)], { type: 'application/zip' }),
+			`${base}_plotprep.zip`
+		);
+	};
+
+	const doExport = () => {
+		if (multi) exportMultiZip();
+		else exportSingle();
 	};
 </script>
 
@@ -525,14 +911,49 @@ ${wrapRotation(artworkInner)}
 		<aside class="pane left">
 			<section class="panel-group">
 				<div class="group-title">input svg</div>
-				{#if !hasSvg}
+				{#if !hasAny}
 					<button
 						class="drop-zone"
 						onclick={() => fileInput?.click()}
-						title="pick an SVG from your device — it never leaves the browser"
+						title="pick SVGs, a folder or a frame-sequence zip — nothing leaves the browser"
 					>
-						drop .svg here<span class="drop-sub">or click to browse</span>
+						drop .svg / frames / .zip here<span class="drop-sub">or click to browse</span>
 					</button>
+					<button
+						class="folder-btn"
+						onclick={() => folderInput?.click()}
+						title="pick a folder of same-size SVG frames (e.g. a studio frame-sequence export)"
+					>
+						▸ browse a folder…
+					</button>
+				{:else if multi}
+					<div class="file-info">
+						<div class="fi-row">
+							<span class="fi-key">frames</span>
+							<span class="fi-val">{frames.length} SVGs</span>
+						</div>
+						<div class="fi-row">
+							<span class="fi-key">dimensions</span>
+							<span class="fi-val">{numFmt(frameW, 1)} × {numFmt(frameH, 1)} mm each</span>
+						</div>
+						<div class="fi-row">
+							<span class="fi-key">layout</span>
+							<span class="fi-val">
+								{grid.cols} × {grid.rows} per page · {pageTotal} page{pageTotal === 1 ? '' : 's'}
+							</span>
+						</div>
+						{#if !grid.fits}
+							<div class="fi-warn">frame + margin exceeds the usable page area</div>
+						{/if}
+						<div class="fi-actions">
+							<button onclick={() => fileInput?.click()} title="load different SVGs">
+								↻ replace
+							</button>
+							<button class="danger" onclick={clearSvg} title="remove the loaded SVGs">
+								✕ clear
+							</button>
+						</div>
+					</div>
 				{:else}
 					<div class="file-info">
 						<div class="fi-row">
@@ -573,6 +994,51 @@ ${wrapRotation(artworkInner)}
 					</select>
 				</label>
 			</section>
+
+			{#if multi}
+				<section class="panel-group">
+					<div class="group-title">frame layout</div>
+					<label
+						class="slider-row"
+						title="margin around each frame (mm) — the frame number is written in its bottom strip"
+					>
+						<span>margin</span>
+						<input
+							type="range"
+							min="0"
+							max="30"
+							step="0.5"
+							bind:value={frameMargin}
+							use:inkRange={frameMargin}
+						/>
+						<input type="number" min="0" max="30" step="0.5" bind:value={frameMargin} />
+					</label>
+					<label class="slider-row" title="space between neighbouring frames (mm)">
+						<span>gap</span>
+						<input
+							type="range"
+							min="0"
+							max="30"
+							step="0.5"
+							bind:value={gridGap}
+							use:inkRange={gridGap}
+						/>
+						<input type="number" min="0" max="30" step="0.5" bind:value={gridGap} />
+					</label>
+					<label class="slider-row" title="clearance kept from the page edges (mm)">
+						<span>edge margin</span>
+						<input
+							type="range"
+							min="0"
+							max="50"
+							step="1"
+							bind:value={edgeMargin}
+							use:inkRange={edgeMargin}
+						/>
+						<input type="number" min="0" max="50" step="1" bind:value={edgeMargin} />
+					</label>
+				</section>
+			{/if}
 
 			<section class="panel-group">
 				<div class="group-title">output layers</div>
@@ -616,29 +1082,44 @@ ${wrapRotation(artworkInner)}
 				<div class="group-title">paper outline</div>
 				<label
 					class="select-row"
-					title="what the paper outline wraps — the artwork or a fixed paper size"
+					title={multi
+						? 'what the paper outline wraps — every frame cell or a fixed paper size'
+						: 'what the paper outline wraps — the artwork or a fixed paper size'}
 				>
 					<span>size</span>
 					<select bind:value={paperOutlineSize}>
-						<option value="artwork">artwork</option>
+						<option value="artwork">{multi ? 'each frame' : 'artwork'}</option>
 						{#each Object.keys(PAGES) as id (id)}
 							<option value={id}>{id}</option>
 						{/each}
 						<option value="custom">custom…</option>
 					</select>
 				</label>
-				<label class="slider-row" title="extra room around the outlined size (mm)">
-					<span>+ margin</span>
-					<input
-						type="range"
-						min="1"
-						max="50"
-						step="0.5"
-						bind:value={paperMargin}
-						use:inkRange={paperMargin}
-					/>
-					<input type="number" min="1" max="50" step="0.5" bind:value={paperMargin} />
+				<label
+					class="select-row"
+					title="how the outline is drawn — a full rectangle, corner marks or crosses on the corners"
+				>
+					<span>style</span>
+					<select bind:value={outlineStyle}>
+						{#each Object.entries(OUTLINE_STYLE_LABELS) as [id, label] (id)}
+							<option value={id}>{label}</option>
+						{/each}
+					</select>
 				</label>
+				{#if !(multi && paperOutlineSize === 'artwork')}
+					<label class="slider-row" title="extra room around the outlined size (mm)">
+						<span>+ margin</span>
+						<input
+							type="range"
+							min="1"
+							max="50"
+							step="0.5"
+							bind:value={paperMargin}
+							use:inkRange={paperMargin}
+						/>
+						<input type="number" min="1" max="50" step="0.5" bind:value={paperMargin} />
+					</label>
+				{/if}
 				{#if paperOutlineSize !== 'artwork' && paperOutlineSize !== 'custom'}
 					<label class="select-row" title="orientation of the outlined paper size">
 						<span>orient</span>
@@ -707,39 +1188,47 @@ ${wrapRotation(artworkInner)}
 				</label>
 			</section>
 
-			<section class="panel-group">
-				<div class="group-title">artwork position</div>
-				<label class="slider-row" title="horizontal offset from the page center (mm)">
-					<span>offset X</span>
-					<input type="range" min="-200" max="200" step="0.5" bind:value={ox} use:inkRange={ox} />
-					<input type="number" step="0.5" bind:value={ox} />
-				</label>
-				<label class="slider-row" title="vertical offset from the page center (mm)">
-					<span>offset Y</span>
-					<input type="range" min="-200" max="200" step="0.5" bind:value={oy} use:inkRange={oy} />
-					<input type="number" step="0.5" bind:value={oy} />
-				</label>
-				<div class="position-actions">
-					<button onclick={centerArtwork} title="center the artwork on the page">⊹ center</button>
-					<button
-						onclick={rotateArtwork}
-						disabled={!hasSvg}
-						title="rotate the artwork 90° clockwise">↻ rotate</button
-					>
-				</div>
-			</section>
+			{#if !multi}
+				<section class="panel-group">
+					<div class="group-title">artwork position</div>
+					<label class="slider-row" title="horizontal offset from the page center (mm)">
+						<span>offset X</span>
+						<input type="range" min="-200" max="200" step="0.5" bind:value={ox} use:inkRange={ox} />
+						<input type="number" step="0.5" bind:value={ox} />
+					</label>
+					<label class="slider-row" title="vertical offset from the page center (mm)">
+						<span>offset Y</span>
+						<input type="range" min="-200" max="200" step="0.5" bind:value={oy} use:inkRange={oy} />
+						<input type="number" step="0.5" bind:value={oy} />
+					</label>
+					<div class="position-actions">
+						<button onclick={centerArtwork} title="center the artwork on the page">⊹ center</button>
+						<button
+							onclick={rotateArtwork}
+							disabled={!hasSvg}
+							title="rotate the artwork 90° clockwise">↻ rotate</button
+						>
+					</div>
+				</section>
+			{/if}
 
 			<section class="panel-group">
 				<div class="group-title">export</div>
 				<button
 					class="primary-btn"
 					onclick={doExport}
-					disabled={!hasSvg}
-					title="download the decorated SVG — artwork plus the enabled marker layers{addReversed
-						? ', artwork layers duplicated in reverse'
-						: ''}"
+					disabled={!hasAny}
+					title={multi
+						? 'download a zip with one decorated SVG per output page — every frame lands on a sheet'
+						: `download the decorated SVG — artwork plus the enabled marker layers${
+								addReversed ? ', artwork layers duplicated in reverse' : ''
+							}`}
 				>
-					↓ export SVG
+					{#if multi}
+						↓ export ZIP · {pageTotal} page{pageTotal === 1 ? '' : 's'}
+					{:else}
+						↓ export SVG
+					{/if}
 				</button>
 			</section>
 
@@ -783,13 +1272,35 @@ ${wrapRotation(artworkInner)}
 					{#if hasSvg && artBlobUrl}
 						<img class="artwork-img" src={artBlobUrl} style={artworkImgStyle} alt="" />
 					{/if}
+					{#if multi && multiBlobUrl}
+						<img class="artwork-img" src={multiBlobUrl} style={multiImgStyle} alt="" />
+					{/if}
 				</div>
 			</div>
 			<div class="stage-footer" bind:clientHeight={footerH}>
+				{#if multi && pageTotal > 1}
+					<span class="page-nav">
+						<button
+							onclick={() => (previewPage = curPage - 1)}
+							disabled={curPage === 0}
+							title="previous page">◀</button
+						>
+						page {curPage + 1}/{pageTotal}
+						<button
+							onclick={() => (previewPage = curPage + 1)}
+							disabled={curPage >= pageTotal - 1}
+							title="next page">▶</button
+						>
+					</span>
+				{/if}
 				<span><span class="legend-dot" style="background: #00BFE8"></span>paper outline</span>
 				<span><span class="legend-dot" style="background: #FFB000"></span>calibration</span>
 				<span><span class="legend-dot" style="background: #FF2AA6"></span>page boundary</span>
-				<span class="legend-hint">drag artwork or calibration block to reposition</span>
+				<span class="legend-hint">
+					{multi
+						? 'drag the calibration block to reposition'
+						: 'drag artwork or calibration block to reposition'}
+				</span>
 			</div>
 		</main>
 	</div>
@@ -797,11 +1308,26 @@ ${wrapRotation(artworkInner)}
 	<input
 		bind:this={fileInput}
 		type="file"
-		accept=".svg,image/svg+xml"
+		accept=".svg,.zip,image/svg+xml,application/zip"
+		multiple
 		style="display: none;"
 		onchange={(event) => {
-			openFile(event.currentTarget.files);
+			// snapshot before resetting the input — that empties its FileList
+			const files = Array.from(event.currentTarget.files ?? []);
 			event.currentTarget.value = '';
+			void openInput(files);
+		}}
+	/>
+	<input
+		bind:this={folderInput}
+		type="file"
+		webkitdirectory
+		style="display: none;"
+		onchange={(event) => {
+			// snapshot before resetting the input — that empties its FileList
+			const files = Array.from(event.currentTarget.files ?? []);
+			event.currentTarget.value = '';
+			void openInput(files);
 		}}
 	/>
 </div>
@@ -945,6 +1471,15 @@ ${wrapRotation(artworkInner)}
 		font-weight: normal;
 	}
 
+	.folder-btn {
+		padding: 0.25rem 0.4rem;
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		background: #fff;
+		color: var(--muted);
+		cursor: pointer;
+	}
+
 	.file-info {
 		display: flex;
 		flex-direction: column;
@@ -973,6 +1508,11 @@ ${wrapRotation(artworkInner)}
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+
+	.fi-warn {
+		font-size: 0.64rem;
+		color: #d50000;
 	}
 
 	.fi-actions {
@@ -1206,6 +1746,25 @@ ${wrapRotation(artworkInner)}
 		width: 6px;
 		height: 6px;
 		border-radius: 50%;
+	}
+
+	.page-nav {
+		font-family: 'mono-bold', monospace;
+		color: var(--ink);
+	}
+
+	.page-nav button {
+		padding: 0 0.35rem;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		background: #fff;
+		color: var(--ink);
+		cursor: pointer;
+	}
+
+	.page-nav button:disabled {
+		opacity: 0.35;
+		cursor: not-allowed;
 	}
 
 	.legend-hint {
