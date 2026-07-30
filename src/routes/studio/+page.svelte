@@ -181,6 +181,17 @@
 	/** timeline position, in output frames at the chosen fps */
 	let currentFrame = $state(0);
 
+	// Set when a picked file can't be used — a video the browser's decoder
+	// rejects (typically an HEVC .mov straight off a phone), or a drop that is
+	// neither image nor video. Cleared on the next pick. `convert` switches on
+	// the convert-to-MP4/WebM guidance in the dropzone hint.
+	interface InputError {
+		title: string;
+		detail: string;
+		convert: boolean;
+	}
+	let inputError: InputError | null = $state(null);
+
 	const videoTotalFrames = $derived(totalFrameCount(videoDuration, video.fps));
 	const videoRange = $derived(exportFrameRange(videoDuration, video));
 
@@ -263,11 +274,21 @@
 	const openFile = (files: FileList | null | undefined) => {
 		const file = files?.[0];
 		if (!file) return;
+		inputError = null;
 		if (file.type.startsWith('video/')) {
 			openVideoFile(file);
 			return;
 		}
-		if (!file.type.startsWith('image/')) return;
+		if (!file.type.startsWith('image/')) {
+			// dropped files bypass the picker's accept filter — say so instead
+			// of silently ignoring them
+			inputError = {
+				title: `can't read "${file.name}"`,
+				detail: `that file is neither an image nor a video the browser recognizes — try a different file.`,
+				convert: false
+			};
+			return;
+		}
 		const reader = new FileReader();
 		reader.onload = () => {
 			// only drop a running video once the image is actually ready
@@ -333,6 +354,26 @@
 		videoDuration = duration;
 		// land the playhead on the first exported frame
 		currentFrame = exportFrameRange(duration, video).start;
+	};
+
+	// The decoder rejected the file — most often an HEVC (H.265) .mov straight
+	// off a phone, which Firefox (and some others) can't decode. Without this
+	// handler the failure is silent: metadata never arrives, so no video UI
+	// ever shows and the studio just sits empty.
+	const onVideoError = () => {
+		if (!videoSrc) return;
+		const name = videoName;
+		const mediaError = videoEl?.error;
+		closeVideo();
+		const looksHevc = /\.(mov|qt|hevc)$/i.test(name);
+		inputError = {
+			title: `can't play "${name}"`,
+			detail: looksHevc
+				? `this browser can't decode it — .mov recordings from phones are usually HEVC (H.265), which many browsers don't support.`
+				: `this browser can't decode this video's format.`,
+			convert: true
+		};
+		console.warn('video decode failed:', mediaError?.code, mediaError?.message);
 	};
 
 	const seekVideo = (el: HTMLVideoElement, t: number): Promise<void> =>
@@ -1864,6 +1905,10 @@
 				</div>
 				{#if videoSrc}
 					<div class="video-name" title={videoName}>{videoName}</div>
+				{:else if inputError}
+					<div class="video-name input-error-note" title={inputError.detail}>
+						{inputError.title}{inputError.convert ? ' — see the note in the render area' : ''}
+					</div>
 				{/if}
 				{#each ADJUST_SLIDERS as slider (slider.id)}
 					<label class="slider-row" title={slider.tip}>
@@ -2169,9 +2214,25 @@
 				{#if inputImage}
 					<img class="render placeholder" src={inputImage} alt="input" />
 				{:else if !videoSrc}
-					<div class="dropzone-hint">
-						<p class="hint-title">drop an image or video here</p>
-						<p class="hint-sub">your image stays in your browser — always</p>
+					<div class="dropzone-hint" class:dropzone-error={inputError !== null}>
+						{#if inputError}
+							<p class="hint-title">{inputError.title}</p>
+							<p class="hint-sub">{inputError.detail}</p>
+							{#if inputError.convert}
+								<p class="hint-sub">
+									convert it to MP4 (H.264) or WebM and load that instead — QuickTime (file → export
+									as…), <a href="https://handbrake.fr" target="_blank" rel="noopener">HandBrake</a>,
+									or
+								</p>
+								<code class="hint-code"
+									>ffmpeg -i input.mov -c:v libx264 -pix_fmt yuv420p output.mp4</code
+								>
+							{/if}
+							<p class="hint-sub">…or drop a different image or video here</p>
+						{:else}
+							<p class="hint-title">drop an image or video here</p>
+							<p class="hint-sub">your image stays in your browser — always</p>
+						{/if}
 					</div>
 				{/if}
 			{/if}
@@ -2801,6 +2862,7 @@
 			muted
 			playsinline
 			onloadedmetadata={onVideoMetadata}
+			onerror={onVideoError}
 		>
 			<track kind="captions" />
 		</video>
@@ -3168,6 +3230,33 @@
 		font-family: 'serif-text', serif;
 		font-size: 0.85rem;
 		margin: 0.4rem 0 0;
+	}
+
+	.dropzone-error {
+		border-color: #e63946;
+		max-width: 34rem;
+	}
+
+	.dropzone-error .hint-title {
+		color: #e63946;
+		overflow-wrap: anywhere;
+	}
+
+	.dropzone-error a {
+		color: inherit;
+	}
+
+	.hint-code {
+		display: inline-block;
+		margin-top: 0.5rem;
+		padding: 0.2rem 0.5rem;
+		font-family: 'mono-light', monospace;
+		font-size: 0.7rem;
+		background: rgba(26, 32, 44, 0.04);
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		user-select: all;
+		overflow-wrap: anywhere;
 	}
 
 	/* ------------------------------------------------- image picker */
@@ -4155,6 +4244,11 @@
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
+	}
+
+	.input-error-note {
+		color: #e63946;
+		white-space: normal;
 	}
 
 	.video-summary {

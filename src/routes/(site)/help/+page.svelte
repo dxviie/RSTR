@@ -101,6 +101,14 @@
 	<section>
 		<h2>video</h2>
 		<dl>
+			<dt>supported formats</dt>
+			<dd>
+				Whatever your browser can decode — MP4 (H.264) and WebM play everywhere. HEVC (H.265)
+				videos, like the .mov recordings phones make, don't decode in many browsers; the studio will
+				tell you when that happens. Convert those to MP4 (H.264) first — QuickTime's export,
+				<a href="https://handbrake.fr" target="_blank" rel="noopener">HandBrake</a>, or
+				<code>ffmpeg -i input.mov -c:v libx264 -pix_fmt yuv420p output.mp4</code> — and load the result.
+			</dd>
 			<dt>output fps</dt>
 			<dd>
 				Frame rate the video is sampled at — fewer frames per second means fewer, smaller files.
@@ -522,6 +530,12 @@
 
 	em {
 		font-style: italic;
+	}
+
+	dd code {
+		font-family: 'mono-light', monospace;
+		font-size: 0.72rem;
+		overflow-wrap: anywhere;
 	}
 
 	@media (max-width: 640px) {
