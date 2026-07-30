@@ -331,10 +331,18 @@
 				Pick the page size and orientation the plotter will see; drag the artwork (or use the
 				offsets) to place it.
 			</dd>
+			<dt>multiple SVGs</dt>
+			<dd>
+				Drop several same-size SVGs, a folder, or the studio's frame-sequence zip (SVGs in the root
+				or an <code>svg/</code> subfolder) — geared to the video export. Frames are laid out as a grid
+				with an adjustable per-frame margin, gap and edge clearance, across as many pages as needed. Matching
+				layers of all frames are combined so pen selection in saxi stays simple, and each frame carries
+				its number in plottable single-stroke digits. Export downloads a zip with one page SVG per sheet.
+			</dd>
 			<dt>paper outline</dt>
 			<dd>
-				A rectangle marking where to place the physical paper — sized to the artwork or a fixed
-				format, plus margin.
+				Marks where to place the physical paper — sized to the artwork (or each frame) or a fixed
+				format, plus margin, drawn as a full rectangle, corner marks or crosses.
 			</dd>
 			<dt>calibration markers</dt>
 			<dd>
