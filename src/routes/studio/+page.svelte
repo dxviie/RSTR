@@ -2212,7 +2212,8 @@
 				<p class="hint-sub">{err.detail}</p>
 				{#if err.convert}
 					<p class="hint-sub">
-						try a different browser or convert it to MP4 (H.264) or WebM and load that instead — QuickTime (file → export as…), <a
+						try a different browser or convert it to MP4 (H.264) or WebM and load that instead —
+						QuickTime (file → export as…), <a
 							href="https://handbrake.fr"
 							target="_blank"
 							rel="noopener">HandBrake</a
