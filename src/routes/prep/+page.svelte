@@ -66,6 +66,10 @@
 	let gridGap = $state(5);
 	/** clearance kept from the page edges, mm */
 	let edgeMargin = $state(10);
+	/** distance of the frame number from the cell's bottom-left corner, mm */
+	let labelOffset = $state(1.25);
+	/** frame-numbers output layer on/off */
+	let layNumbers = $state(true);
 	let previewPage = $state(0);
 	let multiBlobUrl = $state('');
 
@@ -130,15 +134,12 @@
 	const framesOnPage = $derived(
 		multi ? frames.slice(curPage * grid.perPage, (curPage + 1) * grid.perPage) : []
 	);
-	/** frame number cap height — fits the cell's bottom margin strip */
-	const labelH = $derived(Math.min(2.5, frameMargin * 0.55));
-	const showLabels = $derived(multi && labelH >= 0.7);
-	/** baseline of the frame number, local to the cell top-left — centered
-	 *  in the bottom margin strip, leaving (margin − height)/2 below */
-	const labelBaseY = $derived(frameMargin + frameH + (frameMargin + labelH) / 2);
-	/** inset from the cell's left edge — the same distance the label keeps
-	 *  from the cell bottom, so both gaps read equal */
-	const labelInset = $derived((frameMargin - labelH) / 2);
+	/** frame number cap height, mm */
+	const labelH = 2.5;
+	const showLabels = $derived(multi && layNumbers);
+	/** baseline of the frame number, local to the cell top-left — the
+	 *  number keeps labelOffset from the cell's bottom and left edges */
+	const labelBaseY = $derived(2 * frameMargin + frameH - labelOffset);
 
 	const scale = $derived.by(() => {
 		const [pageW, pageH] = page;
@@ -476,7 +477,7 @@
 				if (showLabels) {
 					const { d } = hersheyPathData(frame.label, labelH);
 					if (d) {
-						html += `<path d="${d}" transform="translate(${cell.x + labelInset},${cell.y + labelBaseY})"
+						html += `<path d="${d}" transform="translate(${cell.x + labelOffset},${cell.y + labelBaseY})"
             fill="none" stroke="#60739f" stroke-width="0.3" stroke-linecap="round" stroke-linejoin="round"/>`;
 					}
 				}
@@ -816,7 +817,7 @@ ${layer.content}
 				const cell = cellPosition(grid, index);
 				const { d } = hersheyPathData(frame.label, labelH);
 				if (d) {
-					out += `    <path transform="translate(${(cell.x + labelInset).toFixed(4)},${(cell.y + labelBaseY).toFixed(4)})" d="${d}"/>\n`;
+					out += `    <path transform="translate(${(cell.x + labelOffset).toFixed(4)},${(cell.y + labelBaseY).toFixed(4)})" d="${d}"/>\n`;
 				}
 			}
 			out += `  </g>
@@ -1004,7 +1005,7 @@ ${marks}  </g>
 					<div class="group-title">frame layout</div>
 					<label
 						class="slider-row"
-						title="margin around each frame (mm) — the frame number is written in its bottom strip"
+						title="margin around each frame (mm) — part of the frame's cell"
 					>
 						<span>margin</span>
 						<input
@@ -1041,6 +1042,23 @@ ${marks}  </g>
 						/>
 						<input type="number" min="0" max="50" step="1" bind:value={edgeMargin} />
 					</label>
+					{#if layNumbers}
+						<label
+							class="slider-row"
+							title="distance of the frame number from the cell's bottom-left corner (mm)"
+						>
+							<span>number offset</span>
+							<input
+								type="range"
+								min="0"
+								max="10"
+								step="0.25"
+								bind:value={labelOffset}
+								use:inkRange={labelOffset}
+							/>
+							<input type="number" min="0" max="10" step="0.25" bind:value={labelOffset} />
+						</label>
+					{/if}
 				</section>
 			{/if}
 
@@ -1064,6 +1082,16 @@ ${marks}  </g>
 					<span class="layer-dot" style="background: #FF2AA6"></span>
 					page boundary
 				</label>
+				{#if multi}
+					<label
+						class="toggle-row"
+						title="each frame's number next to it, in plottable single-stroke digits"
+					>
+						<input type="checkbox" bind:checked={layNumbers} />
+						<span class="layer-dot" style="background: #60739f"></span>
+						frame numbers
+					</label>
+				{/if}
 				<label
 					class="toggle-row extras-start"
 					title="strip the calibration block down to the cal-half and cal-pen layers, packed into the smallest possible rectangle"
