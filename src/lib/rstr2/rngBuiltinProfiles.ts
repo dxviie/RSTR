@@ -217,6 +217,10 @@ export const BUILT_IN_COPY_RNG_PROFILE: RngProfile = {
 		{
 			value: 'luma',
 			weight: 1
+		},
+		{
+			value: 'ink',
+			weight: 0
 		}
 	],
 	colors: {

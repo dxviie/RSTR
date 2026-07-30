@@ -213,7 +213,8 @@
 			<dt>channel</dt>
 			<dd>
 				Which part of the image drives the layer's ink: cyan / magenta / yellow (the print
-				channels), key / darkness, red / green / blue, or (inverted) luminance.
+				channels), key / darkness, red / green / blue, or (inverted) luminance. "Match pen color"
+				instead derives the channel from the layer's pen color.
 			</dd>
 			<dt>angle min / max</dt>
 			<dd>

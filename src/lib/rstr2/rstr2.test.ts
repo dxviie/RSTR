@@ -411,11 +411,61 @@ describe('extractChannel', () => {
 		);
 		expect(dark[0]).toBeCloseTo(0.8);
 	});
+
+	it('ink channel is hue-selective: pens ignore strongly mismatched patches', () => {
+		// cell 0: a saturated cyan patch, cell 1: a strong red patch
+		const rr = new Float32Array([0, 1]);
+		const gg = new Float32Array([1, 0.15]);
+		const bb = new Float32Array([1, 0.19]);
+		const redPen = extractChannel(rr, gg, bb, 'ink', '#D22730');
+		const bluePen = extractChannel(rr, gg, bb, 'ink', '#1F5FA8');
+		// the red pen inks the red patch, and all but skips the cyan one
+		expect(redPen[1]).toBeGreaterThan(0.9);
+		expect(redPen[0]).toBeLessThan(0.05);
+		// the blue pen takes real ink to the cyan patch — the pens divide the image
+		expect(bluePen[0]).toBeGreaterThan(0.3);
+	});
+
+	it('a gray ramp under a black pen reads as mean density', () => {
+		const v = new Float32Array([0.2, 0.5, 0.8]);
+		const out = extractChannel(v, v, v, 'ink', '#000000');
+		expect(out[0]).toBeCloseTo(0.8);
+		expect(out[1]).toBeCloseTo(0.5);
+		expect(out[2]).toBeCloseTo(0.2);
+	});
+
+	it('ink channel measures how much of the pen color a cell needs', () => {
+		// Octopus Blue Sloth, the default cyan pen
+		const [ir, ig, ib] = [0x1d / 255, 0x8c / 255, 0xba / 255];
+		const t = 0.4; // a 40% tint of the ink on white paper
+		const cells = (v: number) => new Float32Array([v, 1, 1 - t * (1 - v), 0]);
+		const out = extractChannel(cells(ir), cells(ig), cells(ib), 'ink', '#1D8CBA');
+		expect(out[0]).toBeCloseTo(1); // the ink color itself: full coverage
+		expect(out[1]).toBeCloseTo(0); // white paper: no ink
+		expect(out[2]).toBeCloseTo(t); // a 40% tint wants 40% coverage
+		expect(out[3]).toBeCloseTo(1); // black clamps to full coverage
+	});
+
+	it('a white pen never inks', () => {
+		expect(Array.from(extractChannel(r, g, b, 'ink', '#FFFFFF'))).toEqual([0, 0]);
+	});
+
+	it('an unparseable pen color separates like a black pen', () => {
+		expect(extractChannel(r, g, b, 'ink', 'not-a-hex')).toEqual(
+			extractChannel(r, g, b, 'ink', '#000000')
+		);
+	});
 });
 
 describe('layer persistence', () => {
 	it('round-trips the default CMY stack', () => {
 		const layers = defaultCmyLayers();
+		expect(parseStoredLayers(JSON.stringify(layers))).toEqual(layers);
+	});
+
+	it('round-trips a pen-matched (ink channel) layer', () => {
+		const layers = defaultCmyLayers();
+		layers[0].channel = 'ink';
 		expect(parseStoredLayers(JSON.stringify(layers))).toEqual(layers);
 	});
 

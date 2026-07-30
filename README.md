@@ -51,7 +51,7 @@ Each stage is wired to Svelte 5 runes as an independent `$effect` with its own d
 - **K-means** — 1-D k-means clustering on intensity. An adaptive posterize.
 - **SLIC** — localized k-means over `(x, y, intensity)` that carves the grid into compact, roughly cell-sized superpixels, then merges similar neighbours. Mosaic-like.
 
-**Layers** are the pen model. A layer is just data: an image channel (cyan / magenta / yellow / key / R / G / B / luminance) that drives its ink amount, plus a color, a hatch-angle range, and optional per-layer overrides of the global line settings. Each layer maps to one physical pen and becomes one `<g>` in the exported SVG. CMY is only the default stack.
+**Layers** are the pen model. A layer is just data: an image channel (cyan / magenta / yellow / key / R / G / B / luminance — or "match pen color", which hue-selectively separates against the layer's own ink color) that drives its ink amount, plus a color, a hatch-angle range, and optional per-layer overrides of the global line settings. Each layer maps to one physical pen and becomes one `<g>` in the exported SVG. CMY is only the default stack.
 
 **Hatching** fills each region's contours (holes included) with parallel lines whose spacing is driven by the region's mean ink, through a configurable gamma/boost curve. An ink threshold band acts as a low/high pass filter: regions below its low bound (too faint) or above its high bound (too dense) are left empty, so a band narrowed from both ends isolates the midtones. Each region picks its own angle within the layer's range based on its shape, so a single pen never looks mechanical.
 

@@ -110,7 +110,11 @@ export const CHANNEL_WEIGHTS: WeightedOption<LayerChannel>[] = [
 	{ value: 'r', weight: 1 },
 	{ value: 'g', weight: 1 },
 	{ value: 'b', weight: 1 },
-	{ value: 'luma', weight: 1 }
+	{ value: 'luma', weight: 1 },
+	// pen-matched separation — the channel follows the rolled ink color.
+	// Shipped at 0 (and listed last) so default rolls stay bit-identical;
+	// raise it in a custom rng profile to let the dice roll pen-matched layers.
+	{ value: 'ink', weight: 0 }
 ];
 
 // ─── sampling primitives ─────────────────────────────────────────────────────

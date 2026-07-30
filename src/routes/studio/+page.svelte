@@ -554,11 +554,14 @@
 	// per-layer mutations in the pinned Svelte 5 prerelease. The field lists
 	// stay deliberately narrow — segmentation only cares about channel/enabled
 	// (mapping tweaks must not retrigger the watershed), hatching about
-	// everything that shapes or colors the lines.
+	// everything that shapes or colors the lines. The one exception: a
+	// pen-matched ('ink') layer extracts FROM its color, so there color is a
+	// segmentation input too, not just a stroke style.
 	const trackSegLayerDeps = () => {
 		for (const layer of layers) {
 			void layer.channel;
 			void layer.enabled;
+			if (layer.channel === 'ink') void layer.color;
 		}
 	};
 	const trackHatchLayerDeps = () => {
@@ -626,7 +629,7 @@
 
 		for (const layer of layers) {
 			if (!layer.enabled) continue;
-			const values = extractChannel(grid.r, grid.g, grid.b, layer.channel);
+			const values = extractChannel(grid.r, grid.g, grid.b, layer.channel, layer.color);
 			const seg = segmentGrid(values, grid.cols, grid.rows, {
 				algorithm: params.algorithm,
 				tolerance: params.tolerance,
@@ -1322,7 +1325,13 @@
 		return layers
 			.filter((layer) => layer.enabled)
 			.map((layer) => {
-				const values = extractChannel(adjusted.r, adjusted.g, adjusted.b, layer.channel);
+				const values = extractChannel(
+					adjusted.r,
+					adjusted.g,
+					adjusted.b,
+					layer.channel,
+					layer.color
+				);
 				const seg = segmentGrid(values, adjusted.cols, adjusted.rows, {
 					algorithm: params.algorithm,
 					tolerance: params.tolerance,

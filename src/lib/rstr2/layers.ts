@@ -5,14 +5,14 @@
 // Each layer corresponds to one physical pen on the plotter. CMY is just the
 // default stack.
 
-export type LayerChannel = 'c' | 'm' | 'y' | 'k' | 'r' | 'g' | 'b' | 'luma' | 'luma-inv';
+export type LayerChannel = 'ink' | 'c' | 'm' | 'y' | 'k' | 'r' | 'g' | 'b' | 'luma' | 'luma-inv';
 
 export interface LayerConfig {
 	id: string;
 	name: string;
 	/** which image channel drives this layer's ink amount (0..1) */
 	channel: LayerChannel;
-	/** display + export stroke color */
+	/** display + export stroke color — the 'ink' channel also separates against it */
 	color: string;
 	/** hatch direction range in degrees — each region picks an angle in
 	 *  [angleMin, angleMax] based on its own shape */
@@ -38,6 +38,7 @@ export interface LayerConfig {
 }
 
 export const CHANNEL_LABELS: Record<LayerChannel, string> = {
+	ink: 'Match pen color',
 	c: 'Cyan (1-R)',
 	m: 'Magenta (1-G)',
 	y: 'Yellow (1-B)',
@@ -54,10 +55,15 @@ export const CHANNEL_LABELS: Record<LayerChannel, string> = {
  * r/g/b, and k/luma/luma-inv all track lightness — two channels on one axis
  * carry (nearly) the same separation, or its negative. The dice spreads a
  * stack across distinct axes first (see randomLayer in randomize.ts).
+ *
+ * 'ink' (match pen color) reads a color-dependent mix of the fixed axes, so
+ * it is its own axis: a pen-matched layer neither blocks nor aliases any of
+ * them, and the roll's taken-channel set already keeps it to one per stack.
  */
-export type ChannelAxis = 'red' | 'green' | 'blue' | 'lightness';
+export type ChannelAxis = 'red' | 'green' | 'blue' | 'lightness' | 'ink';
 
 export const CHANNEL_AXES: Record<LayerChannel, ChannelAxis> = {
+	ink: 'ink',
 	c: 'red',
 	r: 'red',
 	m: 'green',
@@ -72,7 +78,8 @@ export const CHANNEL_AXES: Record<LayerChannel, ChannelAxis> = {
 /**
  * Exact-negative channel pairs (v = 1 − inverse). Two layers holding both
  * sides of a pair ink to a constant between them — the pair carries the
- * information of one channel. k has no exact negative among the channels.
+ * information of one channel. k and ink have no exact negative among the
+ * channels.
  */
 export const CHANNEL_INVERSES: Partial<Record<LayerChannel, LayerChannel>> = {
 	c: 'r',
@@ -160,19 +167,70 @@ export const createLayer = (): LayerConfig => ({
 	enabled: true
 });
 
+/** #RGB / #RRGGBB (leading # optional) → [r, g, b] each 0..1, or null */
+const parseHexColor = (hex: string): [number, number, number] | null => {
+	const match = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex.trim());
+	if (!match) return null;
+	const digits = match[1];
+	const wide = digits.length === 6;
+	const part = (i: number): number =>
+		parseInt(wide ? digits.slice(i * 2, i * 2 + 2) : digits[i] + digits[i], 16) / 255;
+	return [part(0), part(1), part(2)];
+};
+
 /**
  * Extract the per-cell ink amount (0..1) for a channel from per-cell RGB
- * arrays (each 0..1).
+ * arrays (each 0..1). The 'ink' channel separates against `inkHex` — the
+ * layer's own pen color; the other channels ignore it.
  */
 export const extractChannel = (
 	r: Float32Array,
 	g: Float32Array,
 	b: Float32Array,
-	channel: LayerChannel
+	channel: LayerChannel,
+	inkHex?: string
 ): Float32Array => {
 	const n = r.length;
 	const values = new Float32Array(n);
 	switch (channel) {
+		case 'ink': {
+			// Hue-selective single-ink separation in density space (density
+			// D = 1 − RGB, pen density d = 1 − pen RGB): the least-squares
+			// amount of this ink, (D·d)/(d·d), weighted by how well the cell's
+			// density DIRECTION matches the pen's, cos²∠(D,d) — together
+			// a = (D·d)³ / ((d·d)² · (D·D)), clamped to 0..1.
+			//
+			// The bare projection alone is hue-blind where it matters: every
+			// saturated or dark cell needs ink from EVERY pen (and real inks'
+			// density vectors all sit near the gray axis), so swapping pens
+			// barely changed the picture. The cos² weight makes the pen color
+			// decide WHAT gets inked: hue-matched cells keep full strength,
+			// unrelated hues fall toward zero, neutrals split across the stack
+			// by how neutral each pen is. Along the pen's own hue nothing
+			// changes — a cell of the pen color still gets exactly 1 and a
+			// tint of it the tint fraction, which is the area coverage the
+			// 'coverage' spacing curve expects, so ink gamma and ink boost
+			// keep their meaning unchanged.
+			const [ir, ig, ib] = parseHexColor(inkHex ?? '') ?? [0, 0, 0];
+			const dr = 1 - ir;
+			const dg = 1 - ig;
+			const db = 1 - ib;
+			const dd = dr * dr + dg * dg + db * db;
+			// an (essentially) white pen can't rebuild anything — no ink at all
+			if (dd < 1e-4) break;
+			const inv = 1 / (dd * dd);
+			for (let i = 0; i < n; i++) {
+				const Dr = 1 - r[i];
+				const Dg = 1 - g[i];
+				const Db = 1 - b[i];
+				const dot = Dr * dr + Dg * dg + Db * db;
+				if (dot <= 0) continue; // white cell (or float noise): no ink
+				const DD = Dr * Dr + Dg * Dg + Db * Db;
+				const a = (dot * dot * dot * inv) / DD;
+				values[i] = a >= 1 ? 1 : a;
+			}
+			break;
+		}
 		case 'c':
 			for (let i = 0; i < n; i++) values[i] = 1 - r[i];
 			break;
