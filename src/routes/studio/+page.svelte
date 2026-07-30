@@ -364,6 +364,9 @@
 		if (!videoSrc) return;
 		const name = videoName;
 		const mediaError = videoEl?.error;
+		// a sequence export mid-flight is grabbing frames off this element —
+		// stop it at its next cancel check instead of letting it spin
+		exporting.cancel = true;
 		closeVideo();
 		const looksHevc = /\.(mov|qt|hevc)$/i.test(name);
 		inputError = {
@@ -384,9 +387,15 @@
 			}
 			const done = () => {
 				el.removeEventListener('seeked', done);
+				el.removeEventListener('error', done);
+				el.removeEventListener('emptied', done);
 				resolve();
 			};
 			el.addEventListener('seeked', done);
+			// a decode failure (or the source being torn down) mid-seek must not
+			// leave this promise — and the export loop awaiting it — hanging
+			el.addEventListener('error', done);
+			el.addEventListener('emptied', done);
 			el.currentTime = t;
 		});
 
@@ -1502,6 +1511,8 @@
 				if (exporting.cancel) return;
 				const frame = range.start + i;
 				await seekVideo(el, frameTime(frame, video.fps, videoDuration));
+				// the seek may have resolved on a decode error rather than a frame
+				if (exporting.cancel || el.error) return;
 				grabCtx.drawImage(el, 0, 0);
 				const px = grabCtx.getImageData(0, 0, grabCanvas.width, grabCanvas.height).data;
 				const exportLayers = computeExportLayers(px, grabCanvas.width, grabCanvas.height);
@@ -2196,6 +2207,21 @@
 			ondragleave={() => (dragActive = false)}
 			ondrop={onDrop}
 		>
+			{#snippet inputErrorContent(err: InputError)}
+				<p class="hint-title">{err.title}</p>
+				<p class="hint-sub">{err.detail}</p>
+				{#if err.convert}
+					<p class="hint-sub">
+						convert it to MP4 (H.264) or WebM and load that instead — QuickTime (file → export as…), <a
+							href="https://handbrake.fr"
+							target="_blank"
+							rel="noopener">HandBrake</a
+						>, or
+					</p>
+					<code class="hint-code">ffmpeg -i input.mov -c:v libx264 -pix_fmt yuv420p output.mp4</code
+					>
+				{/if}
+			{/snippet}
 			<canvas
 				bind:this={hatchCanvas}
 				class="render"
@@ -2216,18 +2242,7 @@
 				{:else if !videoSrc}
 					<div class="dropzone-hint" class:dropzone-error={inputError !== null}>
 						{#if inputError}
-							<p class="hint-title">{inputError.title}</p>
-							<p class="hint-sub">{inputError.detail}</p>
-							{#if inputError.convert}
-								<p class="hint-sub">
-									convert it to MP4 (H.264) or WebM and load that instead — QuickTime (file → export
-									as…), <a href="https://handbrake.fr" target="_blank" rel="noopener">HandBrake</a>,
-									or
-								</p>
-								<code class="hint-code"
-									>ffmpeg -i input.mov -c:v libx264 -pix_fmt yuv420p output.mp4</code
-								>
-							{/if}
+							{@render inputErrorContent(inputError)}
 							<p class="hint-sub">…or drop a different image or video here</p>
 						{:else}
 							<p class="hint-title">drop an image or video here</p>
@@ -2278,6 +2293,19 @@
 							videoDuration
 						).toFixed(2)}s
 					</div>
+				</div>
+			{/if}
+			{#if inputError && (showAdjustPreview || hatchReady || inputImage || videoSrc)}
+				<!-- the input died while something is still on stage (a video that
+				     decoded a few frames before failing leaves its last render up) —
+				     the empty-stage hint can't show, so float the error over it -->
+				<div class="input-error-card" role="alert">
+					<button
+						class="error-close"
+						onclick={() => (inputError = null)}
+						title="dismiss this message">×</button
+					>
+					{@render inputErrorContent(inputError)}
 				</div>
 			{/if}
 		</main>
@@ -3257,6 +3285,58 @@
 		border-radius: 4px;
 		user-select: all;
 		overflow-wrap: anywhere;
+	}
+
+	/* same overlay treatment as the timeline, anchored top instead of bottom */
+	.input-error-card {
+		position: absolute;
+		top: 0.75rem;
+		left: 50%;
+		transform: translateX(-50%);
+		z-index: 3;
+		max-width: min(34rem, calc(100% - 1.5rem));
+		padding: 0.7rem 2rem 0.8rem;
+		text-align: center;
+		border: 1px solid #e63946;
+		border-radius: 8px;
+		background: rgba(255, 255, 255, 0.92);
+		-webkit-backdrop-filter: blur(6px);
+		backdrop-filter: blur(6px);
+		box-shadow: 0 2px 6px rgba(96, 115, 159, 0.15);
+	}
+
+	.input-error-card .hint-title {
+		color: #e63946;
+		font-size: 0.95rem;
+		overflow-wrap: anywhere;
+	}
+
+	.input-error-card .hint-sub {
+		font-size: 0.78rem;
+	}
+
+	.input-error-card a {
+		color: inherit;
+	}
+
+	.error-close {
+		position: absolute;
+		top: 0.2rem;
+		right: 0.2rem;
+		width: 1.4rem;
+		height: 1.4rem;
+		padding: 0;
+		border: none;
+		background: none;
+		color: var(--muted);
+		font-family: 'mono-bold', monospace;
+		font-size: 0.9rem;
+		line-height: 1;
+		cursor: pointer;
+	}
+
+	.error-close:hover {
+		color: var(--ink);
 	}
 
 	/* ------------------------------------------------- image picker */
