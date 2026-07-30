@@ -95,6 +95,14 @@ describe('hersheyPathData', () => {
 		expect(hersheyPathData('x', 3).d).toBe('');
 		expect(hersheyPathData('x7', 3).width).toBeCloseTo(20 * (3 / 21));
 	});
+
+	it('trims the left side bearing so the ink starts exactly at x=0', () => {
+		const minX = (d: string) =>
+			Math.min(...[...d.matchAll(/[ML](-?[\d.]+) /g)].map((m) => parseFloat(m[1])));
+		// '1' carries a big built-in bearing, '42' a small one — both trim to 0
+		expect(minX(hersheyPathData('1', 3).d)).toBe(0);
+		expect(minX(hersheyPathData('42', 3).d)).toBe(0);
+	});
 });
 
 describe('outlineMarks', () => {

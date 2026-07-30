@@ -133,8 +133,12 @@
 	/** frame number cap height — fits the cell's bottom margin strip */
 	const labelH = $derived(Math.min(2.5, frameMargin * 0.55));
 	const showLabels = $derived(multi && labelH >= 0.7);
-	/** baseline of the frame number, local to the cell top-left */
+	/** baseline of the frame number, local to the cell top-left — centered
+	 *  in the bottom margin strip, leaving (margin − height)/2 below */
 	const labelBaseY = $derived(frameMargin + frameH + (frameMargin + labelH) / 2);
+	/** inset from the cell's left edge — the same distance the label keeps
+	 *  from the cell bottom, so both gaps read equal */
+	const labelInset = $derived((frameMargin - labelH) / 2);
 
 	const scale = $derived.by(() => {
 		const [pageW, pageH] = page;
@@ -472,7 +476,7 @@
 				if (showLabels) {
 					const { d } = hersheyPathData(frame.label, labelH);
 					if (d) {
-						html += `<path d="${d}" transform="translate(${cell.x + frameMargin},${cell.y + labelBaseY})"
+						html += `<path d="${d}" transform="translate(${cell.x + labelInset},${cell.y + labelBaseY})"
             fill="none" stroke="#60739f" stroke-width="0.3" stroke-linecap="round" stroke-linejoin="round"/>`;
 					}
 				}
@@ -812,7 +816,7 @@ ${layer.content}
 				const cell = cellPosition(grid, index);
 				const { d } = hersheyPathData(frame.label, labelH);
 				if (d) {
-					out += `    <path transform="translate(${(cell.x + frameMargin).toFixed(4)},${(cell.y + labelBaseY).toFixed(4)})" d="${d}"/>\n`;
+					out += `    <path transform="translate(${(cell.x + labelInset).toFixed(4)},${(cell.y + labelBaseY).toFixed(4)})" d="${d}"/>\n`;
 				}
 			}
 			out += `  </g>

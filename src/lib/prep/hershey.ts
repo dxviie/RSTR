@@ -109,25 +109,38 @@ const CAP_HEIGHT = 21;
 
 /**
  * Render `text` as single-stroke path data, `height` mm tall (cap height),
- * with the origin at the baseline's left end. Characters without a glyph are
- * skipped. Returns the path data and the advance width in mm.
+ * with the origin at the baseline's left end. The left side bearing is
+ * trimmed so the leftmost ink sits exactly on x=0 — placement insets are
+ * optically true, the way the baseline already is vertically. Characters
+ * without a glyph are skipped. Returns the path data and the advance
+ * width in mm.
  */
 export const hersheyPathData = (text: string, height: number): { d: string; width: number } => {
 	const s = height / CAP_HEIGHT;
 	const fmt = (n: number) => String(parseFloat(n.toFixed(3)));
-	let d = '';
+	const polylines: number[][] = [];
 	let cursor = 0;
+	let minX = Infinity;
 	for (const ch of text) {
 		const glyph = GLYPHS[ch];
 		if (!glyph) continue;
 		for (const stroke of glyph.strokes) {
+			const line: number[] = [];
 			for (let i = 0; i + 1 < stroke.length; i += 2) {
 				const x = cursor + stroke[i] * s;
-				const y = -stroke[i + 1] * s;
-				d += `${i === 0 ? 'M' : 'L'}${fmt(x)} ${fmt(y)}`;
+				minX = Math.min(minX, x);
+				line.push(x, -stroke[i + 1] * s);
 			}
+			polylines.push(line);
 		}
 		cursor += glyph.width * s;
+	}
+	if (polylines.length === 0) return { d: '', width: cursor };
+	let d = '';
+	for (const line of polylines) {
+		for (let i = 0; i + 1 < line.length; i += 2) {
+			d += `${i === 0 ? 'M' : 'L'}${fmt(line[i] - minX)} ${fmt(line[i + 1])}`;
+		}
 	}
 	return { d, width: cursor };
 };
