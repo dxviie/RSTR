@@ -85,6 +85,16 @@
 			</dd>
 			<dt>input thumbnail</dt>
 			<dd>Hold it down to peek at the input with the adjustments below applied.</dd>
+			<dt>crop / reposition</dt>
+			<dd>
+				Zoom in on the interesting part by manipulating the input right on the render: drag to move
+				it, scroll to zoom on the cursor (a trackpad pinch works too), alt/⌥ + scroll to rotate — on
+				a touch screen, drag, pinch and twist with two fingers while one finger keeps scrolling the
+				page. While you're reframing, the input shows with a composition grid; let go and the lines
+				recompute for the new framing, which also carries into every export (a video keeps one
+				framing across all its frames). Double-click the render — or the
+				<em>⛶ full image</em> chip that appears — to get the whole picture back.
+			</dd>
 			<dt>brightness / contrast</dt>
 			<dd>Brighten or darken the image, and push contrast around mid grey, before segmentation.</dd>
 			<dt>gamma / key</dt>

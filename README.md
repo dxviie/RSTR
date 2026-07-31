@@ -14,16 +14,16 @@ RSTR splits a picture into regions of similar tone and refills each one with par
 
 ![The RSTR studio, its sections outlined and numbered](static/help/studio-sections.webp)
 
-| #   | Section          | What it does                                                                                                                       |
-| --- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | **image**        | Load a picture or video and tune it (brightness, contrast, gamma, saturation, vibrance) before tracing.                            |
-| 2   | **video**        | Frame rate and export window — shown while a video is loaded.                                                                      |
-| 3   | **segmentation** | How the image is carved into tonal regions (watershed, posterize, k-means, SLIC).                                                  |
-| 4   | **lines**        | Pen width, the ink threshold band (low/high pass), how ink intensity turns into line spacing — and the optional hand-drawn wobble. |
-| 5   | **presets**      | Randomize everything, or save and share complete looks as JSON.                                                                    |
-| 6   | **layers**       | One pen per layer: color, image channel, hatch angles, per-layer overrides.                                                        |
-| 7   | **export**       | Output width (or fit-to-page A6–A3 with a margin) and the SVG / PNG / frame-sequence downloads.                                    |
-| 8   | **stats**        | Render numbers and the estimated plot time.                                                                                        |
+| #   | Section          | What it does                                                                                                                                                         |
+| --- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **image**        | Load a picture or video, crop/reposition it right on the render (drag, zoom, rotate) and tune it (brightness, contrast, gamma, saturation, vibrance) before tracing. |
+| 2   | **video**        | Frame rate and export window — shown while a video is loaded.                                                                                                        |
+| 3   | **segmentation** | How the image is carved into tonal regions (watershed, posterize, k-means, SLIC).                                                                                    |
+| 4   | **lines**        | Pen width, the ink threshold band (low/high pass), how ink intensity turns into line spacing — and the optional hand-drawn wobble.                                   |
+| 5   | **presets**      | Randomize everything, or save and share complete looks as JSON.                                                                                                      |
+| 6   | **layers**       | One pen per layer: color, image channel, hatch angles, per-layer overrides.                                                                                          |
+| 7   | **export**       | Output width (or fit-to-page A6–A3 with a margin) and the SVG / PNG / frame-sequence downloads.                                                                      |
+| 8   | **stats**        | Render numbers and the estimated plot time.                                                                                                                          |
 
 > This README covers **how RSTR is built**. For what each setting _does_, see the [help page](https://rstr.d17e.dev/help) (`src/routes/(site)/help/+page.svelte`) — it mirrors the in-app tooltips.
 
@@ -34,7 +34,8 @@ RSTR splits a picture into regions of similar tone and refills each one with par
 RSTR is a fully client-side image pipeline. An image (or a single video frame) flows through a chain of stages, each one a self-contained function over flat typed arrays:
 
 ```
-image → pixels → cell grid → color adjust → per-layer channel extract
+image → crop/reposition view (drag · zoom · rotate on the render)
+      → pixels → cell grid → color adjust → per-layer channel extract
       → segmentation (watershed | posterize | k-means | SLIC)
       → region geometry (contour tracing, holes included)
       → hatching (ink-driven line spacing per region)
@@ -69,6 +70,7 @@ The engine (`src/lib/rstr2/`) is pure TypeScript with no framework imports, so i
 
 | File                                                                              | Responsibility                                                                                                                                                                                                                       |
 | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `viewTransform.ts`                                                                | The crop/reposition view: pan/zoom/rotate math behind the stage gestures, applied where source pixels are extracted.                                                                                                                 |
 | `grid.ts`                                                                         | Downsample the source image to the working cell grid.                                                                                                                                                                                |
 | `imageAdjust.ts`                                                                  | Brightness / contrast / gamma / saturation / vibrance.                                                                                                                                                                               |
 | `segmentation.ts`                                                                 | Watershed / posterize / k-means / SLIC + shared post-processing.                                                                                                                                                                     |

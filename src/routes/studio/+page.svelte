@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { flushSync } from 'svelte';
 	import DualRangeInput from '@stanko/dual-range-input';
 	import '@stanko/dual-range-input/dist/index.css';
 	import { inkRange } from '$lib/inkRange';
@@ -65,6 +66,17 @@
 		VIDEO_STORAGE_KEY,
 		type VideoExportConfig
 	} from '$lib/rstr2/video';
+	import {
+		applyGesture,
+		gestureBetween,
+		identityView,
+		isIdentityView,
+		snapAngle,
+		viewMatrix,
+		viewRotationDeg,
+		type InputView,
+		type Point
+	} from '$lib/rstr2/viewTransform';
 	import { buildZip, type ZipEntry } from '$lib/rstr2/zip';
 	import { buildExportName } from '$lib/rstr2/exportName';
 	import { pageDims, type PageId } from '$lib/prep/pages';
@@ -219,6 +231,25 @@
 	};
 	const releasePreview = () => (previewHeld = false);
 
+	// Crop / reposition of the input inside its frame — drag, zoom and rotate
+	// on the stage. In-memory only and reset with every new source; scrubbing
+	// a video keeps it, so all frames of a sequence share the framing.
+	const view: InputView = $state(identityView());
+	const viewIsIdentity = $derived(isIdentityView(view));
+	// the current source drawable (image element or the video element), kept
+	// outside $state so gestures and re-extraction can draw it at will
+	let sourceEl: HTMLImageElement | HTMLVideoElement | null = null;
+	let stageEl: HTMLElement | undefined = $state();
+	let cropCanvas: HTMLCanvasElement | undefined = $state();
+	// a crop gesture is in flight right now (pointers down / recent wheel)
+	let cropActive = $state(false);
+	// pixels were re-extracted for a new view and the hatch render hasn't
+	// caught up — keep the crop preview up instead of the stale render
+	let cropPending = $state(false);
+	// like the adjust preview: while the user reframes, the stage shows the
+	// (transformed) source instead of the not-yet-recomputed hatch render
+	const showCropPreview = $derived((cropActive || cropPending) && !showAdjustPreview);
+
 	const status = $state({ busy: false, segMs: 0, hatchMs: 0, regions: 0, lines: 0 });
 
 	const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
@@ -323,6 +354,9 @@
 		videoName = '';
 		videoDuration = 0;
 		currentFrame = 0;
+		// the video element unmounts with videoSrc — nothing to draw from
+		if (sourceEl instanceof HTMLVideoElement) sourceEl = null;
+		resetViewState();
 	};
 
 	const onVideoMetadata = () => {
@@ -417,16 +451,10 @@
 		await seekVideo(el, frameTime(frame, video.fps, videoDuration));
 		// bail if outrun by a newer grab or the video was swapped for an image
 		if (token !== grabToken || !videoSrc || !el.videoWidth) return;
-		const canvas = document.createElement('canvas');
-		canvas.width = el.videoWidth;
-		canvas.height = el.videoHeight;
-		const ctx = canvas.getContext('2d');
-		if (!ctx) return;
-		ctx.drawImage(el, 0, 0);
-		imgWidth = canvas.width;
-		imgHeight = canvas.height;
-		pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-		previewBase = buildPreviewBase(canvas, canvas.width, canvas.height);
+		sourceEl = el;
+		imgWidth = el.videoWidth;
+		imgHeight = el.videoHeight;
+		extractSourcePixels();
 	};
 
 	// keep the playhead and the start offset inside the video when the fps
@@ -486,10 +514,327 @@
 	});
 
 	//***************************************************************
+	// 												CROP / REPOSITION
+	//***************************************************************
+
+	// Conventional direct manipulation on the stage: drag pans, the wheel (or
+	// a trackpad pinch, which browsers report as ctrl+wheel) zooms on the
+	// cursor, ⌥+wheel rotates, a double-click resets; on touch, two fingers
+	// drag / pinch / twist while one finger stays with the page scroll. The
+	// hatch render is far too slow to follow a gesture, so while one is in
+	// flight the stage shows the reframed source instead (same pattern as the
+	// adjust preview) and the pipeline re-runs from the committed view.
+
+	const VIEW_WHEEL_ZOOM = 0.0015; // zoom feel per wheel px
+	const VIEW_PINCH_ZOOM = 0.008; // trackpad pinches report far smaller deltas
+	const VIEW_WHEEL_ROTATE = 0.002; // ⌥+wheel, radians per wheel px
+	const VIEW_COMMIT_MS = 180; // wheel silence before the pipeline re-runs
+
+	// client coords by pointerId — gesture bookkeeping only, nothing renders
+	// from it, so a plain Map avoids reactive overhead on every pointermove
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity
+	const activePointers = new Map<number, Point>();
+	let gestureEngaged = $state(false); // an actual pan/pinch is in flight (not a mere click)
+	let touchRawRotation = 0; // unsnapped angle accumulator for the touch gesture
+	let cropIdleTimer: ReturnType<typeof setTimeout> | undefined;
+	let cropRaf = 0;
+
+	// a crop belongs to the content it framed — new sources start over
+	const resetViewState = () => {
+		Object.assign(view, identityView());
+		cropActive = false;
+		cropPending = false;
+		gestureEngaged = false;
+		activePointers.clear();
+	};
+
+	// reused pixel-extraction canvas — the source drawn into its frame
+	let frameCanvas: HTMLCanvasElement | null = null;
+
+	/**
+	 * (Re)read the working pixels: the source drawn into its frame through
+	 * the current view, white-backed so off-frame area reads as bare paper.
+	 * The single entry point an image load, a video frame grab and every
+	 * crop gesture funnel through.
+	 */
+	const extractSourcePixels = () => {
+		const src = sourceEl;
+		const w = imgWidth;
+		const h = imgHeight;
+		if (!src || !w || !h) return;
+		frameCanvas ??= document.createElement('canvas');
+		if (frameCanvas.width !== w) frameCanvas.width = w;
+		if (frameCanvas.height !== h) frameCanvas.height = h;
+		const ctx = frameCanvas.getContext('2d', { willReadFrequently: true });
+		if (!ctx) return;
+		ctx.setTransform(1, 0, 0, 1, 0, 0);
+		ctx.fillStyle = '#fff';
+		ctx.fillRect(0, 0, w, h);
+		const m = viewMatrix(view, w, h);
+		ctx.setTransform(m.a, m.b, m.c, m.d, m.e, m.f);
+		ctx.drawImage(src, 0, 0, w, h);
+		ctx.setTransform(1, 0, 0, 1, 0, 0);
+		pixels = ctx.getImageData(0, 0, w, h).data;
+		previewBase = buildPreviewBase(frameCanvas, w, h);
+	};
+
+	/** live view of the reframed source on the stage while a gesture runs */
+	const drawCropPreview = (withGrid: boolean) => {
+		const canvas = cropCanvas;
+		const src = sourceEl;
+		if (!canvas || !src || !imgWidth || !canvas.width) return;
+		const ctx = canvas.getContext('2d');
+		if (!ctx) return;
+		const w = canvas.width;
+		const h = canvas.height;
+		ctx.setTransform(1, 0, 0, 1, 0, 0);
+		ctx.fillStyle = '#FFFEF7'; // the render's warm paper white
+		ctx.fillRect(0, 0, w, h);
+		const m = viewMatrix(view, imgWidth, imgHeight, w / imgWidth);
+		ctx.setTransform(m.a, m.b, m.c, m.d, m.e, m.f);
+		ctx.drawImage(src, 0, 0, imgWidth, imgHeight);
+		ctx.setTransform(1, 0, 0, 1, 0, 0);
+		if (!withGrid) return;
+		// rule-of-thirds composition grid while the hands are on the image
+		const line = Math.max(1, w / 600);
+		ctx.lineWidth = line;
+		ctx.strokeStyle = 'rgba(26, 32, 44, 0.3)';
+		ctx.beginPath();
+		for (const t of [1 / 3, 2 / 3]) {
+			ctx.moveTo(w * t, 0);
+			ctx.lineTo(w * t, h);
+			ctx.moveTo(0, h * t);
+			ctx.lineTo(w, h * t);
+		}
+		ctx.stroke();
+		ctx.strokeRect(line / 2, line / 2, w - line, h - line);
+	};
+
+	/** client coords -> frame coords, via the crop canvas's on-screen box */
+	const clientToFrame = (clientX: number, clientY: number): Point | null => {
+		const el = cropCanvas;
+		if (!el || !imgWidth) return null;
+		const rect = el.getBoundingClientRect();
+		if (!rect.width || !rect.height) return null;
+		return {
+			x: ((clientX - rect.left) / rect.width) * imgWidth,
+			y: ((clientY - rect.top) / rect.height) * imgHeight
+		};
+	};
+
+	const engageCrop = () => {
+		if (cropActive) return;
+		cropActive = true;
+		// the crop canvas must be laid out before clientToFrame can measure it
+		flushSync();
+		drawCropPreview(true);
+	};
+
+	const scheduleCropDraw = () => {
+		if (cropRaf) return;
+		cropRaf = requestAnimationFrame(() => {
+			cropRaf = 0;
+			drawCropPreview(true);
+		});
+	};
+
+	// gesture over -> reframed pixels into the pipeline; the gridless crop
+	// preview stays parked (cropPending) until the fresh render lands
+	const commitView = () => {
+		clearTimeout(cropIdleTimer);
+		cropPending = true;
+		cropActive = false;
+		extractSourcePixels();
+		drawCropPreview(false);
+	};
+
+	const resetView = () => {
+		if (viewIsIdentity) return;
+		Object.assign(view, identityView());
+		gestureEngaged = false;
+		commitView();
+	};
+
+	/** overlays on the stage (timeline, chips…) keep their own interactions */
+	const gestureTarget = (event: Event): boolean => {
+		const target = event.target as HTMLElement | null;
+		return !target?.closest('button, input, select, a, .timeline, .input-error-card');
+	};
+
+	const onStagePointerDown = (event: PointerEvent) => {
+		if (!sourceEl || !imgWidth || !gestureTarget(event)) return;
+		if (event.pointerType === 'mouse' && event.button !== 0) return;
+		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+		activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+		clearTimeout(cropIdleTimer);
+		// two fingers engage immediately; mouse/pen wait for a real move so a
+		// plain click stays a click. One finger alone belongs to page scroll.
+		if (activePointers.size === 2) {
+			touchRawRotation = view.rotation;
+			gestureEngaged = true;
+			engageCrop();
+		}
+	};
+
+	const onStagePointerMove = (event: PointerEvent) => {
+		const prev = activePointers.get(event.pointerId);
+		if (!prev) return;
+		const cur = { x: event.clientX, y: event.clientY };
+
+		if (activePointers.size >= 2) {
+			// two fingers: pan + pinch zoom + twist in one similarity step
+			const other = [...activePointers.entries()].find(([id]) => id !== event.pointerId);
+			if (!other) return;
+			activePointers.set(event.pointerId, cur);
+			const a0 = clientToFrame(prev.x, prev.y);
+			const b0 = clientToFrame(other[1].x, other[1].y);
+			const a1 = clientToFrame(cur.x, cur.y);
+			if (!a0 || !b0 || !a1) return;
+			const delta = gestureBetween(a0, b0, a1, b0);
+			const next = applyGesture(view, delta, imgWidth, imgHeight);
+			// touch rotation snaps near the quarter turns, but the raw angle
+			// keeps accumulating so a deliberate tilt can escape the snap
+			touchRawRotation += delta.dphi;
+			next.rotation = snapAngle(touchRawRotation);
+			Object.assign(view, next);
+			scheduleCropDraw();
+			return;
+		}
+
+		if (event.pointerType === 'touch') {
+			// single finger: the page keeps scrolling; just track it so a
+			// second finger can turn the pair into a pinch
+			activePointers.set(event.pointerId, cur);
+			return;
+		}
+		if (!gestureEngaged && Math.hypot(cur.x - prev.x, cur.y - prev.y) < 2) return;
+		if (!gestureEngaged) {
+			gestureEngaged = true;
+			engageCrop();
+		}
+		activePointers.set(event.pointerId, cur);
+		const from = clientToFrame(prev.x, prev.y);
+		const to = clientToFrame(cur.x, cur.y);
+		if (!from || !to) return;
+		Object.assign(view, applyGesture(view, { k: 1, dphi: 0, from, to }, imgWidth, imgHeight));
+		scheduleCropDraw();
+	};
+
+	const onStagePointerUp = (event: PointerEvent) => {
+		if (!activePointers.delete(event.pointerId)) return;
+		const ended =
+			event.pointerType === 'touch' ? activePointers.size < 2 : activePointers.size === 0;
+		if (ended && gestureEngaged) {
+			gestureEngaged = false;
+			commitView();
+		}
+	};
+
+	const onStageDblClick = (event: MouseEvent) => {
+		if (!sourceEl || viewIsIdentity || !gestureTarget(event)) return;
+		event.preventDefault();
+		resetView();
+	};
+
+	const onStageWheel = (event: WheelEvent) => {
+		if (!sourceEl || !imgWidth || !gestureTarget(event)) return;
+		const pinch = event.ctrlKey || event.metaKey;
+		// in the stacked mobile layout the wheel belongs to the page scroll —
+		// zooming there needs ctrl/cmd (a trackpad pinch reports exactly that)
+		if (!pinch && !event.altKey && window.matchMedia('(max-width: 900px)').matches) return;
+		event.preventDefault();
+		// normalize line/page delta modes to px-ish units
+		const raw = event.deltaY !== 0 ? event.deltaY : event.deltaX;
+		const delta = event.deltaMode === 1 ? raw * 40 : event.deltaMode === 2 ? raw * 400 : raw;
+		engageCrop();
+		if (event.altKey && !pinch) {
+			// ⌥ + wheel turns the image around the frame center
+			const c = { x: imgWidth / 2, y: imgHeight / 2 };
+			const dphi = -delta * VIEW_WHEEL_ROTATE;
+			Object.assign(view, applyGesture(view, { k: 1, dphi, from: c, to: c }, imgWidth, imgHeight));
+		} else {
+			const q = clientToFrame(event.clientX, event.clientY);
+			if (!q) return;
+			const k = Math.exp(-delta * (pinch ? VIEW_PINCH_ZOOM : VIEW_WHEEL_ZOOM));
+			Object.assign(view, applyGesture(view, { k, dphi: 0, from: q, to: q }, imgWidth, imgHeight));
+		}
+		scheduleCropDraw();
+		clearTimeout(cropIdleTimer);
+		cropIdleTimer = setTimeout(commitView, VIEW_COMMIT_MS);
+	};
+
+	// Safari-only trackpad pinch/rotate events; other browsers surface
+	// pinches as ctrl+wheel. Guarded to stay out of the way when a two-finger
+	// touch gesture (which Safari mirrors as gesture events too) owns the
+	// screen. TS has no GestureEvent type — shape it locally.
+	interface SafariGestureEvent extends Event {
+		scale: number;
+		rotation: number;
+		clientX: number;
+		clientY: number;
+	}
+
+	// Native listeners: Svelte marks wheel/touch handlers passive, and these
+	// must preventDefault — wheel to keep the page/browser zoom still, touch
+	// to keep a two-finger gesture from becoming a browser pinch-zoom while
+	// single-finger page scrolling stays untouched.
+	$effect(() => {
+		const stage = stageEl;
+		if (!stage) return;
+		const onTouch = (event: TouchEvent) => {
+			if (event.touches.length >= 2 && sourceEl && gestureTarget(event)) event.preventDefault();
+		};
+		let lastScale = 1;
+		let lastRotation = 0;
+		const onGestureStart = (event: Event) => {
+			event.preventDefault();
+			lastScale = 1;
+			lastRotation = 0;
+			if (!sourceEl || activePointers.size > 0 || !gestureTarget(event)) return;
+			engageCrop();
+		};
+		const onGestureChange = (event: Event) => {
+			event.preventDefault();
+			if (!sourceEl || !imgWidth || activePointers.size > 0 || !gestureTarget(event)) return;
+			const g = event as SafariGestureEvent;
+			const q = clientToFrame(g.clientX, g.clientY) ?? { x: imgWidth / 2, y: imgHeight / 2 };
+			const k = g.scale / lastScale;
+			const dphi = ((g.rotation - lastRotation) * Math.PI) / 180;
+			lastScale = g.scale;
+			lastRotation = g.rotation;
+			Object.assign(view, applyGesture(view, { k, dphi, from: q, to: q }, imgWidth, imgHeight));
+			scheduleCropDraw();
+			clearTimeout(cropIdleTimer);
+			cropIdleTimer = setTimeout(commitView, VIEW_COMMIT_MS);
+		};
+		stage.addEventListener('wheel', onStageWheel, { passive: false });
+		stage.addEventListener('touchstart', onTouch, { passive: false });
+		stage.addEventListener('touchmove', onTouch, { passive: false });
+		stage.addEventListener('gesturestart', onGestureStart);
+		stage.addEventListener('gesturechange', onGestureChange);
+		return () => {
+			stage.removeEventListener('wheel', onStageWheel);
+			stage.removeEventListener('touchstart', onTouch);
+			stage.removeEventListener('touchmove', onTouch);
+			stage.removeEventListener('gesturestart', onGestureStart);
+			stage.removeEventListener('gesturechange', onGestureChange);
+		};
+	});
+
+	const viewBadge = $derived.by(() => {
+		const zoom = `${view.scale >= 10 ? view.scale.toFixed(0) : view.scale.toFixed(1)}×`;
+		const deg = Math.round(viewRotationDeg(view));
+		return deg === 0 ? zoom : `${zoom} ∠${deg}°`;
+	});
+
+	const CROP_TIP =
+		'reframe the input: drag to move · scroll to zoom · ⌥ scroll to rotate · double-click for the full image — on touch, drag/pinch/twist with two fingers';
+
+	//***************************************************************
 	// 														PIPELINE
 	//***************************************************************
 
-	// 1. image -> pixels (+ downscaled float copy for the adjust preview)
+	// 1. image -> source drawable + pixels (through the crop view)
 	$effect(() => {
 		const src = inputImage;
 		if (!src || typeof window === 'undefined') return;
@@ -498,16 +843,11 @@
 		img.onload = () => {
 			// a newer source (another image, or a video frame) won the race
 			if (inputImage !== src) return;
-			const canvas = document.createElement('canvas');
-			canvas.width = img.width;
-			canvas.height = img.height;
-			const ctx = canvas.getContext('2d');
-			if (!ctx) return;
-			ctx.drawImage(img, 0, 0);
+			resetViewState();
+			sourceEl = img;
 			imgWidth = img.width;
 			imgHeight = img.height;
-			pixels = ctx.getImageData(0, 0, img.width, img.height).data;
-			previewBase = buildPreviewBase(img, img.width, img.height);
+			extractSourcePixels();
 		};
 		img.src = src;
 	});
@@ -831,6 +1171,9 @@
 		}
 
 		hatchReady = true;
+		// this render reflects the latest committed view — the parked crop
+		// preview (if any) can hand back to it
+		cropPending = false;
 		status.hatchMs = performance.now() - t0;
 		status.lines = totalLines;
 	};
@@ -1505,6 +1848,9 @@
 		grabCanvas.width = el.videoWidth;
 		grabCanvas.height = el.videoHeight;
 		const grabCtx = grabCanvas.getContext('2d', { willReadFrequently: true });
+		// every frame goes through the crop view the preview shows, snapshot
+		// once so a mid-export gesture can't shear the sequence
+		const frameView = viewMatrix({ ...view }, grabCanvas.width, grabCanvas.height);
 		try {
 			if (!grabCtx) return;
 			for (let i = 0; i < range.count; i++) {
@@ -1513,7 +1859,19 @@
 				await seekVideo(el, frameTime(frame, video.fps, videoDuration));
 				// the seek may have resolved on a decode error rather than a frame
 				if (exporting.cancel || el.error) return;
-				grabCtx.drawImage(el, 0, 0);
+				grabCtx.setTransform(1, 0, 0, 1, 0, 0);
+				grabCtx.fillStyle = '#fff';
+				grabCtx.fillRect(0, 0, grabCanvas.width, grabCanvas.height);
+				grabCtx.setTransform(
+					frameView.a,
+					frameView.b,
+					frameView.c,
+					frameView.d,
+					frameView.e,
+					frameView.f
+				);
+				grabCtx.drawImage(el, 0, 0, grabCanvas.width, grabCanvas.height);
+				grabCtx.setTransform(1, 0, 0, 1, 0, 0);
 				const px = grabCtx.getImageData(0, 0, grabCanvas.width, grabCanvas.height).data;
 				const exportLayers = computeExportLayers(px, grabCanvas.width, grabCanvas.height);
 				const name = `frame-${String(frame).padStart(5, '0')}`;
@@ -2197,8 +2555,10 @@
 			STAGE — the render is the centerpiece
 		-------------------------------------------------------------->
 		<main
+			bind:this={stageEl}
 			class="stage"
 			class:drag-active={dragActive}
+			class:panning={gestureEngaged}
 			style={`--stage-aspect: ${imgWidth && imgHeight ? imgHeight / imgWidth : 0.75}`}
 			ondragover={(event) => {
 				event.preventDefault();
@@ -2206,6 +2566,11 @@
 			}}
 			ondragleave={() => (dragActive = false)}
 			ondrop={onDrop}
+			onpointerdown={onStagePointerDown}
+			onpointermove={onStagePointerMove}
+			onpointerup={onStagePointerUp}
+			onpointercancel={onStagePointerUp}
+			ondblclick={onStageDblClick}
 		>
 			{#snippet inputErrorContent(err: InputError)}
 				<p class="hint-title">{err.title}</p>
@@ -2225,10 +2590,11 @@
 			{/snippet}
 			<canvas
 				bind:this={hatchCanvas}
-				class="render"
-				class:hidden={!hatchReady || showAdjustPreview}
+				class="render grabbable"
+				class:hidden={!hatchReady || showAdjustPreview || showCropPreview}
 				width={imgWidth}
 				height={imgHeight}
+				title={CROP_TIP}
 			></canvas>
 			<canvas
 				bind:this={adjustCanvas}
@@ -2237,9 +2603,23 @@
 				width={previewBase?.w ?? 0}
 				height={previewBase?.h ?? 0}
 			></canvas>
-			{#if !showAdjustPreview && !hatchReady}
+			<canvas
+				bind:this={cropCanvas}
+				class="render grabbable"
+				class:hidden={!showCropPreview}
+				width={imgWidth}
+				height={imgHeight}
+				title={CROP_TIP}
+			></canvas>
+			{#if !showAdjustPreview && !showCropPreview && !hatchReady}
 				{#if inputImage}
-					<img class="render placeholder" src={inputImage} alt="input" />
+					<img
+						class="render placeholder grabbable"
+						src={inputImage}
+						alt="input"
+						title={CROP_TIP}
+						draggable="false"
+					/>
 				{:else if !videoSrc}
 					<div class="dropzone-hint" class:dropzone-error={inputError !== null}>
 						{#if inputError}
@@ -2295,6 +2675,15 @@
 						).toFixed(2)}s
 					</div>
 				</div>
+			{/if}
+			{#if !viewIsIdentity}
+				<button
+					class="view-reset"
+					onclick={resetView}
+					title="the input is reframed ({viewBadge}) — click to go back to the full image (double-clicking the render does the same)"
+				>
+					⛶ full image <span class="view-badge">{viewBadge}</span>
+				</button>
 			{/if}
 			{#if inputError && (showAdjustPreview || hatchReady || inputImage || videoSrc)}
 				<!-- the input died while something is still on stage (a video that
@@ -3214,6 +3603,10 @@
 		justify-content: center;
 		padding: 0.75rem;
 		overflow: hidden;
+		/* keep one-finger page scrolling and drop only double-tap zoom, so a
+		   double-tap can reset the crop; two-finger crop gestures are claimed
+		   in JS (non-passive touchstart) before the browser pinch-zooms */
+		touch-action: manipulation;
 	}
 
 	.stage.drag-active {
@@ -3239,6 +3632,41 @@
 	.render.placeholder {
 		border-radius: 0;
 		opacity: 0.9;
+	}
+
+	/* the render is directly manipulable — grab it to reframe the input */
+	.render.grabbable {
+		cursor: grab;
+	}
+
+	.stage.panning,
+	.stage.panning .render.grabbable {
+		cursor: grabbing;
+	}
+
+	/* shows only while the input is reframed — jump back to the full image */
+	.view-reset {
+		position: absolute;
+		top: 1rem;
+		right: 1rem;
+		z-index: 2;
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		padding: 0.35rem 0.6rem;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: rgba(255, 255, 255, 0.88);
+		-webkit-backdrop-filter: blur(6px);
+		backdrop-filter: blur(6px);
+		box-shadow: 0 2px 6px rgba(96, 115, 159, 0.15);
+		color: var(--ink);
+		cursor: pointer;
+	}
+
+	.view-badge {
+		font-family: 'mono-light', monospace;
+		color: var(--muted);
 	}
 
 	.dropzone-hint {
