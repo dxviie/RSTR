@@ -3685,7 +3685,7 @@
 					</ul>
 					<p class="order-note">
 						quickest fix: apply a built-in preset (or roll the dice with “stick to built-in presets”
-						on), use “fit on page” up to A3 — then order away.
+						on), pick an output format up to A3 (or keep the width within one) — then order away.
 					</p>
 					<div class="order-actions">
 						<button onclick={closeOrderDialog}>got it</button>
@@ -3866,6 +3866,10 @@
 		   double-tap can reset the crop; two-finger crop gestures are claimed
 		   in JS (non-passive touchstart) before the browser pinch-zooms */
 		touch-action: manipulation;
+		/* size container so the render surfaces below can contain-fit the
+		   available space (cqw/cqh measure the content box, padding already
+		   excluded); the stage's own size never depends on its contents */
+		container-type: size;
 	}
 
 	.stage.drag-active {
@@ -3882,6 +3886,21 @@
 		box-shadow:
 			0 2px 6px rgba(96, 115, 159, 0.25),
 			0 8px 24px rgba(96, 115, 159, 0.2);
+	}
+
+	/* Fill the stage: without this, a small input sits at its native pixel
+	   size in a sea of empty stage (max-width/height only ever shrink).
+	   Contain-fit against the stage's content box instead, upscaling small
+	   sources too. Sizing the element itself (height keeps the intrinsic
+	   ratio) — rather than object-fit letterboxing — keeps the element box
+	   equal to the visible render, so the paper shadow hugs it and the crop
+	   gestures' clientToFrame mapping stays a plain rect scale. */
+	@supports (width: 1cqh) {
+		.render {
+			max-width: none;
+			max-height: none;
+			width: min(100cqw, calc(100cqh / var(--stage-aspect, 0.75)));
+		}
 	}
 
 	.render.hidden {
