@@ -3,9 +3,12 @@
 // extracted so everything downstream (grid, segmentation, hatching, preview
 // and every export) sees only the reframed picture.
 //
-// The frame is the source's own w×h rectangle; the view maps source pixels
-// into it. Scale and rotation act around the frame center, then the offset
-// shifts the result. The identity view is the image exactly as loaded.
+// The view maps source pixels into a frame. Without an output format the
+// frame is the source's own w×h rectangle and the identity view is the image
+// exactly as loaded; with a format active the frame takes the page's aspect
+// and the default view becomes containView — the source fitted inside the
+// drawable area. Scale and rotation act around the frame center, then the
+// offset shifts the result.
 
 export interface InputView {
 	/** frame-space offset of the image, in source px */
@@ -30,6 +33,39 @@ export const identityView = (): InputView => ({ x: 0, y: 0, scale: 1, rotation: 
 
 export const isIdentityView = (view: InputView): boolean =>
 	view.x === 0 && view.y === 0 && view.scale === 1 && view.rotation === 0;
+
+/** exact-field compare — default views are assigned verbatim, so this is safe */
+export const viewsEqual = (a: InputView, b: InputView): boolean =>
+	a.x === b.x && a.y === b.y && a.scale === b.scale && a.rotation === b.rotation;
+
+/**
+ * The view that fits a srcW×srcH source inside a frameW×frameH frame with
+ * `insetPx` kept clear on every edge, centered and unrotated — the natural
+ * starting composition when an output format reframes the input.
+ */
+export const containView = (
+	srcW: number,
+	srcH: number,
+	frameW: number,
+	frameH: number,
+	insetPx = 0
+): InputView => {
+	if (!srcW || !srcH || !frameW || !frameH) return identityView();
+	const availW = Math.max(frameW - 2 * insetPx, frameW * 0.1);
+	const availH = Math.max(frameH - 2 * insetPx, frameH * 0.1);
+	const scale = Math.min(
+		Math.max(Math.min(availW / srcW, availH / srcH), VIEW_SCALE_MIN),
+		VIEW_SCALE_MAX
+	);
+	// the offset that puts the source center on the frame center:
+	// T(sc) = s·(sc − c) + c + t = c  ⇒  t = s·(c − sc)
+	return {
+		x: scale * (frameW / 2 - srcW / 2),
+		y: scale * (frameH / 2 - srcH / 2),
+		scale,
+		rotation: 0
+	};
+};
 
 export interface ViewMatrix {
 	a: number;
@@ -102,11 +138,17 @@ const clamp = (value: number, min: number, max: number): number =>
  * the frame — its bounding box always reaches at least a tenth of the frame
  * in from every edge it could escape over.
  */
-const clampOffset = (view: InputView, w: number, h: number): InputView => {
+const clampOffset = (
+	view: InputView,
+	w: number,
+	h: number,
+	srcW: number,
+	srcH: number
+): InputView => {
 	const m = viewMatrix(view, w, h);
-	// transformed image corners: (0,0) (w,0) (0,h) (w,h)
-	const xs = [m.e, m.a * w + m.e, m.c * h + m.e, m.a * w + m.c * h + m.e];
-	const ys = [m.f, m.b * w + m.f, m.d * h + m.f, m.b * w + m.d * h + m.f];
+	// transformed source corners: (0,0) (srcW,0) (0,srcH) (srcW,srcH)
+	const xs = [m.e, m.a * srcW + m.e, m.c * srcH + m.e, m.a * srcW + m.c * srcH + m.e];
+	const ys = [m.f, m.b * srcW + m.f, m.d * srcH + m.f, m.b * srcW + m.d * srcH + m.f];
 	const minX = Math.min(...xs);
 	const maxX = Math.max(...xs);
 	const minY = Math.min(...ys);
@@ -125,14 +167,17 @@ const clampOffset = (view: InputView, w: number, h: number): InputView => {
 /**
  * Apply a gesture step to a view. The zoom clamps to VIEW_SCALE_MIN..MAX (the
  * pivot math uses the factor that survives the clamp) and the offset clamps
- * so the image always keeps a corner inside the frame. Pure — returns a new
- * view.
+ * so the image always keeps a corner inside the frame. srcW/srcH are the
+ * source's own dimensions — they only differ from the frame's when an output
+ * format reshapes it. Pure — returns a new view.
  */
 export const applyGesture = (
 	view: InputView,
 	delta: GestureDelta,
 	w: number,
-	h: number
+	h: number,
+	srcW = w,
+	srcH = h
 ): InputView => {
 	const cx = w / 2;
 	const cy = h / 2;
@@ -151,7 +196,9 @@ export const applyGesture = (
 			rotation: view.rotation + delta.dphi
 		},
 		w,
-		h
+		h,
+		srcW,
+		srcH
 	);
 };
 

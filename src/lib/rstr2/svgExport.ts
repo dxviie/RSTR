@@ -120,19 +120,23 @@ export const layerGroupSvg = (exportLayer: ExportLayer): string => {
 /**
  * Build a complete SVG document for the given layers.
  *
- * @param widthPx  source image width — defines the coordinate space
- * @param heightPx source image height
+ * @param widthPx  frame width — defines the coordinate space
+ * @param heightPx frame height
  * @param outputWidthMm physical output width; height keeps the aspect ratio
  * @param settings when given, embedded as a human-readable comment at the top
+ * @param outputHeightMmExact overrides the aspect-derived height — an active
+ *        output format passes its exact page height so frame-pixel rounding
+ *        can never nudge an A4 off 297.00 mm
  */
 export const buildSvgDocument = (
 	layers: ExportLayer[],
 	widthPx: number,
 	heightPx: number,
 	outputWidthMm: number,
-	settings?: Rstr2Settings
+	settings?: Rstr2Settings,
+	outputHeightMmExact?: number
 ): string => {
-	const outputHeightMm = (outputWidthMm * heightPx) / widthPx;
+	const outputHeightMm = outputHeightMmExact ?? (outputWidthMm * heightPx) / widthPx;
 	let svg = settings ? settingsComment(settings) : '';
 	svg += `<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="${outputWidthMm.toFixed(2)}mm" height="${outputHeightMm.toFixed(2)}mm" viewBox="0 0 ${widthPx} ${heightPx}">\n`;
 	for (const layer of layers) {

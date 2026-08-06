@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { computeCellGrid } from './grid';
 import { segmentGrid } from './segmentation';
 import { buildRegionGeometries } from './regionTools';
-import { hatchPolygon, spacingForInk, segmentsToSvgPath } from './hatchTools';
+import { clipSegmentsToRect, hatchPolygon, spacingForInk, segmentsToSvgPath } from './hatchTools';
 import { adjustColors, isNeutralAdjustment } from './imageAdjust';
 import {
 	extractChannel,
@@ -328,6 +328,42 @@ describe('hatchPolygon spacing invariants', () => {
 		expect(segments[0]).toBeCloseTo(104);
 		expect(segments[2]).toBeCloseTo(104);
 		expect(Math.abs(segments[3] - segments[1])).toBeGreaterThan(290);
+	});
+});
+
+describe('clipSegmentsToRect', () => {
+	it('keeps inside segments untouched', () => {
+		expect(clipSegmentsToRect([10, 10, 40, 40], 0, 0, 50, 50)).toEqual([10, 10, 40, 40]);
+	});
+
+	it('drops fully outside segments', () => {
+		expect(clipSegmentsToRect([60, 60, 90, 90], 0, 0, 50, 50)).toEqual([]);
+		// outside, aligned with an edge (p === 0 rejection path)
+		expect(clipSegmentsToRect([-5, 0, -5, 50], 0, 0, 50, 50)).toEqual([]);
+	});
+
+	it('shortens crossing segments to the boundary', () => {
+		expect(clipSegmentsToRect([-10, 20, 60, 20], 0, 0, 50, 50)).toEqual([0, 20, 50, 20]);
+		// diagonal through a corner region
+		const [x1, y1, x2, y2] = clipSegmentsToRect([-10, -10, 30, 30], 0, 0, 50, 50);
+		expect([x1, y1, x2, y2]).toEqual([0, 0, 30, 30]);
+		expect(y2).toBe(30);
+	});
+
+	it('drops a segment that only grazes the outside of a corner', () => {
+		// passes below-left of the rect: x+y = 10 while the rect starts at (20, 20)
+		expect(clipSegmentsToRect([0, 10, 10, 0], 20, 20, 50, 50)).toEqual([]);
+	});
+
+	it('clips many segments in one flat pass', () => {
+		const clipped = clipSegmentsToRect(
+			[5, 5, 45, 5, -20, 30, 20, 30, 60, 60, 70, 70],
+			0,
+			0,
+			50,
+			50
+		);
+		expect(clipped).toEqual([5, 5, 45, 5, 0, 30, 20, 30]);
 	});
 });
 

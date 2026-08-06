@@ -1,12 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import {
 	applyGesture,
+	containView,
 	gestureBetween,
 	identityView,
 	isIdentityView,
 	snapAngle,
 	viewMatrix,
 	viewRotationDeg,
+	viewsEqual,
 	VIEW_SCALE_MAX,
 	VIEW_SCALE_MIN,
 	type InputView,
@@ -151,6 +153,63 @@ describe('applyGesture', () => {
 		const view = identityView();
 		applyGesture(view, { k: 2, dphi: 0.5, from: { x: 0, y: 0 }, to: { x: 9, y: 9 } }, W, H);
 		expect(view).toEqual(identityView());
+	});
+
+	it('clamps against the source rect when it differs from the frame', () => {
+		// a small 20×20 source in the 100×80 frame, dragged far LEFT: its
+		// right edge — 20 source px in, not 100 — must stay in the margin band
+		const srcW = 20;
+		const srcH = 20;
+		const drag = { k: 1, dphi: 0, from: { x: 0, y: 0 }, to: { x: -W * 10, y: 0 } };
+		const view = applyGesture(identityView(), drag, W, H, srcW, srcH);
+		const m = viewMatrix(view, W, H);
+		const rightEdge = m.a * srcW + m.e; // x of the transformed (srcW, 0) corner
+		const margin = Math.min(W, H) * 0.1;
+		expect(rightEdge).toBeGreaterThanOrEqual(margin - 1e-9);
+		expect(view.x).toBeCloseTo(margin - srcW, 6);
+		// the frame-sized rect would allow drifting much further out
+		const frameClamped = applyGesture(identityView(), drag, W, H);
+		expect(frameClamped.x).toBeLessThan(view.x);
+	});
+});
+
+describe('containView', () => {
+	it('fits and centers the source inside the frame', () => {
+		// a 200×400 source in the 100×80 frame: height binds, scale 0.2
+		const view = containView(200, 400, W, H);
+		expect(view.scale).toBeCloseTo(0.2, 6);
+		expect(view.rotation).toBe(0);
+		// the source center maps onto the frame center
+		expectPoint(map(view, { x: 100, y: 200 }), { x: W / 2, y: H / 2 });
+		// and the fitted source spans the frame height exactly
+		expectPoint(map(view, { x: 100, y: 0 }), { x: W / 2, y: 0 });
+		expectPoint(map(view, { x: 100, y: 400 }), { x: W / 2, y: H });
+	});
+
+	it('respects the inset', () => {
+		const inset = 10;
+		const view = containView(100, 80, W, H, inset);
+		// height binds: (80 − 20) / 80 = 0.75 → drawn 75×60, centered
+		expect(view.scale).toBeCloseTo(0.75, 6);
+		expectPoint(map(view, { x: 0, y: 0 }), { x: 12.5, y: inset });
+		expectPoint(map(view, { x: 100, y: 80 }), { x: W - 12.5, y: H - inset });
+	});
+
+	it('is the identity when source and frame agree and there is no inset', () => {
+		expect(containView(W, H, W, H)).toEqual(identityView());
+	});
+
+	it('keeps the scale inside the gesture bounds', () => {
+		expect(containView(100000, 100, W, H).scale).toBe(VIEW_SCALE_MIN);
+	});
+});
+
+describe('viewsEqual', () => {
+	it('compares all four fields', () => {
+		const a: InputView = { x: 1, y: 2, scale: 3, rotation: 4 };
+		expect(viewsEqual(a, { ...a })).toBe(true);
+		expect(viewsEqual(a, { ...a, x: 0 })).toBe(false);
+		expect(viewsEqual(a, { ...a, rotation: 0 })).toBe(false);
 	});
 });
 

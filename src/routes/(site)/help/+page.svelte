@@ -66,7 +66,8 @@
 		<li style="--c: #8b4513">
 			<span class="map-dot">7</span>
 			<span
-				><strong>export</strong> — output width and the SVG, PNG and frame-sequence downloads.</span
+				><strong>export</strong> — output width or a fixed page format, and the SVG, PNG and frame-sequence
+				downloads.</span
 			>
 		</li>
 		<li style="--c: #ff2aa6">
@@ -90,8 +91,9 @@
 				Zoom in on the interesting part by manipulating the input right on the render: drag to move
 				it, scroll to zoom on the cursor (a trackpad pinch works too), alt/⌥ + scroll to rotate — on
 				a touch screen, drag, pinch and twist with two fingers while one finger keeps scrolling the
-				page. While you're reframing, the input shows with a composition grid; let go and the lines
-				recompute for the new framing, which also carries into every export (a video keeps one
+				page. While you're reframing, the input shows with a composition grid and an accent border
+				along its own edge — so you can see where it ends even on a white background; let go and the
+				lines recompute for the new framing, which also carries into every export (a video keeps one
 				framing across all its frames). Double-click the render — or the
 				<em>⛶ full image</em> chip that appears — to get the whole picture back.
 			</dd>
@@ -260,7 +262,8 @@
 			<dt>presets</dt>
 			<dd>
 				Apply a built-in look, or save your current settings under a name — saved presets live in
-				your browser. A fresh visit opens on a random built-in.
+				your browser. A fresh visit opens on a random built-in. Presets are about the look: your
+				output width and margin stay yours (any values stored in older preset files are ignored).
 			</dd>
 			<dt>export / import .json</dt>
 			<dd>Move settings between browsers or share them as a small JSON file.</dd>
@@ -271,16 +274,25 @@
 		<h2>export</h2>
 		<dl>
 			<dt>width (mm)</dt>
-			<dd>Physical output width — the height follows the image aspect.</dd>
-			<dt>fit on page</dt>
 			<dd>
-				One tap sets the width so the art fits a standard sheet — A6, A5, A4 or A3 — within the
-				margin below. The page is turned to match the art: wider-than-tall art gets a landscape
-				sheet, taller art a portrait one, and anything square-ish defaults to portrait.
+				Physical output width — the height follows the image aspect. This is your own setting:
+				presets and the dice never touch it, and it stays put while you switch inputs.
+			</dd>
+			<dt>output format</dt>
+			<dd>
+				Optionally compose onto a fixed sheet instead. Toggle A6–A3 (tap again to turn off — at most
+				one is active), or pick more sizes from the list: A2–A0, B-series, US letter/legal/ tabloid,
+				squares, AxiDraw beds and a custom width × height. The render takes the page's shape, the
+				export becomes exactly that page, and the whole image starts fitted inside the margins —
+				from there, crop and reposition it into the sheet with the usual gestures. Named sheets are
+				turned to match the input (flip them with ⇄); a new input starts back at no format.
 			</dd>
 			<dt>margin (mm)</dt>
 			<dd>
-				The border kept clear on every edge of the sheet when fitting to a page. Defaults to 10mm.
+				With a format active, the margin is a mask: a band this wide around the sheet's edge is kept
+				clear of ink, whatever the composition puts there — like a matted print, and safe for the
+				plotter's paper clamps. The reframing view dims the masked band while you compose. Defaults
+				to 10mm; 0 disables the mask.
 			</dd>
 			<dt>↓ SVG</dt>
 			<dd>A plottable SVG with one layer group per pen, ready for plotter software.</dd>

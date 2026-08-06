@@ -40,7 +40,12 @@
 	} from '$lib/rstr2/rngRuntime.svelte';
 	import { segmentGrid } from '$lib/rstr2/segmentation';
 	import { buildRegionGeometries } from '$lib/rstr2/regionTools';
-	import { hatchPolygon, spacingForInk, type HatchSegments } from '$lib/rstr2/hatchTools';
+	import {
+		clipSegmentsToRect,
+		hatchPolygon,
+		spacingForInk,
+		type HatchSegments
+	} from '$lib/rstr2/hatchTools';
 	import {
 		handDrawnPolylines,
 		polylinesToSegments,
@@ -68,18 +73,29 @@
 	} from '$lib/rstr2/video';
 	import {
 		applyGesture,
+		containView,
 		gestureBetween,
 		identityView,
-		isIdentityView,
 		snapAngle,
 		viewMatrix,
 		viewRotationDeg,
+		viewsEqual,
 		type InputView,
 		type Point
 	} from '$lib/rstr2/viewTransform';
+	import {
+		autoOrientation,
+		clampMarginMm,
+		CUSTOM_FORMAT_ID,
+		frameHeightFor,
+		MORE_FORMATS,
+		QUICK_FORMATS,
+		resolveOutputFormat,
+		sanitizeCustomMm
+	} from '$lib/rstr2/outputFormat';
 	import { buildZip, type ZipEntry } from '$lib/rstr2/zip';
 	import { buildExportName } from '$lib/rstr2/exportName';
-	import { pageDims, type PageId } from '$lib/prep/pages';
+	import type { Orientation } from '$lib/prep/pages';
 	import {
 		allowedPens,
 		checkOrder,
@@ -162,8 +178,11 @@
 	let inputImage = $state('');
 	// filename of the current image source (for export names); '' when none
 	let inputName = $state('');
-	let imgWidth = $state(0);
-	let imgHeight = $state(0);
+	// source natural dimensions — the working frame (imgWidth/imgHeight,
+	// derived below) follows them, reshaped to the page aspect while an
+	// output format is active
+	let srcWidth = $state(0);
+	let srcHeight = $state(0);
 	// Grids hold typed arrays, which Svelte leaves unproxied — plain $state
 	// only tracks the reassignment of these variables, which is what we want.
 	let pixels: Uint8ClampedArray | null = $state(null);
@@ -231,11 +250,52 @@
 	};
 	const releasePreview = () => (previewHeld = false);
 
+	// Output format: an optional fixed page the render composes into, driven
+	// by the A6..A3 toggles and the more-formats picker. At most one is
+	// active; none is the default. Ephemeral like the crop — every new source
+	// starts back at "no format" (the output width setting itself stays).
+	let outputFormatId = $state('');
+	let formatOrientation: Orientation = $state('portrait');
+	const customFormat = $state({ w: 210, h: 297 });
+	const resolvedFormat = $derived(
+		resolveOutputFormat(outputFormatId, customFormat.w, customFormat.h, formatOrientation)
+	);
+	// the working frame all pipeline stages and canvases live in: the
+	// source's own size — reshaped to the page aspect while a format is on
+	const imgWidth = $derived(srcWidth);
+	const imgHeight = $derived(
+		resolvedFormat && srcWidth ? frameHeightFor(srcWidth, resolvedFormat) : srcHeight
+	);
+	// physical output size: the page when a format is active, else the
+	// user's width setting with the height following the frame aspect
+	const outputWidthEff = $derived(resolvedFormat ? resolvedFormat.wMm : params.outputWidthMm);
+	const outputHeightEff = $derived(
+		resolvedFormat
+			? resolvedFormat.hMm
+			: imgWidth
+				? (params.outputWidthMm * imgHeight) / imgWidth
+				: 0
+	);
+	// the mask: a band this wide around the page edge stays clear of ink
+	const marginMmEff = $derived(
+		resolvedFormat ? clampMarginMm(params.fitMarginMm, resolvedFormat) : 0
+	);
+	const marginPx = $derived(
+		resolvedFormat && imgWidth ? (marginMmEff * imgWidth) / resolvedFormat.wMm : 0
+	);
+
 	// Crop / reposition of the input inside its frame — drag, zoom and rotate
 	// on the stage. In-memory only and reset with every new source; scrubbing
 	// a video keeps it, so all frames of a sequence share the framing.
 	const view: InputView = $state(identityView());
-	const viewIsIdentity = $derived(isIdentityView(view));
+	// what the reset chip returns to: the image exactly as loaded — or, on a
+	// page format, the whole image fitted inside the drawable area
+	const defaultView = $derived(
+		resolvedFormat
+			? containView(srcWidth, srcHeight, imgWidth, imgHeight, marginPx)
+			: identityView()
+	);
+	const viewIsDefault = $derived(viewsEqual(view, defaultView));
 	// the current source drawable (image element or the video element), kept
 	// outside $state so gestures and re-extraction can draw it at will
 	let sourceEl: HTMLImageElement | HTMLVideoElement | null = null;
@@ -452,8 +512,8 @@
 		// bail if outrun by a newer grab or the video was swapped for an image
 		if (token !== grabToken || !videoSrc || !el.videoWidth) return;
 		sourceEl = el;
-		imgWidth = el.videoWidth;
-		imgHeight = el.videoHeight;
+		srcWidth = el.videoWidth;
+		srcHeight = el.videoHeight;
 		extractSourcePixels();
 	};
 
@@ -539,14 +599,66 @@
 	let cropIdleTimer: ReturnType<typeof setTimeout> | undefined;
 	let cropRaf = 0;
 
-	// a crop belongs to the content it framed — new sources start over
+	// a crop (and a page format) belongs to the content it framed — new
+	// sources start over; the output width setting itself is kept
 	const resetViewState = () => {
 		Object.assign(view, identityView());
+		outputFormatId = '';
+		formatOrientation = 'portrait';
 		cropActive = false;
 		cropPending = false;
 		gestureEngaged = false;
 		activePointers.clear();
 	};
+
+	// format toggles: reshape the frame, recompose the input into it (the
+	// whole image fitted inside the drawable area) and re-run the pipeline
+	const applyFormatSelection = (id: string) => {
+		if (id === outputFormatId || !srcWidth) return;
+		if (id === CUSTOM_FORMAT_ID && resolvedFormat) {
+			// start the custom page from whatever page was active
+			customFormat.w = resolvedFormat.wMm;
+			customFormat.h = resolvedFormat.hMm;
+		}
+		outputFormatId = id;
+		if (id && id !== CUSTOM_FORMAT_ID) formatOrientation = autoOrientation(srcWidth, srcHeight);
+		reframeToFormat();
+	};
+
+	const toggleQuickFormat = (id: string) => applyFormatSelection(outputFormatId === id ? '' : id);
+
+	const onMoreFormat = (event: Event) =>
+		applyFormatSelection((event.currentTarget as HTMLSelectElement).value);
+
+	const flipOrientation = () => {
+		formatOrientation = formatOrientation === 'portrait' ? 'landscape' : 'portrait';
+		reframeToFormat();
+	};
+
+	const setCustomDim = (axis: 'w' | 'h', value: number) => {
+		const mm = sanitizeCustomMm(value);
+		if (customFormat[axis] === mm) return;
+		customFormat[axis] = mm;
+		reframeToFormat();
+	};
+
+	const reframeToFormat = () => {
+		if (!sourceEl || !srcWidth) return;
+		// the canvases must take the new frame size before anything draws
+		flushSync();
+		Object.assign(view, defaultView);
+		commitView();
+	};
+
+	// the more-formats picker mirrors the selection unless a quick toggle owns it
+	const moreFormatValue = $derived(
+		outputFormatId && !QUICK_FORMATS.some((format) => format.id === outputFormatId)
+			? outputFormatId
+			: ''
+	);
+
+	const fmtMm = (value: number): string =>
+		Number.isInteger(value) ? String(value) : value.toFixed(1);
 
 	// reused pixel-extraction canvas — the source drawn into its frame
 	let frameCanvas: HTMLCanvasElement | null = null;
@@ -572,7 +684,7 @@
 		ctx.fillRect(0, 0, w, h);
 		const m = viewMatrix(view, w, h);
 		ctx.setTransform(m.a, m.b, m.c, m.d, m.e, m.f);
-		ctx.drawImage(src, 0, 0, w, h);
+		ctx.drawImage(src, 0, 0, srcWidth, srcHeight);
 		ctx.setTransform(1, 0, 0, 1, 0, 0);
 		pixels = ctx.getImageData(0, 0, w, h).data;
 		previewBase = buildPreviewBase(frameCanvas, w, h);
@@ -587,24 +699,53 @@
 		if (!ctx) return;
 		const w = canvas.width;
 		const h = canvas.height;
+		const out = w / imgWidth; // canvas px per frame px
 		ctx.setTransform(1, 0, 0, 1, 0, 0);
 		ctx.fillStyle = '#FFFEF7'; // the render's warm paper white
 		ctx.fillRect(0, 0, w, h);
-		const m = viewMatrix(view, imgWidth, imgHeight, w / imgWidth);
+		const m = viewMatrix(view, imgWidth, imgHeight, out);
 		ctx.setTransform(m.a, m.b, m.c, m.d, m.e, m.f);
-		ctx.drawImage(src, 0, 0, imgWidth, imgHeight);
+		ctx.drawImage(src, 0, 0, srcWidth, srcHeight);
 		ctx.setTransform(1, 0, 0, 1, 0, 0);
 		if (!withGrid) return;
-		// rule-of-thirds composition grid while the hands are on the image
 		const line = Math.max(1, w / 600);
+		// accent border along the input's own edge, so where it starts and
+		// ends stays visible even when its background is as white as the
+		// paper — a white halo keeps it readable over dark content too
+		ctx.beginPath();
+		ctx.moveTo(m.e, m.f);
+		ctx.lineTo(m.a * srcWidth + m.e, m.b * srcWidth + m.f);
+		ctx.lineTo(m.a * srcWidth + m.c * srcHeight + m.e, m.b * srcWidth + m.d * srcHeight + m.f);
+		ctx.lineTo(m.c * srcHeight + m.e, m.d * srcHeight + m.f);
+		ctx.closePath();
+		ctx.lineWidth = line * 3;
+		ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+		ctx.stroke();
+		ctx.lineWidth = line * 1.4;
+		ctx.strokeStyle = '#60739f'; // house muted blue
+		ctx.stroke();
+		// the masked margin of an active page format: dim what ink will never
+		// reach and outline the drawable area
+		const inset = marginPx * out;
+		if (inset > 0) {
+			ctx.fillStyle = 'rgba(255, 254, 247, 0.72)';
+			ctx.fillRect(0, 0, w, inset);
+			ctx.fillRect(0, h - inset, w, inset);
+			ctx.fillRect(0, inset, inset, h - 2 * inset);
+			ctx.fillRect(w - inset, inset, inset, h - 2 * inset);
+			ctx.lineWidth = line;
+			ctx.strokeStyle = 'rgba(26, 32, 44, 0.45)';
+			ctx.strokeRect(inset, inset, w - 2 * inset, h - 2 * inset);
+		}
+		// rule-of-thirds composition grid over the drawable area
 		ctx.lineWidth = line;
 		ctx.strokeStyle = 'rgba(26, 32, 44, 0.3)';
 		ctx.beginPath();
 		for (const t of [1 / 3, 2 / 3]) {
-			ctx.moveTo(w * t, 0);
-			ctx.lineTo(w * t, h);
-			ctx.moveTo(0, h * t);
-			ctx.lineTo(w, h * t);
+			ctx.moveTo(inset + (w - 2 * inset) * t, inset);
+			ctx.lineTo(inset + (w - 2 * inset) * t, h - inset);
+			ctx.moveTo(inset, inset + (h - 2 * inset) * t);
+			ctx.lineTo(w - inset, inset + (h - 2 * inset) * t);
 		}
 		ctx.stroke();
 		ctx.strokeRect(line / 2, line / 2, w - line, h - line);
@@ -649,8 +790,8 @@
 	};
 
 	const resetView = () => {
-		if (viewIsIdentity) return;
-		Object.assign(view, identityView());
+		if (viewIsDefault) return;
+		Object.assign(view, defaultView);
 		gestureEngaged = false;
 		commitView();
 	};
@@ -691,7 +832,7 @@
 			const a1 = clientToFrame(cur.x, cur.y);
 			if (!a0 || !b0 || !a1) return;
 			const delta = gestureBetween(a0, b0, a1, b0);
-			const next = applyGesture(view, delta, imgWidth, imgHeight);
+			const next = applyGesture(view, delta, imgWidth, imgHeight, srcWidth, srcHeight);
 			// touch rotation snaps near the quarter turns, but the raw angle
 			// keeps accumulating so a deliberate tilt can escape the snap
 			touchRawRotation += delta.dphi;
@@ -716,7 +857,10 @@
 		const from = clientToFrame(prev.x, prev.y);
 		const to = clientToFrame(cur.x, cur.y);
 		if (!from || !to) return;
-		Object.assign(view, applyGesture(view, { k: 1, dphi: 0, from, to }, imgWidth, imgHeight));
+		Object.assign(
+			view,
+			applyGesture(view, { k: 1, dphi: 0, from, to }, imgWidth, imgHeight, srcWidth, srcHeight)
+		);
 		scheduleCropDraw();
 	};
 
@@ -731,7 +875,7 @@
 	};
 
 	const onStageDblClick = (event: MouseEvent) => {
-		if (!sourceEl || viewIsIdentity || !gestureTarget(event)) return;
+		if (!sourceEl || viewIsDefault || !gestureTarget(event)) return;
 		event.preventDefault();
 		resetView();
 	};
@@ -751,12 +895,18 @@
 			// ⌥ + wheel turns the image around the frame center
 			const c = { x: imgWidth / 2, y: imgHeight / 2 };
 			const dphi = -delta * VIEW_WHEEL_ROTATE;
-			Object.assign(view, applyGesture(view, { k: 1, dphi, from: c, to: c }, imgWidth, imgHeight));
+			Object.assign(
+				view,
+				applyGesture(view, { k: 1, dphi, from: c, to: c }, imgWidth, imgHeight, srcWidth, srcHeight)
+			);
 		} else {
 			const q = clientToFrame(event.clientX, event.clientY);
 			if (!q) return;
 			const k = Math.exp(-delta * (pinch ? VIEW_PINCH_ZOOM : VIEW_WHEEL_ZOOM));
-			Object.assign(view, applyGesture(view, { k, dphi: 0, from: q, to: q }, imgWidth, imgHeight));
+			Object.assign(
+				view,
+				applyGesture(view, { k, dphi: 0, from: q, to: q }, imgWidth, imgHeight, srcWidth, srcHeight)
+			);
 		}
 		scheduleCropDraw();
 		clearTimeout(cropIdleTimer);
@@ -802,7 +952,10 @@
 			const dphi = ((g.rotation - lastRotation) * Math.PI) / 180;
 			lastScale = g.scale;
 			lastRotation = g.rotation;
-			Object.assign(view, applyGesture(view, { k, dphi, from: q, to: q }, imgWidth, imgHeight));
+			Object.assign(
+				view,
+				applyGesture(view, { k, dphi, from: q, to: q }, imgWidth, imgHeight, srcWidth, srcHeight)
+			);
 			scheduleCropDraw();
 			clearTimeout(cropIdleTimer);
 			cropIdleTimer = setTimeout(commitView, VIEW_COMMIT_MS);
@@ -822,7 +975,10 @@
 	});
 
 	const viewBadge = $derived.by(() => {
-		const zoom = `${view.scale >= 10 ? view.scale.toFixed(0) : view.scale.toFixed(1)}×`;
+		// zoom reads relative to the default composition, so 1.0× is always
+		// "the whole image" — also when a page format rescaled the fit
+		const relative = view.scale / (defaultView.scale || 1);
+		const zoom = `${relative >= 10 ? relative.toFixed(0) : relative.toFixed(1)}×`;
 		const deg = Math.round(viewRotationDeg(view));
 		return deg === 0 ? zoom : `${zoom} ∠${deg}°`;
 	});
@@ -845,8 +1001,8 @@
 			if (inputImage !== src) return;
 			resetViewState();
 			sourceEl = img;
-			imgWidth = img.width;
-			imgHeight = img.height;
+			srcWidth = img.width;
+			srcHeight = img.height;
 			extractSourcePixels();
 		};
 		img.src = src;
@@ -1061,7 +1217,6 @@
 	let hatchGeneration = 0;
 	$effect(() => {
 		trackHatchLayerDeps();
-		void params.outputWidthMm;
 		void params.penWidthMm;
 		void params.spacingMinMm;
 		void params.spacingMaxMm;
@@ -1073,9 +1228,12 @@
 		void params.wobbleAmplitudeMm;
 		void params.wobbleWavelengthMm;
 		void params.wobbleSeed;
+		// real reads — deriveds only register as dependencies when used
+		const pxPerMm = imgWidth / outputWidthEff;
+		const maskInsetPx = marginPx;
 		const results = layerResults;
 		if (results.length === 0 || !imgWidth || !hatchCanvas) return;
-		recomputeHatching(results);
+		recomputeHatching(results, pxPerMm, maskInsetPx);
 	});
 
 	// Pick a hatch angle within the layer's range based on the region's own
@@ -1089,7 +1247,11 @@
 		return layer.angleMin + (base / 90) * (layer.angleMax - layer.angleMin);
 	};
 
-	const recomputeHatching = async (results: LayerResult[]) => {
+	const recomputeHatching = async (
+		results: LayerResult[],
+		pxPerMm: number,
+		maskInsetPx: number
+	) => {
 		const generation = ++hatchGeneration;
 		const canvas = hatchCanvas;
 		const ctx = canvas?.getContext('2d');
@@ -1105,7 +1267,6 @@
 		ctx.globalCompositeOperation = 'multiply';
 		ctx.globalAlpha = 0.85; // translucent-ink simulation
 
-		const pxPerMm = imgWidth / params.outputWidthMm;
 		const wobble = wobbleOptions(pxPerMm);
 		let totalLines = 0;
 
@@ -1143,12 +1304,23 @@
 					maxSpacingPx,
 					spacingOptions
 				);
-				const segments = hatchPolygon(
+				let segments = hatchPolygon(
 					region.loops,
 					angleForRegion(layer, region),
 					spacing,
 					penWidthPx
 				);
+				// an active page format masks its margin: no ink beyond the
+				// drawable area, exactly
+				if (maskInsetPx > 0) {
+					segments = clipSegmentsToRect(
+						segments,
+						maskInsetPx,
+						maskInsetPx,
+						canvas.width - maskInsetPx,
+						canvas.height - maskInsetPx
+					);
+				}
 				region.hatchSegments = segments;
 				totalLines += segments.length / 4;
 				if (wobble) {
@@ -1214,7 +1386,7 @@
 			plotEstimate = null;
 			return;
 		}
-		const pxPerMm = imgWidth / params.outputWidthMm;
+		const pxPerMm = imgWidth / outputWidthEff;
 		const perLayer = layers
 			.filter((layer) => layer.enabled)
 			.map((layer) => {
@@ -1330,6 +1502,11 @@
 	// which structuredClone refuses to touch.
 	const applySettings = (settings: Rstr2Settings) => {
 		const clone: Rstr2Settings = JSON.parse(JSON.stringify(settings));
+		// Output sizing is the user's own setup, not part of a look — presets,
+		// imports and dice rolls leave the width and the mask margin exactly
+		// where the user put them (stored values in old files are ignored).
+		clone.params.outputWidthMm = params.outputWidthMm;
+		clone.params.fitMarginMm = params.fitMarginMm;
 		Object.assign(params, clone.params);
 		layers = clone.layers;
 	};
@@ -1445,34 +1622,10 @@
 	const exportName = (suffix: string, ext: string): string =>
 		buildExportName(videoName || inputName, suffix, ext, stamp());
 
-	// paper sizes offered by the "fit on page" buttons (subset of the shared
-	// PAGES table, smallest → largest)
-	const FIT_PAGES: PageId[] = ['A6', 'A5', 'A4', 'A3'];
-
-	// Set outputWidthMm so the art fits within the chosen paper size, leaving the
-	// configured margin clear on every edge. The page is turned to match the art:
-	// wider-than-tall art gets a landscape page, taller art a portrait page, and
-	// anything square-ish (within ~5%) defaults to portrait.
-	const fitToPage = (pageId: PageId) => {
-		if (!imgWidth || !imgHeight) return;
-		const artAspect = imgWidth / imgHeight; // >1 = landscape art
-		const orient = artAspect > 1.05 ? 'landscape' : 'portrait';
-		const [pageW, pageH] = pageDims(pageId, orient);
-		const margin = Math.max(0, params.fitMarginMm);
-		const availW = Math.max(0, pageW - 2 * margin);
-		const availH = Math.max(0, pageH - 2 * margin);
-		// art width is the free variable; its height is availW-derived via the
-		// aspect, so cap the width by whichever page edge binds first
-		const width = Math.min(availW, availH * artAspect);
-		if (width <= 0) return;
-		params.outputWidthMm = Math.round(width * 10) / 10;
-		markSettingsEdited();
-	};
-
 	/** assemble the current design as SVG text — shared by export and ordering */
 	const buildSvgText = (): string | null => {
 		if (!imgWidth) return null;
-		const pxPerMm = imgWidth / params.outputWidthMm;
+		const pxPerMm = imgWidth / outputWidthEff;
 		const exportLayers = layers
 			.filter((layer) => layer.enabled)
 			.map((layer) => {
@@ -1486,10 +1639,15 @@
 						: undefined
 				};
 			});
-		return buildSvgDocument(exportLayers, imgWidth, imgHeight, params.outputWidthMm, {
-			params,
-			layers
-		});
+		return buildSvgDocument(
+			exportLayers,
+			imgWidth,
+			imgHeight,
+			outputWidthEff,
+			// the embedded settings echo the size actually exported
+			{ params: { ...params, outputWidthMm: outputWidthEff }, layers },
+			resolvedFormat?.hMm
+		);
 	};
 
 	const downloadSvgText = (svg: string) =>
@@ -1598,13 +1756,21 @@
 
 	const ORDER_FROM_EUR = PRICING.tiers.A6.base + PRICING.tiers.A6.shippingEur;
 
+	// What the order must fit on paper is the drawn extent: the full art
+	// size — or, while a page format is active, the drawable area inside the
+	// masked margin (the ink never reaches beyond it).
+	const orderCheckNow = (): OrderCheck => {
+		const widthMm = outputWidthEff - 2 * marginMmEff;
+		const heightMm = outputHeightEff - 2 * marginMmEff;
+		return checkOrder({ ...params, outputWidthMm: widthMm }, layers, heightMm / widthMm);
+	};
+
 	// live quote for the order-button subtext: the same math the order dialog
 	// runs, recomputed as the design changes. null (falling back to the
 	// starting price) while the render is busy or the design isn't orderable.
 	const orderLiveQuote = $derived.by(() => {
 		if (!hatchReady || status.busy || !imgWidth || !imgHeight) return null;
-		const check = checkOrder(params, layers, imgHeight / imgWidth);
-		return quoteOrder(check, plotEstimate?.seconds ?? 0);
+		return quoteOrder(orderCheckNow(), plotEstimate?.seconds ?? 0);
 	});
 
 	// the pens on my shelf, grouped by ink, for the unsupported dialog
@@ -1621,7 +1787,7 @@
 
 	const orderPlot = () => {
 		if (!hatchReady || status.busy || !imgWidth || !imgHeight) return;
-		const check = checkOrder(params, layers, imgHeight / imgWidth);
+		const check = orderCheckNow();
 		orderCheck = check;
 		orderQuote = quoteOrder(check, plotEstimate?.seconds ?? 0);
 		orderDialog = check.supported && orderQuote ? 'summary' : 'unsupported';
@@ -1713,7 +1879,8 @@
 		const adjusted = isNeutralAdjustment(adjustments)
 			? grid
 			: { ...grid, ...adjustColors(grid.r, grid.g, grid.b, adjustments) };
-		const pxPerMm = w / params.outputWidthMm;
+		const pxPerMm = w / outputWidthEff;
+		const maskInsetPx = marginPx;
 		const wobble = wobbleOptions(pxPerMm);
 		return layers
 			.filter((layer) => layer.enabled)
@@ -1765,7 +1932,10 @@
 						boundsW: geometry.maxX - geometry.minX,
 						boundsH: geometry.maxY - geometry.minY
 					});
-					return hatchPolygon(geometry.loops, angle, spacing, penWidthPx);
+					const lines = hatchPolygon(geometry.loops, angle, spacing, penWidthPx);
+					return maskInsetPx > 0
+						? clipSegmentsToRect(lines, maskInsetPx, maskInsetPx, w - maskInsetPx, h - maskInsetPx)
+						: lines;
 				});
 				return {
 					layer,
@@ -1844,13 +2014,20 @@
 		const entries: ZipEntry[] = [];
 		// both formats in one archive get sorted into subfolders
 		const both = video.exportSvg && video.exportRaster;
+		// the grab canvas is the working frame (page-shaped while a format is
+		// active), not the raw video size — every frame goes through the crop
+		// view the preview shows, snapshot once so a mid-export gesture can't
+		// shear the sequence
 		const grabCanvas = document.createElement('canvas');
-		grabCanvas.width = el.videoWidth;
-		grabCanvas.height = el.videoHeight;
+		grabCanvas.width = imgWidth;
+		grabCanvas.height = imgHeight;
 		const grabCtx = grabCanvas.getContext('2d', { willReadFrequently: true });
-		// every frame goes through the crop view the preview shows, snapshot
-		// once so a mid-export gesture can't shear the sequence
 		const frameView = viewMatrix({ ...view }, grabCanvas.width, grabCanvas.height);
+		const exportWidthMm = outputWidthEff;
+		const exportHeightMm = resolvedFormat?.hMm;
+		const exportSettings: Rstr2Settings = JSON.parse(
+			JSON.stringify({ params: { ...params, outputWidthMm: exportWidthMm }, layers })
+		);
 		try {
 			if (!grabCtx) return;
 			for (let i = 0; i < range.count; i++) {
@@ -1870,7 +2047,7 @@
 					frameView.e,
 					frameView.f
 				);
-				grabCtx.drawImage(el, 0, 0, grabCanvas.width, grabCanvas.height);
+				grabCtx.drawImage(el, 0, 0, el.videoWidth, el.videoHeight);
 				grabCtx.setTransform(1, 0, 0, 1, 0, 0);
 				const px = grabCtx.getImageData(0, 0, grabCanvas.width, grabCanvas.height).data;
 				const exportLayers = computeExportLayers(px, grabCanvas.width, grabCanvas.height);
@@ -1880,8 +2057,9 @@
 						exportLayers,
 						grabCanvas.width,
 						grabCanvas.height,
-						params.outputWidthMm,
-						{ params, layers }
+						exportWidthMm,
+						exportSettings,
+						exportHeightMm
 					);
 					const data = encoder.encode(svg);
 					entries.push({ name: `${both ? 'svg/' : ''}${name}.svg`, data });
@@ -2676,7 +2854,7 @@
 					</div>
 				</div>
 			{/if}
-			{#if !viewIsIdentity}
+			{#if !viewIsDefault}
 				<button
 					class="view-reset"
 					onclick={resetView}
@@ -2994,7 +3172,9 @@
 				<div class="group-title">export</div>
 				<label
 					class="slider-row"
-					title="target output width in millimeters — the height follows the image aspect"
+					title={resolvedFormat
+						? 'the output format below sets the size — turn it off to size freely (your width setting is kept)'
+						: 'target output width in millimeters — the height follows the image aspect'}
 				>
 					<span>width (mm)</span>
 					<input
@@ -3004,41 +3184,120 @@
 						step="1"
 						bind:value={params.outputWidthMm}
 						use:inkRange={params.outputWidthMm}
+						disabled={resolvedFormat !== null}
 					/>
-					<input type="number" min="10" max="1000" step="1" bind:value={params.outputWidthMm} />
+					<input
+						type="number"
+						min="10"
+						max="1000"
+						step="1"
+						bind:value={params.outputWidthMm}
+						disabled={resolvedFormat !== null}
+					/>
 				</label>
 				<div
 					class="fit-title"
-					title="set the width so the art fits on a standard paper size within the margin below — the page turns to match the art's orientation"
+					title="compose onto a fixed page instead: the render takes the page's shape, the input crops into it, and the margin below is masked — click the active size again (or pick nothing in the list) to turn it off"
 				>
-					fit on page
+					output format
 				</div>
 				<div class="fit-pages">
-					{#each FIT_PAGES as pageId (pageId)}
+					{#each QUICK_FORMATS as format (format.id)}
 						<button
-							onclick={() => fitToPage(pageId)}
-							disabled={!imgWidth || !imgHeight}
-							title={`size the art to fit ${pageId} with a ${params.fitMarginMm}mm margin`}
+							class:active={outputFormatId === format.id}
+							aria-pressed={outputFormatId === format.id}
+							onclick={() => toggleQuickFormat(format.id)}
+							disabled={!srcWidth}
+							title={outputFormatId === format.id
+								? `stop composing on ${format.id} — back to the free output width`
+								: `compose on ${format.label}, turned to match the input`}
 						>
-							{pageId}
+							{format.id}
 						</button>
 					{/each}
 				</div>
-				<label
-					class="slider-row"
-					title="margin kept clear on every edge of the page when fitting the art to a paper size"
-				>
-					<span>margin (mm)</span>
-					<input
-						type="range"
-						min="5"
-						max="50"
-						step="1"
-						bind:value={params.fitMarginMm}
-						use:inkRange={params.fitMarginMm}
-					/>
-					<input type="number" min="5" max="50" step="1" bind:value={params.fitMarginMm} />
-				</label>
+				<div class="format-row">
+					<select
+						value={moreFormatValue}
+						onchange={onMoreFormat}
+						disabled={!srcWidth}
+						title="more page sizes — and a custom one; picking the top entry turns the format off"
+					>
+						<option value="">more formats…</option>
+						{#each MORE_FORMATS as format (format.id)}
+							<option value={format.id}>{format.label}</option>
+						{/each}
+						<option value={CUSTOM_FORMAT_ID}>custom…</option>
+					</select>
+				</div>
+				{#if outputFormatId === CUSTOM_FORMAT_ID}
+					<div
+						class="custom-size"
+						title="custom page size in millimeters, as typed — no auto-turning"
+					>
+						<input
+							type="number"
+							min="20"
+							max="2000"
+							step="1"
+							value={customFormat.w}
+							onchange={(event) => {
+								setCustomDim('w', event.currentTarget.valueAsNumber);
+								event.currentTarget.value = String(customFormat.w);
+							}}
+						/>
+						<span>×</span>
+						<input
+							type="number"
+							min="20"
+							max="2000"
+							step="1"
+							value={customFormat.h}
+							onchange={(event) => {
+								setCustomDim('h', event.currentTarget.valueAsNumber);
+								event.currentTarget.value = String(customFormat.h);
+							}}
+						/>
+						<span>mm</span>
+					</div>
+				{/if}
+				{#if resolvedFormat}
+					<label
+						class="slider-row"
+						title="masked margin — a band this wide around the page edge is kept clear of ink, whatever the composition puts there"
+					>
+						<span>margin (mm)</span>
+						<input
+							type="range"
+							min="0"
+							max="50"
+							step="1"
+							bind:value={params.fitMarginMm}
+							use:inkRange={params.fitMarginMm}
+						/>
+						<input type="number" min="0" max="50" step="1" bind:value={params.fitMarginMm} />
+					</label>
+					<div class="format-info">
+						<span title="page size — and the drawable area the masked margin leaves">
+							page {fmtMm(resolvedFormat.wMm)} × {fmtMm(resolvedFormat.hMm)}
+							{#if marginMmEff > 0}
+								· drawable {fmtMm(resolvedFormat.wMm - 2 * marginMmEff)} × {fmtMm(
+									resolvedFormat.hMm - 2 * marginMmEff
+								)}
+							{/if}
+							mm
+						</span>
+						{#if resolvedFormat.orientable}
+							<button
+								class="icon-btn"
+								onclick={flipOrientation}
+								title="turn the page (portrait ⇄ landscape)"
+							>
+								⇄
+							</button>
+						{/if}
+					</div>
+				{/if}
 				<div class="export-actions">
 					<button
 						class="primary-btn"
@@ -4336,6 +4595,53 @@
 		cursor: default;
 	}
 
+	/* the toggled-on page format — filled like a pressed key */
+	.fit-pages button.active {
+		background: var(--ink) !important;
+		border-color: var(--ink);
+		color: var(--bg);
+	}
+
+	.fit-pages button.active:hover:not(:disabled) {
+		background: var(--ink-soft) !important;
+		border-color: var(--ink-soft);
+	}
+
+	.format-row select {
+		width: 100%;
+		padding: 0.3rem;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		background: #fff;
+		color: var(--ink);
+		font: inherit;
+	}
+
+	.custom-size {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+		color: var(--muted);
+	}
+
+	.custom-size input {
+		flex: 1;
+		min-width: 0;
+		padding: 0.25rem 0.35rem;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		font: inherit;
+	}
+
+	.format-info {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.4rem;
+		font-size: 0.68rem;
+		color: var(--muted);
+	}
+
 	.primary-btn {
 		flex: 1;
 		padding: 0.45rem;
@@ -4977,6 +5283,8 @@
 		.plotter-row input[type='number'],
 		.select-row select,
 		.preset-row select,
+		.format-row select,
+		.custom-size input,
 		.preset-name {
 			font-size: 16px;
 		}

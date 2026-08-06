@@ -22,7 +22,7 @@ RSTR splits a picture into regions of similar tone and refills each one with par
 | 4   | **lines**        | Pen width, the ink threshold band (low/high pass), how ink intensity turns into line spacing — and the optional hand-drawn wobble.                                   |
 | 5   | **presets**      | Randomize everything, or save and share complete looks as JSON.                                                                                                      |
 | 6   | **layers**       | One pen per layer: color, image channel, hatch angles, per-layer overrides.                                                                                          |
-| 7   | **export**       | Output width (or fit-to-page A6–A3 with a margin) and the SVG / PNG / frame-sequence downloads.                                                                      |
+| 7   | **export**       | Output width — or a fixed page format (A6–A3 toggles, more sizes, custom) whose margin is masked — and the SVG / PNG / frame-sequence downloads.                     |
 | 8   | **stats**        | Render numbers and the estimated plot time.                                                                                                                          |
 
 > This README covers **how RSTR is built**. For what each setting _does_, see the [help page](https://rstr.d17e.dev/help) (`src/routes/(site)/help/+page.svelte`) — it mirrors the in-app tooltips.
@@ -35,6 +35,7 @@ RSTR is a fully client-side image pipeline. An image (or a single video frame) f
 
 ```
 image → crop/reposition view (drag · zoom · rotate on the render)
+      → optional output format (fixed page frame, margin masked)
       → pixels → cell grid → color adjust → per-layer channel extract
       → segmentation (watershed | posterize | k-means | SLIC)
       → region geometry (contour tracing, holes included)
@@ -71,6 +72,7 @@ The engine (`src/lib/rstr2/`) is pure TypeScript with no framework imports, so i
 | File                                                                              | Responsibility                                                                                                                                                                                                                       |
 | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `viewTransform.ts`                                                                | The crop/reposition view: pan/zoom/rotate math behind the stage gestures, applied where source pixels are extracted.                                                                                                                 |
+| `outputFormat.ts`                                                                 | Optional fixed output pages: the format catalog (A/B series, US, squares, Axi beds, custom), orientation and the masked-margin math.                                                                                                 |
 | `grid.ts`                                                                         | Downsample the source image to the working cell grid.                                                                                                                                                                                |
 | `imageAdjust.ts`                                                                  | Brightness / contrast / gamma / saturation / vibrance.                                                                                                                                                                               |
 | `segmentation.ts`                                                                 | Watershed / posterize / k-means / SLIC + shared post-processing.                                                                                                                                                                     |
