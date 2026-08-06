@@ -2,6 +2,122 @@
 	// Help page: a compact reference of every setting and feature in the
 	// studio (plus prep and classic). Descriptions mirror the in-app
 	// tooltips — hover any control in the app for the same hint in place.
+
+	interface HelpSection {
+		/** anchor id of the section (or the h1, for overview) */
+		id: string;
+		/** label in the legend and the on-this-page panel */
+		title: string;
+		/** studio-screenshot number + dot color — only the studio sections */
+		num?: number;
+		color?: string;
+		/** legend blurb (studio sections only) */
+		blurb?: string;
+	}
+
+	// One entry per page section, in DOCUMENT order — drives the on-this-page
+	// panel and the scroll spy. The numbered legend under the screenshot
+	// renders the studio subset in numeric order; numbers and colors mirror
+	// the annotated screenshot.
+	const SECTIONS: HelpSection[] = [
+		{ id: 'overview', title: 'overview' },
+		{
+			id: 'image',
+			title: 'image',
+			num: 1,
+			color: '#e63946',
+			blurb: 'load a picture or video and tune it before tracing.'
+		},
+		{
+			id: 'video',
+			title: 'video',
+			num: 2,
+			color: '#8338ec',
+			blurb: 'frame rate and export window, shown while a video is loaded.'
+		},
+		{
+			id: 'segmentation',
+			title: 'segmentation',
+			num: 3,
+			color: '#3a86ff',
+			blurb: 'how the image is carved into tonal regions.'
+		},
+		{
+			id: 'lines',
+			title: 'lines',
+			num: 4,
+			color: '#00b4d8',
+			blurb: 'pen width, how ink turns into line spacing, and the optional hand-drawn wobble.'
+		},
+		{
+			id: 'layers',
+			title: 'layers',
+			num: 6,
+			color: '#06a77d',
+			blurb: 'one pen per layer: color, channel, hatch angles, overrides.'
+		},
+		{
+			id: 'presets',
+			title: 'presets',
+			num: 5,
+			color: '#fb8500',
+			blurb: 'randomize everything, or save and share complete looks.'
+		},
+		{
+			id: 'export',
+			title: 'export',
+			num: 7,
+			color: '#8b4513',
+			blurb: 'output width or a fixed page format, and the SVG, PNG and frame-sequence downloads.'
+		},
+		{
+			id: 'stats',
+			title: 'stats',
+			num: 8,
+			color: '#ff2aa6',
+			blurb: 'render numbers and the estimated plot time.'
+		},
+		{ id: 'prep', title: 'prep' },
+		{ id: 'classic', title: 'classic' },
+		{ id: 'good-to-know', title: 'good to know' }
+	];
+
+	const mapSections = SECTIONS.filter((section) => section.num).sort(
+		(a, b) => (a.num ?? 0) - (b.num ?? 0)
+	);
+
+	// Scroll spy for the panel: the last section whose top has passed the
+	// reading line (a quarter down the viewport) is the active one; pinned to
+	// the very end of the page, the final section wins even when it is too
+	// short to ever reach that line.
+	let activeSection = $state('overview');
+	$effect(() => {
+		let raf = 0;
+		const update = () => {
+			raf = 0;
+			const line = window.innerHeight * 0.25;
+			let current = SECTIONS[0].id;
+			for (const section of SECTIONS) {
+				const el = document.getElementById(section.id);
+				if (el && el.getBoundingClientRect().top <= line) current = section.id;
+			}
+			if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2) {
+				current = SECTIONS[SECTIONS.length - 1].id;
+			}
+			activeSection = current;
+		};
+		const schedule = () => {
+			if (!raf) raf = requestAnimationFrame(update);
+		};
+		update();
+		window.addEventListener('scroll', schedule, { passive: true });
+		window.addEventListener('resize', schedule);
+		return () => {
+			cancelAnimationFrame(raf);
+			window.removeEventListener('scroll', schedule);
+			window.removeEventListener('resize', schedule);
+		};
+	});
 </script>
 
 <svelte:head>
@@ -13,7 +129,28 @@
 </svelte:head>
 
 <div class="help">
-	<h1>help</h1>
+	<h1 id="overview">help</h1>
+	<nav class="toc" aria-label="on this page">
+		<div class="toc-title">on this page</div>
+		<ol>
+			{#each SECTIONS as section (section.id)}
+				<li>
+					<a
+						href="#{section.id}"
+						class:active={activeSection === section.id}
+						style={section.color ? `--c: ${section.color}` : ''}
+					>
+						{#if section.num}
+							<span class="toc-dot">{section.num}</span>
+						{:else}
+							<span class="toc-gap"></span>
+						{/if}
+						<span>{section.title}</span>
+					</a>
+				</li>
+			{/each}
+		</ol>
+	</nav>
 	<p class="intro">
 		The <a href="/studio">studio</a> is where images become line art: the left pane feeds and tunes the
 		image, the middle shows the render, the right pane manages pens and exports. Every control in the
@@ -31,52 +168,18 @@
 		</a>
 	</figure>
 	<ol class="map">
-		<li style="--c: #e63946">
-			<span class="map-dot">1</span>
-			<span><strong>image</strong> — load a picture or video and tune it before tracing.</span>
-		</li>
-		<li style="--c: #8338ec">
-			<span class="map-dot">2</span>
-			<span
-				><strong>video</strong> — frame rate and export window, shown while a video is loaded.</span
-			>
-		</li>
-		<li style="--c: #3a86ff">
-			<span class="map-dot">3</span>
-			<span><strong>segmentation</strong> — how the image is carved into tonal regions.</span>
-		</li>
-		<li style="--c: #00b4d8">
-			<span class="map-dot">4</span>
-			<span
-				><strong>lines</strong> — pen width, how ink turns into line spacing, and the optional hand-drawn
-				wobble.</span
-			>
-		</li>
-		<li style="--c: #fb8500">
-			<span class="map-dot">5</span>
-			<span><strong>presets</strong> — randomize everything, or save and share complete looks.</span
-			>
-		</li>
-		<li style="--c: #06a77d">
-			<span class="map-dot">6</span>
-			<span
-				><strong>layers</strong> — one pen per layer: color, channel, hatch angles, overrides.</span
-			>
-		</li>
-		<li style="--c: #8b4513">
-			<span class="map-dot">7</span>
-			<span
-				><strong>export</strong> — output width or a fixed page format, and the SVG, PNG and frame-sequence
-				downloads.</span
-			>
-		</li>
-		<li style="--c: #ff2aa6">
-			<span class="map-dot">8</span>
-			<span><strong>stats</strong> — render numbers and the estimated plot time.</span>
-		</li>
+		{#each mapSections as section (section.id)}
+			<li style="--c: {section.color}">
+				<span class="map-dot">{section.num}</span>
+				<span>
+					<a class="map-title" href="#{section.id}"><strong>{section.title}</strong></a>
+					— {section.blurb}
+				</span>
+			</li>
+		{/each}
 	</ol>
 
-	<section>
+	<section id="image">
 		<h2>image</h2>
 		<dl>
 			<dt>browse / drop</dt>
@@ -110,7 +213,7 @@
 		</dl>
 	</section>
 
-	<section>
+	<section id="video">
 		<h2>video</h2>
 		<dl>
 			<dt>supported formats</dt>
@@ -138,7 +241,7 @@
 		</dl>
 	</section>
 
-	<section>
+	<section id="segmentation">
 		<h2>segmentation</h2>
 		<p class="section-note">
 			Segmentation carves the image into regions of similar tone — the shapes the lines will fill.
@@ -165,7 +268,7 @@
 		</dl>
 	</section>
 
-	<section>
+	<section id="lines">
 		<h2>lines</h2>
 		<dl>
 			<dt>pen width (mm)</dt>
@@ -222,7 +325,7 @@
 		</dl>
 	</section>
 
-	<section>
+	<section id="layers">
 		<h2>layers — one per pen</h2>
 		<dl>
 			<dt>layer basics</dt>
@@ -250,7 +353,7 @@
 		</dl>
 	</section>
 
-	<section>
+	<section id="presets">
 		<h2>presets & randomize</h2>
 		<dl>
 			<dt>randomize</dt>
@@ -270,7 +373,7 @@
 		</dl>
 	</section>
 
-	<section>
+	<section id="export">
 		<h2>export</h2>
 		<dl>
 			<dt>width (mm)</dt>
@@ -309,7 +412,7 @@
 		</dl>
 	</section>
 
-	<section>
+	<section id="stats">
 		<h2>stats & plot time</h2>
 		<dl>
 			<dt>grid / regions / lines / render</dt>
@@ -331,7 +434,7 @@
 		</dl>
 	</section>
 
-	<section>
+	<section id="prep">
 		<h2>prep — <a href="/prep">/prep</a></h2>
 		<figure class="shot">
 			<a href="/help/prep.webp" target="_blank" rel="noopener">
@@ -384,7 +487,7 @@
 		</dl>
 	</section>
 
-	<section>
+	<section id="classic">
 		<h2>classic — <a href="/classic">/classic</a></h2>
 		<figure class="shot">
 			<a href="/help/classic.webp" target="_blank" rel="noopener">
@@ -403,7 +506,7 @@
 		</p>
 	</section>
 
-	<section>
+	<section id="good-to-know">
 		<h2>good to know</h2>
 		<dl>
 			<dt>private by design</dt>
@@ -519,9 +622,110 @@
 		font-size: 0.8rem;
 	}
 
+	/* the legend titles link to their section — the site's dashed link style
+	   provides the affordance */
+	.map-title {
+		color: inherit;
+	}
+
 	section {
 		padding: 1.75rem 0;
 		border-top: 1px solid var(--border-c);
+	}
+
+	/* anchor targets land just below the sticky top bar */
+	section,
+	h1 {
+		scroll-margin-top: 3.5rem;
+	}
+
+	@media (prefers-reduced-motion: no-preference) {
+		:global(html) {
+			scroll-behavior: smooth;
+		}
+	}
+
+	/* ------------------------------------------- on-this-page panel */
+
+	/* Fixed beside the centered column on desktop, absent elsewhere — the
+	   legend anchors cover navigation on small screens. */
+	.toc {
+		display: none;
+	}
+
+	@media (min-width: 1200px) {
+		.toc {
+			display: block;
+			position: fixed;
+			top: 5.5rem;
+			/* right of the 46rem content column, 1rem off its padded edge */
+			left: calc(50vw + 24rem);
+			width: 11.5rem;
+			max-height: calc(100vh - 7rem);
+			overflow-y: auto;
+		}
+
+		.toc-title {
+			font-family: 'mono-bold', monospace;
+			font-size: 0.68rem;
+			text-transform: uppercase;
+			letter-spacing: 0.08em;
+			color: var(--muted-c);
+			margin: 0 0 0.6rem;
+			padding-left: 0.5rem;
+		}
+
+		.toc ol {
+			list-style: none;
+			margin: 0;
+			padding: 0;
+		}
+
+		.toc li + li {
+			margin-top: 0.15rem;
+		}
+
+		.toc a {
+			display: flex;
+			align-items: center;
+			gap: 0.5rem;
+			padding: 0.2rem 0.5rem;
+			border: none;
+			border-left: 2px solid transparent;
+			border-radius: 0 4px 4px 0;
+			font-family: 'mono-light', monospace;
+			font-size: 0.78rem;
+			color: var(--muted-c);
+		}
+
+		.toc a:hover {
+			color: var(--ink);
+			border-left-color: var(--border-c);
+		}
+
+		.toc a.active {
+			color: var(--ink);
+			border-left-color: var(--ink);
+			background: var(--muted-light);
+		}
+
+		.toc-dot,
+		.toc-gap {
+			flex-shrink: 0;
+			width: 1rem;
+		}
+
+		.toc-dot {
+			height: 1rem;
+			border-radius: 50%;
+			background: var(--c, var(--muted-c));
+			color: #fff;
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			font-family: 'mono-bold', monospace;
+			font-size: 0.6rem;
+		}
 	}
 
 	h2 {
