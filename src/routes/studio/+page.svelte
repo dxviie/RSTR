@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { flushSync } from 'svelte';
 	import DualRangeInput from '@stanko/dual-range-input';
 	import '@stanko/dual-range-input/dist/index.css';
 	import { inkRange } from '$lib/inkRange';
@@ -39,7 +40,12 @@
 	} from '$lib/rstr2/rngRuntime.svelte';
 	import { segmentGrid } from '$lib/rstr2/segmentation';
 	import { buildRegionGeometries } from '$lib/rstr2/regionTools';
-	import { hatchPolygon, spacingForInk, type HatchSegments } from '$lib/rstr2/hatchTools';
+	import {
+		clipSegmentsToRect,
+		hatchPolygon,
+		spacingForInk,
+		type HatchSegments
+	} from '$lib/rstr2/hatchTools';
 	import {
 		handDrawnPolylines,
 		polylinesToSegments,
@@ -65,9 +71,31 @@
 		VIDEO_STORAGE_KEY,
 		type VideoExportConfig
 	} from '$lib/rstr2/video';
+	import {
+		applyGesture,
+		containView,
+		gestureBetween,
+		identityView,
+		snapAngle,
+		viewMatrix,
+		viewRotationDeg,
+		viewsEqual,
+		type InputView,
+		type Point
+	} from '$lib/rstr2/viewTransform';
+	import {
+		autoOrientation,
+		clampMarginMm,
+		CUSTOM_FORMAT_ID,
+		frameHeightFor,
+		MORE_FORMATS,
+		QUICK_FORMATS,
+		resolveOutputFormat,
+		sanitizeCustomMm
+	} from '$lib/rstr2/outputFormat';
 	import { buildZip, type ZipEntry } from '$lib/rstr2/zip';
 	import { buildExportName } from '$lib/rstr2/exportName';
-	import { pageDims, type PageId } from '$lib/prep/pages';
+	import type { Orientation } from '$lib/prep/pages';
 	import {
 		allowedPens,
 		checkOrder,
@@ -150,8 +178,11 @@
 	let inputImage = $state('');
 	// filename of the current image source (for export names); '' when none
 	let inputName = $state('');
-	let imgWidth = $state(0);
-	let imgHeight = $state(0);
+	// source natural dimensions — the working frame (imgWidth/imgHeight,
+	// derived below) follows them, reshaped to the page aspect while an
+	// output format is active
+	let srcWidth = $state(0);
+	let srcHeight = $state(0);
 	// Grids hold typed arrays, which Svelte leaves unproxied — plain $state
 	// only tracks the reassignment of these variables, which is what we want.
 	let pixels: Uint8ClampedArray | null = $state(null);
@@ -218,6 +249,66 @@
 		previewHeld = true;
 	};
 	const releasePreview = () => (previewHeld = false);
+
+	// Output format: an optional fixed page the render composes into, driven
+	// by the A6..A3 toggles and the more-formats picker. At most one is
+	// active; none is the default. Ephemeral like the crop — every new source
+	// starts back at "no format" (the output width setting itself stays).
+	let outputFormatId = $state('');
+	let formatOrientation: Orientation = $state('portrait');
+	const customFormat = $state({ w: 210, h: 297 });
+	const resolvedFormat = $derived(
+		resolveOutputFormat(outputFormatId, customFormat.w, customFormat.h, formatOrientation)
+	);
+	// the working frame all pipeline stages and canvases live in: the
+	// source's own size — reshaped to the page aspect while a format is on
+	const imgWidth = $derived(srcWidth);
+	const imgHeight = $derived(
+		resolvedFormat && srcWidth ? frameHeightFor(srcWidth, resolvedFormat) : srcHeight
+	);
+	// physical output size: the page when a format is active, else the
+	// user's width setting with the height following the frame aspect
+	const outputWidthEff = $derived(resolvedFormat ? resolvedFormat.wMm : params.outputWidthMm);
+	const outputHeightEff = $derived(
+		resolvedFormat
+			? resolvedFormat.hMm
+			: imgWidth
+				? (params.outputWidthMm * imgHeight) / imgWidth
+				: 0
+	);
+	// the mask: a band this wide around the page edge stays clear of ink
+	const marginMmEff = $derived(
+		resolvedFormat ? clampMarginMm(params.fitMarginMm, resolvedFormat) : 0
+	);
+	const marginPx = $derived(
+		resolvedFormat && imgWidth ? (marginMmEff * imgWidth) / resolvedFormat.wMm : 0
+	);
+
+	// Crop / reposition of the input inside its frame — drag, zoom and rotate
+	// on the stage. In-memory only and reset with every new source; scrubbing
+	// a video keeps it, so all frames of a sequence share the framing.
+	const view: InputView = $state(identityView());
+	// what the reset chip returns to: the image exactly as loaded — or, on a
+	// page format, the whole image fitted inside the drawable area
+	const defaultView = $derived(
+		resolvedFormat
+			? containView(srcWidth, srcHeight, imgWidth, imgHeight, marginPx)
+			: identityView()
+	);
+	const viewIsDefault = $derived(viewsEqual(view, defaultView));
+	// the current source drawable (image element or the video element), kept
+	// outside $state so gestures and re-extraction can draw it at will
+	let sourceEl: HTMLImageElement | HTMLVideoElement | null = null;
+	let stageEl: HTMLElement | undefined = $state();
+	let cropCanvas: HTMLCanvasElement | undefined = $state();
+	// a crop gesture is in flight right now (pointers down / recent wheel)
+	let cropActive = $state(false);
+	// pixels were re-extracted for a new view and the hatch render hasn't
+	// caught up — keep the crop preview up instead of the stale render
+	let cropPending = $state(false);
+	// like the adjust preview: while the user reframes, the stage shows the
+	// (transformed) source instead of the not-yet-recomputed hatch render
+	const showCropPreview = $derived((cropActive || cropPending) && !showAdjustPreview);
 
 	const status = $state({ busy: false, segMs: 0, hatchMs: 0, regions: 0, lines: 0 });
 
@@ -323,6 +414,9 @@
 		videoName = '';
 		videoDuration = 0;
 		currentFrame = 0;
+		// the video element unmounts with videoSrc — nothing to draw from
+		if (sourceEl instanceof HTMLVideoElement) sourceEl = null;
+		resetViewState();
 	};
 
 	const onVideoMetadata = () => {
@@ -417,16 +511,10 @@
 		await seekVideo(el, frameTime(frame, video.fps, videoDuration));
 		// bail if outrun by a newer grab or the video was swapped for an image
 		if (token !== grabToken || !videoSrc || !el.videoWidth) return;
-		const canvas = document.createElement('canvas');
-		canvas.width = el.videoWidth;
-		canvas.height = el.videoHeight;
-		const ctx = canvas.getContext('2d');
-		if (!ctx) return;
-		ctx.drawImage(el, 0, 0);
-		imgWidth = canvas.width;
-		imgHeight = canvas.height;
-		pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-		previewBase = buildPreviewBase(canvas, canvas.width, canvas.height);
+		sourceEl = el;
+		srcWidth = el.videoWidth;
+		srcHeight = el.videoHeight;
+		extractSourcePixels();
 	};
 
 	// keep the playhead and the start offset inside the video when the fps
@@ -486,10 +574,423 @@
 	});
 
 	//***************************************************************
+	// 												CROP / REPOSITION
+	//***************************************************************
+
+	// Conventional direct manipulation on the stage: drag pans, the wheel (or
+	// a trackpad pinch, which browsers report as ctrl+wheel) zooms on the
+	// cursor, ⌥+wheel rotates, a double-click resets; on touch, two fingers
+	// drag / pinch / twist while one finger stays with the page scroll. The
+	// hatch render is far too slow to follow a gesture, so while one is in
+	// flight the stage shows the reframed source instead (same pattern as the
+	// adjust preview) and the pipeline re-runs from the committed view.
+
+	const VIEW_WHEEL_ZOOM = 0.0015; // zoom feel per wheel px
+	const VIEW_PINCH_ZOOM = 0.008; // trackpad pinches report far smaller deltas
+	const VIEW_WHEEL_ROTATE = 0.002; // ⌥+wheel, radians per wheel px
+	const VIEW_COMMIT_MS = 180; // wheel silence before the pipeline re-runs
+
+	// client coords by pointerId — gesture bookkeeping only, nothing renders
+	// from it, so a plain Map avoids reactive overhead on every pointermove
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity
+	const activePointers = new Map<number, Point>();
+	let gestureEngaged = $state(false); // an actual pan/pinch is in flight (not a mere click)
+	let touchRawRotation = 0; // unsnapped angle accumulator for the touch gesture
+	let cropIdleTimer: ReturnType<typeof setTimeout> | undefined;
+	let cropRaf = 0;
+
+	// a crop (and a page format) belongs to the content it framed — new
+	// sources start over; the output width setting itself is kept
+	const resetViewState = () => {
+		Object.assign(view, identityView());
+		outputFormatId = '';
+		formatOrientation = 'portrait';
+		cropActive = false;
+		cropPending = false;
+		gestureEngaged = false;
+		activePointers.clear();
+	};
+
+	// format toggles: reshape the frame, recompose the input into it (the
+	// whole image fitted inside the drawable area) and re-run the pipeline
+	const applyFormatSelection = (id: string) => {
+		if (id === outputFormatId || !srcWidth) return;
+		if (id === CUSTOM_FORMAT_ID && resolvedFormat) {
+			// start the custom page from whatever page was active
+			customFormat.w = resolvedFormat.wMm;
+			customFormat.h = resolvedFormat.hMm;
+		}
+		outputFormatId = id;
+		if (id && id !== CUSTOM_FORMAT_ID) formatOrientation = autoOrientation(srcWidth, srcHeight);
+		reframeToFormat();
+	};
+
+	const toggleQuickFormat = (id: string) => applyFormatSelection(outputFormatId === id ? '' : id);
+
+	const onMoreFormat = (event: Event) =>
+		applyFormatSelection((event.currentTarget as HTMLSelectElement).value);
+
+	const flipOrientation = () => {
+		formatOrientation = formatOrientation === 'portrait' ? 'landscape' : 'portrait';
+		reframeToFormat();
+	};
+
+	const setCustomDim = (axis: 'w' | 'h', value: number) => {
+		const mm = sanitizeCustomMm(value);
+		if (customFormat[axis] === mm) return;
+		customFormat[axis] = mm;
+		reframeToFormat();
+	};
+
+	const reframeToFormat = () => {
+		if (!sourceEl || !srcWidth) return;
+		// the canvases must take the new frame size before anything draws
+		flushSync();
+		Object.assign(view, defaultView);
+		commitView();
+	};
+
+	// the more-formats picker mirrors the selection unless a quick toggle owns it
+	const moreFormatValue = $derived(
+		outputFormatId && !QUICK_FORMATS.some((format) => format.id === outputFormatId)
+			? outputFormatId
+			: ''
+	);
+
+	const fmtMm = (value: number): string =>
+		Number.isInteger(value) ? String(value) : value.toFixed(1);
+
+	// reused pixel-extraction canvas — the source drawn into its frame
+	let frameCanvas: HTMLCanvasElement | null = null;
+
+	/**
+	 * (Re)read the working pixels: the source drawn into its frame through
+	 * the current view, white-backed so off-frame area reads as bare paper.
+	 * The single entry point an image load, a video frame grab and every
+	 * crop gesture funnel through.
+	 */
+	const extractSourcePixels = () => {
+		const src = sourceEl;
+		const w = imgWidth;
+		const h = imgHeight;
+		if (!src || !w || !h) return;
+		frameCanvas ??= document.createElement('canvas');
+		if (frameCanvas.width !== w) frameCanvas.width = w;
+		if (frameCanvas.height !== h) frameCanvas.height = h;
+		const ctx = frameCanvas.getContext('2d', { willReadFrequently: true });
+		if (!ctx) return;
+		ctx.setTransform(1, 0, 0, 1, 0, 0);
+		ctx.fillStyle = '#fff';
+		ctx.fillRect(0, 0, w, h);
+		const m = viewMatrix(view, w, h);
+		ctx.setTransform(m.a, m.b, m.c, m.d, m.e, m.f);
+		ctx.drawImage(src, 0, 0, srcWidth, srcHeight);
+		ctx.setTransform(1, 0, 0, 1, 0, 0);
+		pixels = ctx.getImageData(0, 0, w, h).data;
+		previewBase = buildPreviewBase(frameCanvas, w, h);
+	};
+
+	/** live view of the reframed source on the stage while a gesture runs */
+	const drawCropPreview = (withGrid: boolean) => {
+		const canvas = cropCanvas;
+		const src = sourceEl;
+		if (!canvas || !src || !imgWidth || !canvas.width) return;
+		const ctx = canvas.getContext('2d');
+		if (!ctx) return;
+		const w = canvas.width;
+		const h = canvas.height;
+		const out = w / imgWidth; // canvas px per frame px
+		ctx.setTransform(1, 0, 0, 1, 0, 0);
+		ctx.fillStyle = '#FFFEF7'; // the render's warm paper white
+		ctx.fillRect(0, 0, w, h);
+		const m = viewMatrix(view, imgWidth, imgHeight, out);
+		ctx.setTransform(m.a, m.b, m.c, m.d, m.e, m.f);
+		ctx.drawImage(src, 0, 0, srcWidth, srcHeight);
+		ctx.setTransform(1, 0, 0, 1, 0, 0);
+		if (!withGrid) return;
+		const line = Math.max(1, w / 600);
+		// accent border along the input's own edge, so where it starts and
+		// ends stays visible even when its background is as white as the
+		// paper — a white halo keeps it readable over dark content too
+		ctx.beginPath();
+		ctx.moveTo(m.e, m.f);
+		ctx.lineTo(m.a * srcWidth + m.e, m.b * srcWidth + m.f);
+		ctx.lineTo(m.a * srcWidth + m.c * srcHeight + m.e, m.b * srcWidth + m.d * srcHeight + m.f);
+		ctx.lineTo(m.c * srcHeight + m.e, m.d * srcHeight + m.f);
+		ctx.closePath();
+		ctx.lineWidth = line * 3;
+		ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+		ctx.stroke();
+		ctx.lineWidth = line * 1.4;
+		ctx.strokeStyle = '#60739f'; // house muted blue
+		ctx.stroke();
+		// the masked margin of an active page format: dim what ink will never
+		// reach and outline the drawable area
+		const inset = marginPx * out;
+		if (inset > 0) {
+			ctx.fillStyle = 'rgba(255, 254, 247, 0.72)';
+			ctx.fillRect(0, 0, w, inset);
+			ctx.fillRect(0, h - inset, w, inset);
+			ctx.fillRect(0, inset, inset, h - 2 * inset);
+			ctx.fillRect(w - inset, inset, inset, h - 2 * inset);
+			ctx.lineWidth = line;
+			ctx.strokeStyle = 'rgba(26, 32, 44, 0.45)';
+			ctx.strokeRect(inset, inset, w - 2 * inset, h - 2 * inset);
+		}
+		// rule-of-thirds composition grid over the drawable area
+		ctx.lineWidth = line;
+		ctx.strokeStyle = 'rgba(26, 32, 44, 0.3)';
+		ctx.beginPath();
+		for (const t of [1 / 3, 2 / 3]) {
+			ctx.moveTo(inset + (w - 2 * inset) * t, inset);
+			ctx.lineTo(inset + (w - 2 * inset) * t, h - inset);
+			ctx.moveTo(inset, inset + (h - 2 * inset) * t);
+			ctx.lineTo(w - inset, inset + (h - 2 * inset) * t);
+		}
+		ctx.stroke();
+		ctx.strokeRect(line / 2, line / 2, w - line, h - line);
+	};
+
+	/** client coords -> frame coords, via the crop canvas's on-screen box */
+	const clientToFrame = (clientX: number, clientY: number): Point | null => {
+		const el = cropCanvas;
+		if (!el || !imgWidth) return null;
+		const rect = el.getBoundingClientRect();
+		if (!rect.width || !rect.height) return null;
+		return {
+			x: ((clientX - rect.left) / rect.width) * imgWidth,
+			y: ((clientY - rect.top) / rect.height) * imgHeight
+		};
+	};
+
+	const engageCrop = () => {
+		if (cropActive) return;
+		cropActive = true;
+		// the crop canvas must be laid out before clientToFrame can measure it
+		flushSync();
+		drawCropPreview(true);
+	};
+
+	const scheduleCropDraw = () => {
+		if (cropRaf) return;
+		cropRaf = requestAnimationFrame(() => {
+			cropRaf = 0;
+			drawCropPreview(true);
+		});
+	};
+
+	// gesture over -> reframed pixels into the pipeline; the gridless crop
+	// preview stays parked (cropPending) until the fresh render lands
+	const commitView = () => {
+		clearTimeout(cropIdleTimer);
+		cropPending = true;
+		cropActive = false;
+		extractSourcePixels();
+		drawCropPreview(false);
+	};
+
+	const resetView = () => {
+		if (viewIsDefault) return;
+		Object.assign(view, defaultView);
+		gestureEngaged = false;
+		commitView();
+	};
+
+	/** overlays on the stage (timeline, chips…) keep their own interactions */
+	const gestureTarget = (event: Event): boolean => {
+		const target = event.target as HTMLElement | null;
+		return !target?.closest('button, input, select, a, .timeline, .input-error-card');
+	};
+
+	const onStagePointerDown = (event: PointerEvent) => {
+		if (!sourceEl || !imgWidth || !gestureTarget(event)) return;
+		if (event.pointerType === 'mouse' && event.button !== 0) return;
+		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+		activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+		clearTimeout(cropIdleTimer);
+		// two fingers engage immediately; mouse/pen wait for a real move so a
+		// plain click stays a click. One finger alone belongs to page scroll.
+		if (activePointers.size === 2) {
+			touchRawRotation = view.rotation;
+			gestureEngaged = true;
+			engageCrop();
+		}
+	};
+
+	const onStagePointerMove = (event: PointerEvent) => {
+		const prev = activePointers.get(event.pointerId);
+		if (!prev) return;
+		const cur = { x: event.clientX, y: event.clientY };
+
+		if (activePointers.size >= 2) {
+			// two fingers: pan + pinch zoom + twist in one similarity step
+			const other = [...activePointers.entries()].find(([id]) => id !== event.pointerId);
+			if (!other) return;
+			activePointers.set(event.pointerId, cur);
+			const a0 = clientToFrame(prev.x, prev.y);
+			const b0 = clientToFrame(other[1].x, other[1].y);
+			const a1 = clientToFrame(cur.x, cur.y);
+			if (!a0 || !b0 || !a1) return;
+			const delta = gestureBetween(a0, b0, a1, b0);
+			const next = applyGesture(view, delta, imgWidth, imgHeight, srcWidth, srcHeight);
+			// touch rotation snaps near the quarter turns, but the raw angle
+			// keeps accumulating so a deliberate tilt can escape the snap
+			touchRawRotation += delta.dphi;
+			next.rotation = snapAngle(touchRawRotation);
+			Object.assign(view, next);
+			scheduleCropDraw();
+			return;
+		}
+
+		if (event.pointerType === 'touch') {
+			// single finger: the page keeps scrolling; just track it so a
+			// second finger can turn the pair into a pinch
+			activePointers.set(event.pointerId, cur);
+			return;
+		}
+		if (!gestureEngaged && Math.hypot(cur.x - prev.x, cur.y - prev.y) < 2) return;
+		if (!gestureEngaged) {
+			gestureEngaged = true;
+			engageCrop();
+		}
+		activePointers.set(event.pointerId, cur);
+		const from = clientToFrame(prev.x, prev.y);
+		const to = clientToFrame(cur.x, cur.y);
+		if (!from || !to) return;
+		Object.assign(
+			view,
+			applyGesture(view, { k: 1, dphi: 0, from, to }, imgWidth, imgHeight, srcWidth, srcHeight)
+		);
+		scheduleCropDraw();
+	};
+
+	const onStagePointerUp = (event: PointerEvent) => {
+		if (!activePointers.delete(event.pointerId)) return;
+		const ended =
+			event.pointerType === 'touch' ? activePointers.size < 2 : activePointers.size === 0;
+		if (ended && gestureEngaged) {
+			gestureEngaged = false;
+			commitView();
+		}
+	};
+
+	const onStageDblClick = (event: MouseEvent) => {
+		if (!sourceEl || viewIsDefault || !gestureTarget(event)) return;
+		event.preventDefault();
+		resetView();
+	};
+
+	const onStageWheel = (event: WheelEvent) => {
+		if (!sourceEl || !imgWidth || !gestureTarget(event)) return;
+		const pinch = event.ctrlKey || event.metaKey;
+		// in the stacked mobile layout the wheel belongs to the page scroll —
+		// zooming there needs ctrl/cmd (a trackpad pinch reports exactly that)
+		if (!pinch && !event.altKey && window.matchMedia('(max-width: 900px)').matches) return;
+		event.preventDefault();
+		// normalize line/page delta modes to px-ish units
+		const raw = event.deltaY !== 0 ? event.deltaY : event.deltaX;
+		const delta = event.deltaMode === 1 ? raw * 40 : event.deltaMode === 2 ? raw * 400 : raw;
+		engageCrop();
+		if (event.altKey && !pinch) {
+			// ⌥ + wheel turns the image around the frame center
+			const c = { x: imgWidth / 2, y: imgHeight / 2 };
+			const dphi = -delta * VIEW_WHEEL_ROTATE;
+			Object.assign(
+				view,
+				applyGesture(view, { k: 1, dphi, from: c, to: c }, imgWidth, imgHeight, srcWidth, srcHeight)
+			);
+		} else {
+			const q = clientToFrame(event.clientX, event.clientY);
+			if (!q) return;
+			const k = Math.exp(-delta * (pinch ? VIEW_PINCH_ZOOM : VIEW_WHEEL_ZOOM));
+			Object.assign(
+				view,
+				applyGesture(view, { k, dphi: 0, from: q, to: q }, imgWidth, imgHeight, srcWidth, srcHeight)
+			);
+		}
+		scheduleCropDraw();
+		clearTimeout(cropIdleTimer);
+		cropIdleTimer = setTimeout(commitView, VIEW_COMMIT_MS);
+	};
+
+	// Safari-only trackpad pinch/rotate events; other browsers surface
+	// pinches as ctrl+wheel. Guarded to stay out of the way when a two-finger
+	// touch gesture (which Safari mirrors as gesture events too) owns the
+	// screen. TS has no GestureEvent type — shape it locally.
+	interface SafariGestureEvent extends Event {
+		scale: number;
+		rotation: number;
+		clientX: number;
+		clientY: number;
+	}
+
+	// Native listeners: Svelte marks wheel/touch handlers passive, and these
+	// must preventDefault — wheel to keep the page/browser zoom still, touch
+	// to keep a two-finger gesture from becoming a browser pinch-zoom while
+	// single-finger page scrolling stays untouched.
+	$effect(() => {
+		const stage = stageEl;
+		if (!stage) return;
+		const onTouch = (event: TouchEvent) => {
+			if (event.touches.length >= 2 && sourceEl && gestureTarget(event)) event.preventDefault();
+		};
+		let lastScale = 1;
+		let lastRotation = 0;
+		const onGestureStart = (event: Event) => {
+			event.preventDefault();
+			lastScale = 1;
+			lastRotation = 0;
+			if (!sourceEl || activePointers.size > 0 || !gestureTarget(event)) return;
+			engageCrop();
+		};
+		const onGestureChange = (event: Event) => {
+			event.preventDefault();
+			if (!sourceEl || !imgWidth || activePointers.size > 0 || !gestureTarget(event)) return;
+			const g = event as SafariGestureEvent;
+			const q = clientToFrame(g.clientX, g.clientY) ?? { x: imgWidth / 2, y: imgHeight / 2 };
+			const k = g.scale / lastScale;
+			const dphi = ((g.rotation - lastRotation) * Math.PI) / 180;
+			lastScale = g.scale;
+			lastRotation = g.rotation;
+			Object.assign(
+				view,
+				applyGesture(view, { k, dphi, from: q, to: q }, imgWidth, imgHeight, srcWidth, srcHeight)
+			);
+			scheduleCropDraw();
+			clearTimeout(cropIdleTimer);
+			cropIdleTimer = setTimeout(commitView, VIEW_COMMIT_MS);
+		};
+		stage.addEventListener('wheel', onStageWheel, { passive: false });
+		stage.addEventListener('touchstart', onTouch, { passive: false });
+		stage.addEventListener('touchmove', onTouch, { passive: false });
+		stage.addEventListener('gesturestart', onGestureStart);
+		stage.addEventListener('gesturechange', onGestureChange);
+		return () => {
+			stage.removeEventListener('wheel', onStageWheel);
+			stage.removeEventListener('touchstart', onTouch);
+			stage.removeEventListener('touchmove', onTouch);
+			stage.removeEventListener('gesturestart', onGestureStart);
+			stage.removeEventListener('gesturechange', onGestureChange);
+		};
+	});
+
+	const viewBadge = $derived.by(() => {
+		// zoom reads relative to the default composition, so 1.0× is always
+		// "the whole image" — also when a page format rescaled the fit
+		const relative = view.scale / (defaultView.scale || 1);
+		const zoom = `${relative >= 10 ? relative.toFixed(0) : relative.toFixed(1)}×`;
+		const deg = Math.round(viewRotationDeg(view));
+		return deg === 0 ? zoom : `${zoom} ∠${deg}°`;
+	});
+
+	const CROP_TIP =
+		'reframe the input: drag to move · scroll to zoom · ⌥ scroll to rotate · double-click for the full image — on touch, drag/pinch/twist with two fingers';
+
+	//***************************************************************
 	// 														PIPELINE
 	//***************************************************************
 
-	// 1. image -> pixels (+ downscaled float copy for the adjust preview)
+	// 1. image -> source drawable + pixels (through the crop view)
 	$effect(() => {
 		const src = inputImage;
 		if (!src || typeof window === 'undefined') return;
@@ -498,16 +999,11 @@
 		img.onload = () => {
 			// a newer source (another image, or a video frame) won the race
 			if (inputImage !== src) return;
-			const canvas = document.createElement('canvas');
-			canvas.width = img.width;
-			canvas.height = img.height;
-			const ctx = canvas.getContext('2d');
-			if (!ctx) return;
-			ctx.drawImage(img, 0, 0);
-			imgWidth = img.width;
-			imgHeight = img.height;
-			pixels = ctx.getImageData(0, 0, img.width, img.height).data;
-			previewBase = buildPreviewBase(img, img.width, img.height);
+			resetViewState();
+			sourceEl = img;
+			srcWidth = img.width;
+			srcHeight = img.height;
+			extractSourcePixels();
 		};
 		img.src = src;
 	});
@@ -721,7 +1217,6 @@
 	let hatchGeneration = 0;
 	$effect(() => {
 		trackHatchLayerDeps();
-		void params.outputWidthMm;
 		void params.penWidthMm;
 		void params.spacingMinMm;
 		void params.spacingMaxMm;
@@ -733,9 +1228,12 @@
 		void params.wobbleAmplitudeMm;
 		void params.wobbleWavelengthMm;
 		void params.wobbleSeed;
+		// real reads — deriveds only register as dependencies when used
+		const pxPerMm = imgWidth / outputWidthEff;
+		const maskInsetPx = marginPx;
 		const results = layerResults;
 		if (results.length === 0 || !imgWidth || !hatchCanvas) return;
-		recomputeHatching(results);
+		recomputeHatching(results, pxPerMm, maskInsetPx);
 	});
 
 	// Pick a hatch angle within the layer's range based on the region's own
@@ -749,7 +1247,11 @@
 		return layer.angleMin + (base / 90) * (layer.angleMax - layer.angleMin);
 	};
 
-	const recomputeHatching = async (results: LayerResult[]) => {
+	const recomputeHatching = async (
+		results: LayerResult[],
+		pxPerMm: number,
+		maskInsetPx: number
+	) => {
 		const generation = ++hatchGeneration;
 		const canvas = hatchCanvas;
 		const ctx = canvas?.getContext('2d');
@@ -765,7 +1267,6 @@
 		ctx.globalCompositeOperation = 'multiply';
 		ctx.globalAlpha = 0.85; // translucent-ink simulation
 
-		const pxPerMm = imgWidth / params.outputWidthMm;
 		const wobble = wobbleOptions(pxPerMm);
 		let totalLines = 0;
 
@@ -803,12 +1304,23 @@
 					maxSpacingPx,
 					spacingOptions
 				);
-				const segments = hatchPolygon(
+				let segments = hatchPolygon(
 					region.loops,
 					angleForRegion(layer, region),
 					spacing,
 					penWidthPx
 				);
+				// an active page format masks its margin: no ink beyond the
+				// drawable area, exactly
+				if (maskInsetPx > 0) {
+					segments = clipSegmentsToRect(
+						segments,
+						maskInsetPx,
+						maskInsetPx,
+						canvas.width - maskInsetPx,
+						canvas.height - maskInsetPx
+					);
+				}
 				region.hatchSegments = segments;
 				totalLines += segments.length / 4;
 				if (wobble) {
@@ -831,6 +1343,9 @@
 		}
 
 		hatchReady = true;
+		// this render reflects the latest committed view — the parked crop
+		// preview (if any) can hand back to it
+		cropPending = false;
 		status.hatchMs = performance.now() - t0;
 		status.lines = totalLines;
 	};
@@ -871,7 +1386,7 @@
 			plotEstimate = null;
 			return;
 		}
-		const pxPerMm = imgWidth / params.outputWidthMm;
+		const pxPerMm = imgWidth / outputWidthEff;
 		const perLayer = layers
 			.filter((layer) => layer.enabled)
 			.map((layer) => {
@@ -987,6 +1502,11 @@
 	// which structuredClone refuses to touch.
 	const applySettings = (settings: Rstr2Settings) => {
 		const clone: Rstr2Settings = JSON.parse(JSON.stringify(settings));
+		// Output sizing is the user's own setup, not part of a look — presets,
+		// imports and dice rolls leave the width and the mask margin exactly
+		// where the user put them (stored values in old files are ignored).
+		clone.params.outputWidthMm = params.outputWidthMm;
+		clone.params.fitMarginMm = params.fitMarginMm;
 		Object.assign(params, clone.params);
 		layers = clone.layers;
 	};
@@ -1102,34 +1622,10 @@
 	const exportName = (suffix: string, ext: string): string =>
 		buildExportName(videoName || inputName, suffix, ext, stamp());
 
-	// paper sizes offered by the "fit on page" buttons (subset of the shared
-	// PAGES table, smallest → largest)
-	const FIT_PAGES: PageId[] = ['A6', 'A5', 'A4', 'A3'];
-
-	// Set outputWidthMm so the art fits within the chosen paper size, leaving the
-	// configured margin clear on every edge. The page is turned to match the art:
-	// wider-than-tall art gets a landscape page, taller art a portrait page, and
-	// anything square-ish (within ~5%) defaults to portrait.
-	const fitToPage = (pageId: PageId) => {
-		if (!imgWidth || !imgHeight) return;
-		const artAspect = imgWidth / imgHeight; // >1 = landscape art
-		const orient = artAspect > 1.05 ? 'landscape' : 'portrait';
-		const [pageW, pageH] = pageDims(pageId, orient);
-		const margin = Math.max(0, params.fitMarginMm);
-		const availW = Math.max(0, pageW - 2 * margin);
-		const availH = Math.max(0, pageH - 2 * margin);
-		// art width is the free variable; its height is availW-derived via the
-		// aspect, so cap the width by whichever page edge binds first
-		const width = Math.min(availW, availH * artAspect);
-		if (width <= 0) return;
-		params.outputWidthMm = Math.round(width * 10) / 10;
-		markSettingsEdited();
-	};
-
 	/** assemble the current design as SVG text — shared by export and ordering */
 	const buildSvgText = (): string | null => {
 		if (!imgWidth) return null;
-		const pxPerMm = imgWidth / params.outputWidthMm;
+		const pxPerMm = imgWidth / outputWidthEff;
 		const exportLayers = layers
 			.filter((layer) => layer.enabled)
 			.map((layer) => {
@@ -1143,10 +1639,15 @@
 						: undefined
 				};
 			});
-		return buildSvgDocument(exportLayers, imgWidth, imgHeight, params.outputWidthMm, {
-			params,
-			layers
-		});
+		return buildSvgDocument(
+			exportLayers,
+			imgWidth,
+			imgHeight,
+			outputWidthEff,
+			// the embedded settings echo the size actually exported
+			{ params: { ...params, outputWidthMm: outputWidthEff }, layers },
+			resolvedFormat?.hMm
+		);
 	};
 
 	const downloadSvgText = (svg: string) =>
@@ -1255,13 +1756,21 @@
 
 	const ORDER_FROM_EUR = PRICING.tiers.A6.base + PRICING.tiers.A6.shippingEur;
 
+	// What the order must fit on paper is the drawn extent: the full art
+	// size — or, while a page format is active, the drawable area inside the
+	// masked margin (the ink never reaches beyond it).
+	const orderCheckNow = (): OrderCheck => {
+		const widthMm = outputWidthEff - 2 * marginMmEff;
+		const heightMm = outputHeightEff - 2 * marginMmEff;
+		return checkOrder({ ...params, outputWidthMm: widthMm }, layers, heightMm / widthMm);
+	};
+
 	// live quote for the order-button subtext: the same math the order dialog
 	// runs, recomputed as the design changes. null (falling back to the
 	// starting price) while the render is busy or the design isn't orderable.
 	const orderLiveQuote = $derived.by(() => {
 		if (!hatchReady || status.busy || !imgWidth || !imgHeight) return null;
-		const check = checkOrder(params, layers, imgHeight / imgWidth);
-		return quoteOrder(check, plotEstimate?.seconds ?? 0);
+		return quoteOrder(orderCheckNow(), plotEstimate?.seconds ?? 0);
 	});
 
 	// the pens on my shelf, grouped by ink, for the unsupported dialog
@@ -1278,7 +1787,7 @@
 
 	const orderPlot = () => {
 		if (!hatchReady || status.busy || !imgWidth || !imgHeight) return;
-		const check = checkOrder(params, layers, imgHeight / imgWidth);
+		const check = orderCheckNow();
 		orderCheck = check;
 		orderQuote = quoteOrder(check, plotEstimate?.seconds ?? 0);
 		orderDialog = check.supported && orderQuote ? 'summary' : 'unsupported';
@@ -1370,7 +1879,8 @@
 		const adjusted = isNeutralAdjustment(adjustments)
 			? grid
 			: { ...grid, ...adjustColors(grid.r, grid.g, grid.b, adjustments) };
-		const pxPerMm = w / params.outputWidthMm;
+		const pxPerMm = w / outputWidthEff;
+		const maskInsetPx = marginPx;
 		const wobble = wobbleOptions(pxPerMm);
 		return layers
 			.filter((layer) => layer.enabled)
@@ -1422,7 +1932,10 @@
 						boundsW: geometry.maxX - geometry.minX,
 						boundsH: geometry.maxY - geometry.minY
 					});
-					return hatchPolygon(geometry.loops, angle, spacing, penWidthPx);
+					const lines = hatchPolygon(geometry.loops, angle, spacing, penWidthPx);
+					return maskInsetPx > 0
+						? clipSegmentsToRect(lines, maskInsetPx, maskInsetPx, w - maskInsetPx, h - maskInsetPx)
+						: lines;
 				});
 				return {
 					layer,
@@ -1501,10 +2014,20 @@
 		const entries: ZipEntry[] = [];
 		// both formats in one archive get sorted into subfolders
 		const both = video.exportSvg && video.exportRaster;
+		// the grab canvas is the working frame (page-shaped while a format is
+		// active), not the raw video size — every frame goes through the crop
+		// view the preview shows, snapshot once so a mid-export gesture can't
+		// shear the sequence
 		const grabCanvas = document.createElement('canvas');
-		grabCanvas.width = el.videoWidth;
-		grabCanvas.height = el.videoHeight;
+		grabCanvas.width = imgWidth;
+		grabCanvas.height = imgHeight;
 		const grabCtx = grabCanvas.getContext('2d', { willReadFrequently: true });
+		const frameView = viewMatrix({ ...view }, grabCanvas.width, grabCanvas.height);
+		const exportWidthMm = outputWidthEff;
+		const exportHeightMm = resolvedFormat?.hMm;
+		const exportSettings: Rstr2Settings = JSON.parse(
+			JSON.stringify({ params: { ...params, outputWidthMm: exportWidthMm }, layers })
+		);
 		try {
 			if (!grabCtx) return;
 			for (let i = 0; i < range.count; i++) {
@@ -1513,7 +2036,19 @@
 				await seekVideo(el, frameTime(frame, video.fps, videoDuration));
 				// the seek may have resolved on a decode error rather than a frame
 				if (exporting.cancel || el.error) return;
-				grabCtx.drawImage(el, 0, 0);
+				grabCtx.setTransform(1, 0, 0, 1, 0, 0);
+				grabCtx.fillStyle = '#fff';
+				grabCtx.fillRect(0, 0, grabCanvas.width, grabCanvas.height);
+				grabCtx.setTransform(
+					frameView.a,
+					frameView.b,
+					frameView.c,
+					frameView.d,
+					frameView.e,
+					frameView.f
+				);
+				grabCtx.drawImage(el, 0, 0, el.videoWidth, el.videoHeight);
+				grabCtx.setTransform(1, 0, 0, 1, 0, 0);
 				const px = grabCtx.getImageData(0, 0, grabCanvas.width, grabCanvas.height).data;
 				const exportLayers = computeExportLayers(px, grabCanvas.width, grabCanvas.height);
 				const name = `frame-${String(frame).padStart(5, '0')}`;
@@ -1522,8 +2057,9 @@
 						exportLayers,
 						grabCanvas.width,
 						grabCanvas.height,
-						params.outputWidthMm,
-						{ params, layers }
+						exportWidthMm,
+						exportSettings,
+						exportHeightMm
 					);
 					const data = encoder.encode(svg);
 					entries.push({ name: `${both ? 'svg/' : ''}${name}.svg`, data });
@@ -2197,8 +2733,10 @@
 			STAGE — the render is the centerpiece
 		-------------------------------------------------------------->
 		<main
+			bind:this={stageEl}
 			class="stage"
 			class:drag-active={dragActive}
+			class:panning={gestureEngaged}
 			style={`--stage-aspect: ${imgWidth && imgHeight ? imgHeight / imgWidth : 0.75}`}
 			ondragover={(event) => {
 				event.preventDefault();
@@ -2206,6 +2744,11 @@
 			}}
 			ondragleave={() => (dragActive = false)}
 			ondrop={onDrop}
+			onpointerdown={onStagePointerDown}
+			onpointermove={onStagePointerMove}
+			onpointerup={onStagePointerUp}
+			onpointercancel={onStagePointerUp}
+			ondblclick={onStageDblClick}
 		>
 			{#snippet inputErrorContent(err: InputError)}
 				<p class="hint-title">{err.title}</p>
@@ -2225,10 +2768,11 @@
 			{/snippet}
 			<canvas
 				bind:this={hatchCanvas}
-				class="render"
-				class:hidden={!hatchReady || showAdjustPreview}
+				class="render grabbable"
+				class:hidden={!hatchReady || showAdjustPreview || showCropPreview}
 				width={imgWidth}
 				height={imgHeight}
+				title={CROP_TIP}
 			></canvas>
 			<canvas
 				bind:this={adjustCanvas}
@@ -2237,9 +2781,23 @@
 				width={previewBase?.w ?? 0}
 				height={previewBase?.h ?? 0}
 			></canvas>
-			{#if !showAdjustPreview && !hatchReady}
+			<canvas
+				bind:this={cropCanvas}
+				class="render grabbable"
+				class:hidden={!showCropPreview}
+				width={imgWidth}
+				height={imgHeight}
+				title={CROP_TIP}
+			></canvas>
+			{#if !showAdjustPreview && !showCropPreview && !hatchReady}
 				{#if inputImage}
-					<img class="render placeholder" src={inputImage} alt="input" />
+					<img
+						class="render placeholder grabbable"
+						src={inputImage}
+						alt="input"
+						title={CROP_TIP}
+						draggable="false"
+					/>
 				{:else if !videoSrc}
 					<div class="dropzone-hint" class:dropzone-error={inputError !== null}>
 						{#if inputError}
@@ -2295,6 +2853,15 @@
 						).toFixed(2)}s
 					</div>
 				</div>
+			{/if}
+			{#if !viewIsDefault}
+				<button
+					class="view-reset"
+					onclick={resetView}
+					title="the input is reframed ({viewBadge}) — click to go back to the full image (double-clicking the render does the same)"
+				>
+					⛶ full image <span class="view-badge">{viewBadge}</span>
+				</button>
 			{/if}
 			{#if inputError && (showAdjustPreview || hatchReady || inputImage || videoSrc)}
 				<!-- the input died while something is still on stage (a video that
@@ -2605,7 +3172,9 @@
 				<div class="group-title">export</div>
 				<label
 					class="slider-row"
-					title="target output width in millimeters — the height follows the image aspect"
+					title={resolvedFormat
+						? 'the output format below sets the size — turn it off to size freely (your width setting is kept)'
+						: 'target output width in millimeters — the height follows the image aspect'}
 				>
 					<span>width (mm)</span>
 					<input
@@ -2615,41 +3184,120 @@
 						step="1"
 						bind:value={params.outputWidthMm}
 						use:inkRange={params.outputWidthMm}
+						disabled={resolvedFormat !== null}
 					/>
-					<input type="number" min="10" max="1000" step="1" bind:value={params.outputWidthMm} />
+					<input
+						type="number"
+						min="10"
+						max="1000"
+						step="1"
+						bind:value={params.outputWidthMm}
+						disabled={resolvedFormat !== null}
+					/>
 				</label>
 				<div
 					class="fit-title"
-					title="set the width so the art fits on a standard paper size within the margin below — the page turns to match the art's orientation"
+					title="compose onto a fixed page instead: the render takes the page's shape, the input crops into it, and the margin below is masked — click the active size again (or pick nothing in the list) to turn it off"
 				>
-					fit on page
+					output format
 				</div>
 				<div class="fit-pages">
-					{#each FIT_PAGES as pageId (pageId)}
+					{#each QUICK_FORMATS as format (format.id)}
 						<button
-							onclick={() => fitToPage(pageId)}
-							disabled={!imgWidth || !imgHeight}
-							title={`size the art to fit ${pageId} with a ${params.fitMarginMm}mm margin`}
+							class:active={outputFormatId === format.id}
+							aria-pressed={outputFormatId === format.id}
+							onclick={() => toggleQuickFormat(format.id)}
+							disabled={!srcWidth}
+							title={outputFormatId === format.id
+								? `stop composing on ${format.id} — back to the free output width`
+								: `compose on ${format.label}, turned to match the input`}
 						>
-							{pageId}
+							{format.id}
 						</button>
 					{/each}
 				</div>
-				<label
-					class="slider-row"
-					title="margin kept clear on every edge of the page when fitting the art to a paper size"
-				>
-					<span>margin (mm)</span>
-					<input
-						type="range"
-						min="5"
-						max="50"
-						step="1"
-						bind:value={params.fitMarginMm}
-						use:inkRange={params.fitMarginMm}
-					/>
-					<input type="number" min="5" max="50" step="1" bind:value={params.fitMarginMm} />
-				</label>
+				<div class="format-row">
+					<select
+						value={moreFormatValue}
+						onchange={onMoreFormat}
+						disabled={!srcWidth}
+						title="more page sizes — and a custom one; picking the top entry turns the format off"
+					>
+						<option value="">more formats…</option>
+						{#each MORE_FORMATS as format (format.id)}
+							<option value={format.id}>{format.label}</option>
+						{/each}
+						<option value={CUSTOM_FORMAT_ID}>custom…</option>
+					</select>
+				</div>
+				{#if outputFormatId === CUSTOM_FORMAT_ID}
+					<div
+						class="custom-size"
+						title="custom page size in millimeters, as typed — no auto-turning"
+					>
+						<input
+							type="number"
+							min="20"
+							max="2000"
+							step="1"
+							value={customFormat.w}
+							onchange={(event) => {
+								setCustomDim('w', event.currentTarget.valueAsNumber);
+								event.currentTarget.value = String(customFormat.w);
+							}}
+						/>
+						<span>×</span>
+						<input
+							type="number"
+							min="20"
+							max="2000"
+							step="1"
+							value={customFormat.h}
+							onchange={(event) => {
+								setCustomDim('h', event.currentTarget.valueAsNumber);
+								event.currentTarget.value = String(customFormat.h);
+							}}
+						/>
+						<span>mm</span>
+					</div>
+				{/if}
+				{#if resolvedFormat}
+					<label
+						class="slider-row"
+						title="masked margin — a band this wide around the page edge is kept clear of ink, whatever the composition puts there"
+					>
+						<span>margin (mm)</span>
+						<input
+							type="range"
+							min="0"
+							max="50"
+							step="1"
+							bind:value={params.fitMarginMm}
+							use:inkRange={params.fitMarginMm}
+						/>
+						<input type="number" min="0" max="50" step="1" bind:value={params.fitMarginMm} />
+					</label>
+					<div class="format-info">
+						<span title="page size — and the drawable area the masked margin leaves">
+							page {fmtMm(resolvedFormat.wMm)} × {fmtMm(resolvedFormat.hMm)}
+							{#if marginMmEff > 0}
+								· drawable {fmtMm(resolvedFormat.wMm - 2 * marginMmEff)} × {fmtMm(
+									resolvedFormat.hMm - 2 * marginMmEff
+								)}
+							{/if}
+							mm
+						</span>
+						{#if resolvedFormat.orientable}
+							<button
+								class="icon-btn"
+								onclick={flipOrientation}
+								title="turn the page (portrait ⇄ landscape)"
+							>
+								⇄
+							</button>
+						{/if}
+					</div>
+				{/if}
 				<div class="export-actions">
 					<button
 						class="primary-btn"
@@ -3037,7 +3685,7 @@
 					</ul>
 					<p class="order-note">
 						quickest fix: apply a built-in preset (or roll the dice with “stick to built-in presets”
-						on), use “fit on page” up to A3 — then order away.
+						on), pick an output format up to A3 (or keep the width within one) — then order away.
 					</p>
 					<div class="order-actions">
 						<button onclick={closeOrderDialog}>got it</button>
@@ -3214,6 +3862,14 @@
 		justify-content: center;
 		padding: 0.75rem;
 		overflow: hidden;
+		/* keep one-finger page scrolling and drop only double-tap zoom, so a
+		   double-tap can reset the crop; two-finger crop gestures are claimed
+		   in JS (non-passive touchstart) before the browser pinch-zooms */
+		touch-action: manipulation;
+		/* size container so the render surfaces below can contain-fit the
+		   available space (cqw/cqh measure the content box, padding already
+		   excluded); the stage's own size never depends on its contents */
+		container-type: size;
 	}
 
 	.stage.drag-active {
@@ -3232,6 +3888,21 @@
 			0 8px 24px rgba(96, 115, 159, 0.2);
 	}
 
+	/* Fill the stage: without this, a small input sits at its native pixel
+	   size in a sea of empty stage (max-width/height only ever shrink).
+	   Contain-fit against the stage's content box instead, upscaling small
+	   sources too. Sizing the element itself (height keeps the intrinsic
+	   ratio) — rather than object-fit letterboxing — keeps the element box
+	   equal to the visible render, so the paper shadow hugs it and the crop
+	   gestures' clientToFrame mapping stays a plain rect scale. */
+	@supports (width: 1cqh) {
+		.render {
+			max-width: none;
+			max-height: none;
+			width: min(100cqw, calc(100cqh / var(--stage-aspect, 0.75)));
+		}
+	}
+
 	.render.hidden {
 		display: none;
 	}
@@ -3239,6 +3910,41 @@
 	.render.placeholder {
 		border-radius: 0;
 		opacity: 0.9;
+	}
+
+	/* the render is directly manipulable — grab it to reframe the input */
+	.render.grabbable {
+		cursor: grab;
+	}
+
+	.stage.panning,
+	.stage.panning .render.grabbable {
+		cursor: grabbing;
+	}
+
+	/* shows only while the input is reframed — jump back to the full image */
+	.view-reset {
+		position: absolute;
+		top: 1rem;
+		right: 1rem;
+		z-index: 2;
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		padding: 0.35rem 0.6rem;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: rgba(255, 255, 255, 0.88);
+		-webkit-backdrop-filter: blur(6px);
+		backdrop-filter: blur(6px);
+		box-shadow: 0 2px 6px rgba(96, 115, 159, 0.15);
+		color: var(--ink);
+		cursor: pointer;
+	}
+
+	.view-badge {
+		font-family: 'mono-light', monospace;
+		color: var(--muted);
 	}
 
 	.dropzone-hint {
@@ -3908,6 +4614,53 @@
 		cursor: default;
 	}
 
+	/* the toggled-on page format — filled like a pressed key */
+	.fit-pages button.active {
+		background: var(--ink) !important;
+		border-color: var(--ink);
+		color: var(--bg);
+	}
+
+	.fit-pages button.active:hover:not(:disabled) {
+		background: var(--ink-soft) !important;
+		border-color: var(--ink-soft);
+	}
+
+	.format-row select {
+		width: 100%;
+		padding: 0.3rem;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		background: #fff;
+		color: var(--ink);
+		font: inherit;
+	}
+
+	.custom-size {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+		color: var(--muted);
+	}
+
+	.custom-size input {
+		flex: 1;
+		min-width: 0;
+		padding: 0.25rem 0.35rem;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		font: inherit;
+	}
+
+	.format-info {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.4rem;
+		font-size: 0.68rem;
+		color: var(--muted);
+	}
+
 	.primary-btn {
 		flex: 1;
 		padding: 0.45rem;
@@ -4549,6 +5302,8 @@
 		.plotter-row input[type='number'],
 		.select-row select,
 		.preset-row select,
+		.format-row select,
+		.custom-size input,
 		.preset-name {
 			font-size: 16px;
 		}

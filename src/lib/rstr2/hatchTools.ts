@@ -152,6 +152,64 @@ export const spacingForInk = (
 	return Math.max(minSpacingPx, Math.min(maxSpacingPx, spacing));
 };
 
+/**
+ * Clip a flat segment list to the axis-aligned rect [x0,y0]–[x1,y1]
+ * (Liang–Barsky per segment). Segments outside are dropped, crossing ones
+ * shortened to the boundary — this is what masks the margin band when an
+ * output format is active: no ink beyond the drawable area, exactly.
+ */
+export const clipSegmentsToRect = (
+	segments: HatchSegments,
+	x0: number,
+	y0: number,
+	x1: number,
+	y1: number
+): HatchSegments => {
+	const clipped: HatchSegments = [];
+	for (let k = 0; k < segments.length; k += 4) {
+		const ax = segments[k];
+		const ay = segments[k + 1];
+		const dx = segments[k + 2] - ax;
+		const dy = segments[k + 3] - ay;
+		let t0 = 0;
+		let t1 = 1;
+		let keep = true;
+		// each side: p·t must stay ≥ q (entering raises t0, leaving lowers t1)
+		const sides: [number, number][] = [
+			[-dx, ax - x0],
+			[dx, x1 - ax],
+			[-dy, ay - y0],
+			[dy, y1 - ay]
+		];
+		for (const [p, q] of sides) {
+			if (p === 0) {
+				if (q < 0) {
+					keep = false;
+					break;
+				}
+				continue;
+			}
+			const t = q / p;
+			if (p < 0) {
+				if (t > t1) {
+					keep = false;
+					break;
+				}
+				if (t > t0) t0 = t;
+			} else {
+				if (t < t0) {
+					keep = false;
+					break;
+				}
+				if (t < t1) t1 = t;
+			}
+		}
+		if (!keep || t1 - t0 < 1e-9) continue;
+		clipped.push(ax + dx * t0, ay + dy * t0, ax + dx * t1, ay + dy * t1);
+	}
+	return clipped;
+};
+
 /** Compact SVG path ("M x y L x y M ...") for a flat segment list. */
 export const segmentsToSvgPath = (segments: HatchSegments): string => {
 	let d = '';
