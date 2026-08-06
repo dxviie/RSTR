@@ -50,18 +50,18 @@
 			blurb: 'pen width, how ink turns into line spacing, and the optional hand-drawn wobble.'
 		},
 		{
-			id: 'layers',
-			title: 'layers',
-			num: 6,
-			color: '#06a77d',
-			blurb: 'one pen per layer: color, channel, hatch angles, overrides.'
-		},
-		{
 			id: 'presets',
 			title: 'presets',
 			num: 5,
 			color: '#fb8500',
 			blurb: 'randomize everything, or save and share complete looks.'
+		},
+		{
+			id: 'layers',
+			title: 'layers',
+			num: 6,
+			color: '#06a77d',
+			blurb: 'one pen per layer: color, channel, hatch angles, overrides.'
 		},
 		{
 			id: 'export',
@@ -325,6 +325,26 @@
 		</dl>
 	</section>
 
+	<section id="presets">
+		<h2>presets & randomize</h2>
+		<dl>
+			<dt>randomize</dt>
+			<dd>
+				The dice rolls all segmentation, lines and layer settings. "Stick to built-in presets"
+				limits the roll to ink + pen combinations that physically exist, so the result stays
+				plottable.
+			</dd>
+			<dt>presets</dt>
+			<dd>
+				Apply a built-in look, or save your current settings under a name — saved presets live in
+				your browser. A fresh visit opens on a random built-in. Presets are about the look: your
+				output width and margin stay yours (any values stored in older preset files are ignored).
+			</dd>
+			<dt>export / import .json</dt>
+			<dd>Move settings between browsers or share them as a small JSON file.</dd>
+		</dl>
+	</section>
+
 	<section id="layers">
 		<h2>layers — one per pen</h2>
 		<dl>
@@ -350,26 +370,6 @@
 				layer. Empty fields inherit the global lines values (shown as grey italics); "clear
 				overrides" resets them all.
 			</dd>
-		</dl>
-	</section>
-
-	<section id="presets">
-		<h2>presets & randomize</h2>
-		<dl>
-			<dt>randomize</dt>
-			<dd>
-				The dice rolls all segmentation, lines and layer settings. "Stick to built-in presets"
-				limits the roll to ink + pen combinations that physically exist, so the result stays
-				plottable.
-			</dd>
-			<dt>presets</dt>
-			<dd>
-				Apply a built-in look, or save your current settings under a name — saved presets live in
-				your browser. A fresh visit opens on a random built-in. Presets are about the look: your
-				output width and margin stay yours (any values stored in older preset files are ignored).
-			</dd>
-			<dt>export / import .json</dt>
-			<dd>Move settings between browsers or share them as a small JSON file.</dd>
 		</dl>
 	</section>
 
