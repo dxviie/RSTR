@@ -50,17 +50,17 @@
 		},
 		{
 			name: 'broken-gradient-2',
-			alt: 'abstract gradient study — a dark monolith over a teal-to-magenta field'
+			alt: 'abstract gradient study, a dark monolith over a teal-to-magenta field'
 		},
 		{ name: 'metro-1', alt: 'a child in a red hat on the metro, in warm hatched colour' },
 		{ name: 'mona-2', alt: 'close-up of the crosshatched pen strokes' },
 		{ name: 'lines-1', alt: 'an abstract portrait plotted in dense single-pen directional lines' },
 		{ name: 'space-2-1', alt: 'plot of a nebula in reds and oranges on a dark starfield' },
-		{ name: 'street-2', alt: 'detail of the townscape plot — blue sky over hatched rooftops' },
+		{ name: 'street-2', alt: 'detail of the townscape plot, blue sky over hatched rooftops' },
 		{ name: 'pearl-2', alt: 'detail of the hatched blocks in the Pearl Earring plot' },
 		{ name: 'hatch-1', alt: 'close-up of vivid magenta, blue and yellow pen strokes' },
 		{ name: 'melkmeisje-2', alt: 'the Milkmaid plot in progress on the AxiDraw' },
-		{ name: 'space-1-2', alt: 'detail of the Carina Nebula plot — thousands of tiny pen strokes' },
+		{ name: 'space-1-2', alt: 'detail of the Carina Nebula plot, thousands of tiny pen strokes' },
 		{ name: 'broken-gradient-2-2', alt: 'detail of the woven hatch texture in the gradient study' },
 		{ name: 'space-2-2', alt: 'detail of the red nebula plot with sparkling star highlights' }
 	];
@@ -193,7 +193,7 @@
 	const STEPS = [
 		{
 			title: 'drop an image or video',
-			text: 'Any photo or video works. It never leaves your browser. All the processing happens right on your machine.'
+			text: 'Any photo or video works, and it never leaves your browser. Everything runs on your own machine.'
 		},
 		{
 			title: 'shape the lines',
@@ -231,10 +231,10 @@
 </script>
 
 <svelte:head>
-	<title>RSTR — turn your favorite pictures into bespoke art</title>
+	<title>RSTR: turn your favorite pictures into plotter art</title>
 	<meta
 		name="description"
-		content="RSTR turns your best memories into unique hatched line art. Print it, share it, or plot it with a pen plotter. Free and instant, right in your browser."
+		content="RSTR turns your best memories into hatched line art. Print it, share it, or plot it with a pen plotter. Free, instant, and it all happens in your browser."
 	/>
 </svelte:head>
 
@@ -297,17 +297,17 @@
 				<h2>what's a plotter?</h2>
 				<p>
 					A pen plotter is a machine that draws by moving a real pen across paper along vector
-					paths. It can't color in shapes the way software does. If you want a colored square, you
-					have to draw a bunch of lines neatly next to each other — or with some spacing in between
-					to create different shades. That technique is called
+					paths. It can't color in shapes the way software does. To get a colored square you draw a
+					lot of lines next to each other, tight for a solid block, spaced further apart for a
+					lighter shade. That technique is called
 					<a href="https://en.wikipedia.org/wiki/Hatching" target="_blank" rel="noopener"
 						><em>hatching</em></a
 					>, and it's probably as old as drawing itself.
 				</p>
 				<p>
-					RSTR reimagines hatching for pen plotters: it splits your image into regions of similar
-					tone and fills each one with lines — denser where the image is dark, sparser where it's
-					light. The result is an image rebuilt entirely from straight lines.
+					RSTR does the hatching for you. It splits your image into regions of similar tone and
+					fills each one with lines, dense where the image is dark, sparse where it's light. What
+					comes out is your picture rebuilt entirely from straight lines.
 				</p>
 				<p class="aside">
 					Curious about plotter art? Have a look at the
@@ -339,7 +339,7 @@
 				your browser.
 			</p>
 			<p>
-				The tool itself is in the open, too: the source code is on
+				The tool itself is open too. The source code is on
 				<a href="https://github.com/dxviie/RSTR" target="_blank" rel="noopener">GitHub</a>, licensed
 				under the GPL.
 			</p>
@@ -362,8 +362,8 @@
 			<div class="plot-service">
 				<h3>don't own a plotter?</h3>
 				<p>
-					No problem — I can plot yours for you. Make something in the studio, then hit
-					<strong>⚡ order this plot</strong> to have it drawn with real pens on real paper and shipped
+					I can plot yours for you. Make something in the studio, then hit
+					<strong>⚡ order this plot</strong> and I'll draw it with real pens on real paper and ship it
 					to your door.
 				</p>
 			</div>
@@ -373,7 +373,7 @@
 		<section class="gallery-section">
 			<h2>#madewithrstr</h2>
 			<p class="gallery-lede">
-				A few of my own: plots from photos, run through RSTR and drawn with real pens on real paper.
+				A few of mine. Photos run through RSTR, then drawn with real pens on real paper.
 			</p>
 			<div class="gallery">
 				{#each gallerySlots as plotIndex, slot (slot)}
@@ -409,9 +409,9 @@
 			<div class="community">
 				<h3>your turn</h3>
 				<p>
-					Made something with RSTR — plotted, printed, or straight off the screen? Share it and tag
-					it <strong>#madewithrstr</strong> so others can find it. A community gallery will grow right
-					here, so show off your work!
+					Made something with RSTR, plotted, printed, or straight off the screen? Post it with the
+					tag <strong>#madewithrstr</strong> so other people can find it. A community gallery is going
+					up right here, and I'd like yours in it.
 				</p>
 			</div>
 		</section>
@@ -425,10 +425,9 @@
 			<p>
 				RSTR started as a sketch for the Genuary '24 prompt
 				<a href="https://genuary24.d17e.dev/?prompt=5" target="_blank" rel="noopener"
-					><em>“In the style of Vera Molnár (1924–2023)”</em></a
-				>
-				— and never really stopped. It grew from a single experiment into the studio it is today; the
-				<a href="/classic">original version</a> still lives on if you're feeling nostalgic.
+					><em>"In the style of Vera Molnár (1924-2023)"</em></a
+				>, and never really stopped. One experiment turned into the studio you see now. The
+				<a href="/classic">original version</a> still runs if you're feeling nostalgic.
 			</p>
 			<p>
 				It's made by me, David Vandenbogaerde (or <a
@@ -436,9 +435,9 @@
 					target="_blank"
 					rel="noopener">d17e</a
 				>
-				for short), a software engineer and artist living in Amsterdam 🇳🇱. Ever since I owned a plotter,
-				I've been experimenting with novel ways to turn images into plotter art.<br />
-				Which is why RSTR exists. I hope you like it.
+				for short), a software engineer and artist living in Amsterdam 🇳🇱. Ever since I got a plotter,
+				I've been looking for new ways to turn images into something it can draw.<br />
+				That's why RSTR exists. I hope you like it.
 			</p>
 			<div class="cta-row center">
 				<a class="btn primary" href="/studio">launch RSTR</a>

@@ -61,7 +61,7 @@
 			title: 'layers',
 			num: 6,
 			color: '#06a77d',
-			blurb: 'one pen per layer: color, channel, hatch angles, overrides.'
+			blurb: 'one pen per layer, with its color, channel, hatch angles and overrides.'
 		},
 		{
 			id: 'export',
@@ -121,10 +121,10 @@
 </script>
 
 <svelte:head>
-	<title>RSTR help — settings & features</title>
+	<title>RSTR help: what every setting does</title>
 	<meta
 		name="description"
-		content="What every RSTR setting does: image adjustments, segmentation, lines, layers, presets, export, plot time — plus the prep tool and the classic app."
+		content="What every RSTR setting does: image adjustments, segmentation, lines, layers, presets, export and plot time, plus the prep tool and the classic app."
 	/>
 </svelte:head>
 
@@ -152,16 +152,17 @@
 		</ol>
 	</nav>
 	<p class="intro">
-		The <a href="/studio">studio</a> is where images become line art: the left pane feeds and tunes the
-		image, the middle shows the render, the right pane manages pens and exports. Every control in the
-		app has a tooltip — hover (or long-press) it for a hint in place. This page is the longer version.
+		The <a href="/studio">studio</a> is where images become line art. The left pane loads and tunes the
+		image, the middle shows the render, and the right pane handles pens and exports. Every control in
+		the app has a tooltip: hover it, or long-press on a touch screen, for a hint in place. This page is
+		the longer version.
 	</p>
 
 	<figure class="shot">
 		<a href="/help/studio-sections.webp" target="_blank" rel="noopener">
 			<img
 				src="/help/studio-sections.webp"
-				alt="the RSTR studio on desktop, its sections outlined and numbered — 1 source & adjustments, 2 video, 3 segmentation and 4 lines on the left, 5 presets, 6 layers, 7 export and 8 stats on the right, the render in the middle"
+				alt="the RSTR studio on desktop with its sections outlined and numbered: 1 source and adjustments, 2 video, 3 segmentation and 4 lines on the left, 5 presets, 6 layers, 7 export and 8 stats on the right, the render in the middle"
 				width="2000"
 				height="1405"
 			/>
@@ -172,8 +173,7 @@
 			<li style="--c: {section.color}">
 				<span class="map-dot">{section.num}</span>
 				<span>
-					<a class="map-title" href="#{section.id}"><strong>{section.title}</strong></a>
-					— {section.blurb}
+					<a class="map-title" href="#{section.id}"><strong>{section.title}</strong></a>: {section.blurb}
 				</span>
 			</li>
 		{/each}
@@ -184,26 +184,26 @@
 		<dl>
 			<dt>browse / drop</dt>
 			<dd>
-				Load an image or video from your device — or drop it straight onto the render. Nothing is
-				uploaded; all processing happens in your browser.
+				Load an image or video from your device, or drop it straight onto the render. Nothing is
+				uploaded. It all runs in your browser.
 			</dd>
 			<dt>input thumbnail</dt>
 			<dd>Hold it down to peek at the input with the adjustments below applied.</dd>
 			<dt>crop / reposition</dt>
 			<dd>
-				Zoom in on the interesting part by manipulating the input right on the render: drag to move
-				it, scroll to zoom on the cursor (a trackpad pinch works too), alt/⌥ + scroll to rotate — on
-				a touch screen, drag, pinch and twist with two fingers while one finger keeps scrolling the
-				page. While you're reframing, the input shows with a composition grid and an accent border
-				along its own edge — so you can see where it ends even on a white background; let go and the
-				lines recompute for the new framing, which also carries into every export (a video keeps one
-				framing across all its frames). Double-click the render — or the
-				<em>⛶ full image</em> chip that appears — to get the whole picture back.
+				Move the input around right on the render to zoom in on the interesting part. Drag to move
+				it, scroll to zoom on the cursor (a trackpad pinch works too), alt/⌥ + scroll to rotate. On
+				a touch screen, drag, pinch and twist with two fingers, while one finger keeps scrolling the
+				page. While you reframe, the input gets a composition grid and an accent border along its
+				own edge, so you can see where it ends even on a white background. Let go and the lines
+				recompute for the new framing, which carries into every export (a video keeps one framing
+				across all its frames). Double-click the render, or the <em>⛶ full image</em> chip that appears,
+				to get the whole picture back.
 			</dd>
 			<dt>brightness / contrast</dt>
 			<dd>Brighten or darken the image, and push contrast around mid grey, before segmentation.</dd>
 			<dt>gamma / key</dt>
-			<dd>Midtone curve — above 1 lifts the midtones, below 1 keys them down.</dd>
+			<dd>Midtone curve. Above 1 lifts the midtones, below 1 keys them down.</dd>
 			<dt>saturation</dt>
 			<dd>Uniform color saturation; 0 turns the input greyscale.</dd>
 			<dt>vibrance</dt>
@@ -218,15 +218,16 @@
 		<dl>
 			<dt>supported formats</dt>
 			<dd>
-				Whatever your browser can decode — MP4 (H.264) and WebM play everywhere. HEVC (H.265)
-				videos, like the .mov recordings phones make, don't decode in many browsers; the studio will
-				tell you when that happens. Convert those to MP4 (H.264) first — QuickTime's export,
+				Whatever your browser can decode. MP4 (H.264) and WebM play everywhere. HEVC (H.265) videos,
+				like the .mov recordings phones make, don't decode in many browsers, and the studio tells
+				you when that happens. Convert those to MP4 (H.264) first with QuickTime's export,
 				<a href="https://handbrake.fr" target="_blank" rel="noopener">HandBrake</a>, or
-				<code>ffmpeg -i input.mov -c:v libx264 -pix_fmt yuv420p output.mp4</code> — and load the result.
+				<code>ffmpeg -i input.mov -c:v libx264 -pix_fmt yuv420p output.mp4</code>, then load the
+				result.
 			</dd>
 			<dt>output fps</dt>
 			<dd>
-				Frame rate the video is sampled at — fewer frames per second means fewer, smaller files.
+				Frame rate the video is sampled at. Fewer frames per second means fewer, smaller files.
 			</dd>
 			<dt>frames</dt>
 			<dd>
@@ -235,7 +236,7 @@
 			</dd>
 			<dt>frame sequence export</dt>
 			<dd>
-				Renders every frame in the window and downloads one zip — plottable SVGs, images (png, jpeg
+				Renders every frame in the window and downloads one zip: plottable SVGs, images (png, jpeg
 				or webp with quality and scale controls), or both.
 			</dd>
 		</dl>
@@ -244,7 +245,8 @@
 	<section id="segmentation">
 		<h2>segmentation</h2>
 		<p class="section-note">
-			Segmentation carves the image into regions of similar tone — the shapes the lines will fill.
+			Segmentation carves the image into regions of similar tone. Those regions are the shapes the
+			lines fill.
 		</p>
 		<dl>
 			<dt>algorithm</dt>
@@ -253,9 +255,11 @@
 				<em>k-means</em> clusters them, and <em>SLIC</em> carves compact superpixels.
 			</dd>
 			<dt>resolution</dt>
-			<dd>Grid resolution the image is sampled at — more cells, more detail, slower renders.</dd>
+			<dd>
+				Grid resolution the image is sampled at. More cells means more detail and slower renders.
+			</dd>
 			<dt>smoothing</dt>
-			<dd>Blur passes before segmentation — higher means fewer, larger regions.</dd>
+			<dd>Blur passes before segmentation. Higher means fewer, larger regions.</dd>
 			<dt>superpixel size / compactness</dt>
 			<dd>
 				SLIC only: superpixel spacing in grid cells, and how strictly they stay grid-like versus
@@ -264,7 +268,7 @@
 			<dt>tolerance</dt>
 			<dd>Maximum intensity difference for merging adjacent regions.</dd>
 			<dt>min region size</dt>
-			<dd>Regions with fewer cells get absorbed into a neighbour.</dd>
+			<dd>Regions with fewer cells merge into a neighbour.</dd>
 		</dl>
 	</section>
 
@@ -276,13 +280,13 @@
 			<dt>ink gamma</dt>
 			<dd>Perceptual weight on ink intensity before it becomes line spacing.</dd>
 			<dt>ink boost</dt>
-			<dd>Coverage multiplier — above 1 pushes dark regions into overlapping lines.</dd>
+			<dd>Coverage multiplier. Above 1 pushes dark regions into overlapping lines.</dd>
 			<dt>ink threshold</dt>
 			<dd>
-				The band of ink a region must fall in to be hatched. The low bound is a high-pass filter —
-				regions holding less ink stay empty; the high bound is a low-pass filter — regions holding
-				more ink stay empty too (leave it at 1 to keep every dark region). Narrow the band from both
-				ends to isolate the midtones.
+				The band of ink a region must fall in to be hatched. The low bound works as a high-pass
+				filter, so regions holding less ink stay empty. The high bound is a low-pass filter, so
+				regions holding more ink stay empty too (leave it at 1 to keep every dark region). Narrow
+				the band from both ends to isolate the midtones.
 			</dd>
 			<dt>spacing (mm)</dt>
 			<dd>
@@ -294,7 +298,7 @@
 			<a href="/help/hand-drawn.webp" target="_blank" rel="noopener">
 				<img
 					src="/help/hand-drawn.webp"
-					alt="the same render region twice — hand-drawn off with perfectly straight hatch lines on the left, hand-drawn on with organic wavy lines on the right"
+					alt="the same render region twice: hand-drawn off on the left with perfectly straight hatch lines, hand-drawn on at right with organic wavy lines"
 					width="2000"
 					height="1250"
 					loading="lazy"
@@ -304,20 +308,21 @@
 		<dl>
 			<dt>hand-drawn lines</dt>
 			<dd>
-				Swap the perfectly straight hatch lines for organic, hand-drawn-looking ones. Off by default
-				— and off means untouched: the classic ruler-straight output stays exactly as it was. When
-				on, the same wobble flows through everything consistently — preview, SVG and PNG exports,
-				frame sequences and the plot-time estimate (squiggly lines are longer, so plots take a bit
-				more time). The wobble is deterministic: the same settings always draw the same squiggles.
+				Swap the perfectly straight hatch lines for organic, hand-drawn-looking ones. Off by
+				default, and off means untouched. The classic ruler-straight output stays exactly as it was.
+				Switch it on and the same wobble runs through everything: preview, SVG and PNG exports,
+				frame sequences, and the plot-time estimate (squiggly lines are longer, so plots take a bit
+				more time). The wobble is deterministic, so the same settings always draw the same
+				squiggles.
 			</dd>
 			<dt>squiggle (mm)</dt>
 			<dd>
-				How far a line may wander from perfectly straight — the squiggliness. Lines keep their exact
-				endpoints and short strokes stay steadier, so regions keep their shape.
+				How far a line may wander from perfectly straight. Lines keep their exact endpoints, and
+				short strokes stay steadier, so regions keep their shape.
 			</dd>
 			<dt>wave (mm)</dt>
 			<dd>
-				Distance between direction changes along a line — short makes a nervous scribble, long makes
+				Distance between direction changes along a line. Short makes a nervous scribble, long makes
 				lazy waves.
 			</dd>
 			<dt>variation</dt>
@@ -336,9 +341,10 @@
 			</dd>
 			<dt>presets</dt>
 			<dd>
-				Apply a built-in look, or save your current settings under a name — saved presets live in
-				your browser. A fresh visit opens on a random built-in. Presets are about the look: your
-				output width and margin stay yours (any values stored in older preset files are ignored).
+				Apply a built-in look, or save your current settings under a name. Saved presets live in
+				your browser, and a fresh visit opens on a random built-in. Presets only carry the look.
+				Your output width and margin stay yours (RSTR ignores any width or margin stored in older
+				preset files).
 			</dd>
 			<dt>export / import .json</dt>
 			<dd>Move settings between browsers or share them as a small JSON file.</dd>
@@ -346,7 +352,7 @@
 	</section>
 
 	<section id="layers">
-		<h2>layers — one per pen</h2>
+		<h2>layers, one per pen</h2>
 		<dl>
 			<dt>layer basics</dt>
 			<dd>
@@ -361,7 +367,7 @@
 			</dd>
 			<dt>angle min / max</dt>
 			<dd>
-				Hatch direction range — every region picks its own angle within it, based on the region's
+				Hatch direction range. Every region picks its own angle within it, based on the region's
 				shape, so one layer never looks mechanical.
 			</dd>
 			<dt>overrides</dt>
@@ -378,36 +384,36 @@
 		<dl>
 			<dt>width (mm)</dt>
 			<dd>
-				Physical output width — the height follows the image aspect. This is your own setting:
-				presets and the dice never touch it, and it stays put while you switch inputs.
+				Physical output width. The height follows the image aspect. This one is yours. Presets and
+				the dice never touch it, and it stays put while you switch inputs.
 			</dd>
 			<dt>output format</dt>
 			<dd>
-				Optionally compose onto a fixed sheet instead. Toggle A6–A3 (tap again to turn off — at most
-				one is active), or pick more sizes from the list: A2–A0, B-series, US letter/legal/ tabloid,
+				You can compose onto a fixed sheet instead. Toggle A6–A3 (tap again to turn off; at most one
+				is active), or pick more sizes from the list: A2–A0, B-series, US letter/legal/tabloid,
 				squares, AxiDraw beds and a custom width × height. The render takes the page's shape, the
-				export becomes exactly that page, and the whole image starts fitted inside the margins —
-				from there, crop and reposition it into the sheet with the usual gestures. Named sheets are
+				export becomes exactly that page, and the whole image starts fitted inside the margins. From
+				there, crop and reposition it into the sheet with the usual gestures. Named sheets are
 				turned to match the input (flip them with ⇄); a new input starts back at no format.
 			</dd>
 			<dt>margin (mm)</dt>
 			<dd>
-				With a format active, the margin is a mask: a band this wide around the sheet's edge is kept
-				clear of ink, whatever the composition puts there — like a matted print, and safe for the
-				plotter's paper clamps. The reframing view dims the masked band while you compose. Defaults
-				to 10mm; 0 disables the mask.
+				With a format active, the margin works as a mask. RSTR keeps a band this wide around the
+				sheet's edge clear of ink, whatever the composition puts there, like a matted print, and
+				safe for the plotter's paper clamps. The reframing view dims the masked band while you
+				compose. Defaults to 10mm; 0 disables the mask.
 			</dd>
 			<dt>↓ SVG</dt>
 			<dd>A plottable SVG with one layer group per pen, ready for plotter software.</dd>
 			<dt>↓ PNG</dt>
-			<dd>The current render as an image — for screens, sharing and regular printing.</dd>
+			<dd>The current render as an image, for screens, sharing and regular printing.</dd>
 			<dt>⚡ order this plot</dt>
 			<dd>
-				No plotter? I'll plot it for you — real pens on paper, shipped flat-packed with tracking,
+				No plotter? I'll plot it for you. Real pens on paper, shipped flat-packed with tracking,
 				shipping included in the price. Orders are limited to the inks in the built-in presets and
-				sizes up to A3; the order dialog tells you if a design needs adjusting. Only the exported
-				SVG — the lines to draw — is sent with your order, never your image, and it's used solely to
-				produce your plot.
+				sizes up to A3, and the order dialog tells you if a design needs adjusting. Your order
+				carries only the exported SVG, the lines to draw. Your image stays on your device, and I use
+				the SVG for nothing but making your plot.
 			</dd>
 		</dl>
 	</section>
@@ -417,30 +423,30 @@
 		<dl>
 			<dt>grid / regions / lines / render</dt>
 			<dd>
-				The sampling grid size, how many tonal regions segmentation found, how many hatch lines were
-				drawn, and how long your browser needed to compute the render.
+				The sampling grid size, how many tonal regions segmentation found, how many hatch lines it
+				drew, and how long your browser needed to compute the render.
 			</dd>
 			<dt>plot time</dt>
 			<dd>
-				Estimated plotting time on an AxiDraw-style machine (saxi's motion model): drawing, travel
-				and pen lifts — hover it for the per-pen breakdown.
+				Estimated plotting time on an AxiDraw-style machine, using saxi's motion model: drawing,
+				travel and pen lifts. Hover it for the per-pen breakdown.
 			</dd>
 			<dt>plotter settings</dt>
 			<dd>
 				The motion profile behind that estimate: pen-up/-down speeds and accelerations, cornering,
-				pen lift/drop pauses and the join radius (lines closer than this are drawn without lifting
-				the pen). Match it to your machine, or reset to saxi's defaults.
+				pen lift/drop pauses and the join radius (the plotter draws lines closer together than this
+				without lifting the pen). Match it to your machine, or reset to saxi's defaults.
 			</dd>
 		</dl>
 	</section>
 
 	<section id="prep">
-		<h2>prep — <a href="/prep">/prep</a></h2>
+		<h2>prep</h2>
 		<figure class="shot">
 			<a href="/help/prep.webp" target="_blank" rel="noopener">
 				<img
 					src="/help/prep.webp"
-					alt="the prep tool on desktop — a studio export placed on an A3 page, with the paper outline, calibration block and page boundary around it"
+					alt="the prep tool on desktop, with a studio export placed on an A3 page inside the paper outline, calibration block and page boundary"
 					width="2000"
 					height="1250"
 					loading="lazy"
@@ -448,7 +454,8 @@
 			</a>
 		</figure>
 		<p class="section-note">
-			The plot prep tool takes an exported SVG and dresses it for the machine.
+			The plot prep tool at <a href="/prep">/prep</a> takes an exported SVG and dresses it up for the
+			machine.
 		</p>
 		<dl>
 			<dt>output page</dt>
@@ -459,15 +466,16 @@
 			<dt>multiple SVGs</dt>
 			<dd>
 				Drop several same-size SVGs, a folder, or the studio's frame-sequence zip (SVGs in the root
-				or an <code>svg/</code> subfolder) — geared to the video export. Frames are laid out as a grid
-				with an adjustable per-frame margin, gap and edge clearance, across as many pages as needed. Matching
-				layers of all frames are combined so pen selection in saxi stays simple, and each frame carries
-				its number in plottable single-stroke digits. Export downloads a zip with one page SVG per sheet.
+				or an <code>svg/</code> subfolder), which is what the video export produces. Prep lays the frames
+				out as a grid with an adjustable per-frame margin, gap and edge clearance, across as many pages
+				as it needs. It merges the matching layers of all frames so pen selection in saxi stays simple,
+				and writes each frame's number in plottable single-stroke digits. Export downloads a zip with
+				one page SVG per sheet.
 			</dd>
 			<dt>paper outline</dt>
 			<dd>
-				Marks where to place the physical paper — sized to the artwork (or each frame) or a fixed
-				format, plus margin, drawn as a full rectangle, corner marks or crosses.
+				Marks where to place the physical paper. Size it to the artwork (or to each frame) or to a
+				fixed format, add a margin, and draw it as a full rectangle, corner marks or crosses.
 			</dd>
 			<dt>calibration markers</dt>
 			<dd>
@@ -481,17 +489,17 @@
 				Multi-frame exports only. Adds a <code>…_frame-template.svg</code> to the zip: page 1 with
 				one <code>frame-N</code> rectangle per grid cell, numbered row by row in animation order.
 				Load it as the template in
-				<a href="https://tools.d17e.dev/framesheet-studio" target="_blank" rel="noopener"
+				<a href="https://tools.d17e.dev/tool/framesheet-studio" target="_blank" rel="noopener"
 					>Framesheet Studio</a
 				>
-				together with photos of the plotted pages and it turns them back into a looping animation. Not
-				a plot file — keep it out of the plotter queue.
+				together with photos of the plotted pages, and it turns them back into a looping animation. It
+				is not a plot file, so keep it out of the plotter queue.
 			</dd>
 			<dt>add reversed layers</dt>
 			<dd>
-				Duplicates every artwork layer with the same lines running in the opposite direction — each
-				line gets plotted twice for denser ink. Works on the studio's hand-drawn wobbly lines too:
-				every squiggle is retraced point for point, just backwards.
+				Duplicates every artwork layer with the same lines running in the opposite direction, so
+				each line gets plotted twice for denser ink. Works on the studio's hand-drawn wobbly lines
+				too: every squiggle is retraced point for point, just backwards.
 			</dd>
 			<dt>export SVG</dt>
 			<dd>Downloads the decorated SVG with everything on its own (Inkscape-compatible) layer.</dd>
@@ -499,12 +507,12 @@
 	</section>
 
 	<section id="classic">
-		<h2>classic — <a href="/classic">/classic</a></h2>
+		<h2>classic</h2>
 		<figure class="shot">
 			<a href="/help/classic.webp" target="_blank" rel="noopener">
 				<img
 					src="/help/classic.webp"
-					alt="the classic app on desktop — a finished multi-color line render next to its resolution, grouping and fill controls"
+					alt="the classic app on desktop, with a finished multi-color line render next to its resolution, grouping and fill controls"
 					width="2000"
 					height="1468"
 					loading="lazy"
@@ -512,8 +520,9 @@
 			</a>
 		</figure>
 		<p class="section-note">
-			The original RSTR, kept around for nostalgia (and because it still makes nice plots). One
-			image, one layer, multiple pens. The algorithm that started it all.
+			The original RSTR lives on at <a href="/classic">/classic</a>, kept around for nostalgia and
+			because it still makes nice plots. One image, one layer, multiple pens. The algorithm that
+			started all this.
 		</p>
 	</section>
 
@@ -522,22 +531,24 @@
 		<dl>
 			<dt>private by design</dt>
 			<dd>
-				Images, videos and settings never leave your device. The one deliberate exception: ordering
-				a plot sends the exported SVG — the drawn lines, never your image — along with your order,
-				and it's used solely to produce that plot.
+				Images, videos and settings never leave your device. There is one deliberate exception.
+				Ordering a plot sends the exported SVG along with your order: the lines to draw, never your
+				image. I use it for nothing but making that plot.
 			</dd>
 			<dt>works offline</dt>
-			<dd>RSTR is an installable web app — once visited, it keeps working without a connection.</dd>
+			<dd>
+				RSTR is an installable web app. Once you've visited it, it keeps working without a
+				connection.
+			</dd>
 			<dt>settings persistence</dt>
 			<dd>
-				Your settings are remembered in this browser from the moment you first edit them — until
-				then, every visit rolls a fresh random preset.
+				This browser remembers your settings from the moment you first edit one. Until then, every
+				visit rolls a fresh random preset.
 			</dd>
 			<dt>real ink colors</dt>
 			<dd>
-				The palettes behind the randomize button are sampled from real fountain-pen inks, so a
-				random roll always lands on colors you can actually plot with. They're based on the ranges
-				from
+				The palettes behind the randomize button come from real fountain-pen inks, so a random roll
+				always lands on colors you can plot with. They follow the ranges from
 				<a href="https://www.de-atramentis.com/en/Artist-ink-/" target="_blank" rel="noopener"
 					>De Atramentis</a
 				>,
