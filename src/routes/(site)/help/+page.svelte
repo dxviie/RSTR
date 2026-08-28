@@ -489,7 +489,7 @@
 				Multi-frame exports only. Adds a <code>…_frame-template.svg</code> to the zip: page 1 with
 				one <code>frame-N</code> rectangle per grid cell, numbered row by row in animation order.
 				Load it as the template in
-				<a href="https://tools.d17e.dev/framesheet-studio" target="_blank" rel="noopener"
+				<a href="https://tools.d17e.dev/tool/framesheet-studio" target="_blank" rel="noopener"
 					>Framesheet Studio</a
 				>
 				together with photos of the plotted pages, and it turns them back into a looping animation. It
