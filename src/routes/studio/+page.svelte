@@ -5129,8 +5129,8 @@
 		position: absolute;
 		top: 50%;
 		transform: translateY(-50%);
-		height: 1rem;
-		background: var(--muted-light);
+		height: .77rem;
+		background: var(--color-accent);
 		border: 1px solid var(--border);
 		border-radius: 4px;
 		pointer-events: none;
