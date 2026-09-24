@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { cellPosition, commonBase, compareFrameNames, frameLabel, gridLayout } from './multi';
+import {
+	cellPosition,
+	commonBase,
+	compareFrameNames,
+	frameLabel,
+	gridLayout,
+	templateFrameBoxes
+} from './multi';
 import { hersheyPathData } from './hershey';
 import { outlineMarks } from './outline';
 import { readZip, zipSvgEntries } from './zipRead';
@@ -50,6 +57,27 @@ describe('gridLayout', () => {
 		const last = cellPosition(layout, layout.perPage - 1);
 		expect(last.x + layout.cellW).toBeLessThanOrEqual(420 - 20 + 1e-6);
 		expect(last.y + layout.cellH).toBeLessThanOrEqual(297 - 20 + 1e-6);
+	});
+});
+
+describe('templateFrameBoxes', () => {
+	// A3 landscape, 80×45 frames with a 5 mm margin: 90×55 cells, 4×4 per page
+	const layout = gridLayout({ pageW: 420, pageH: 297, cellW: 90, cellH: 55, gap: 5, edge: 10 });
+
+	it('traces the paper outline of every cell, row by row', () => {
+		const boxes = templateFrameBoxes(layout, 5, true);
+		expect(boxes).toHaveLength(16);
+		boxes.forEach((box, index) => {
+			const cell = cellPosition(layout, index);
+			expect(box).toEqual({ x: cell.x, y: cell.y, w: 90, h: 55 });
+		});
+	});
+
+	it('falls back to the artwork, the margin inside its cell, without per-cell outlines', () => {
+		const [first, second] = templateFrameBoxes(layout, 5, false);
+		const cell = cellPosition(layout, 0);
+		expect(first).toEqual({ x: cell.x + 5, y: cell.y + 5, w: 80, h: 45 });
+		expect(second.x - first.x).toBeCloseTo(95);
 	});
 });
 
