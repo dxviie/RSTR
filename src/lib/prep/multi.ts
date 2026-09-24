@@ -72,6 +72,38 @@ export const cellPosition = (layout: GridLayout, index: number): { x: number; y:
 	y: layout.y0 + Math.floor(index / layout.cols) * (layout.cellH + layout.gap)
 });
 
+export interface FrameBox {
+	x: number;
+	y: number;
+	w: number;
+	h: number;
+}
+
+/**
+ * The frame boxes of a Framesheet Studio template, one per cell of the page,
+ * row-major (= animation order). With a paper outline drawn around every cell
+ * the box is that outline: its corners land on printed marks Studio can align
+ * each frame on, where the artwork has no clean edge. Without per-cell outlines
+ * there is nothing to align on, and the box is the artwork, `margin` inside its
+ * cell.
+ */
+export const templateFrameBoxes = (
+	layout: GridLayout,
+	margin: number,
+	onOutline: boolean
+): FrameBox[] => {
+	const inset = onOutline ? 0 : margin;
+	return Array.from({ length: layout.perPage }, (_, index) => {
+		const cell = cellPosition(layout, index);
+		return {
+			x: cell.x + inset,
+			y: cell.y + inset,
+			w: layout.cellW - 2 * inset,
+			h: layout.cellH - 2 * inset
+		};
+	});
+};
+
 //***************************************************************
 // 														NAMES
 //***************************************************************
