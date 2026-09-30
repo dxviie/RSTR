@@ -5129,7 +5129,7 @@
 		position: absolute;
 		top: 50%;
 		transform: translateY(-50%);
-		height: .77rem;
+		height: 0.77rem;
 		background: var(--color-accent);
 		border: 1px solid var(--border);
 		border-radius: 4px;
