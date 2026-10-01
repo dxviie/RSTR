@@ -88,6 +88,12 @@
 		--gutter: clamp(1rem, 4vw, 2rem);
 		--section-pad: clamp(4rem, 8.5vw, 6.5rem);
 
+		/* the edge, borrowed from the riso poster but kept to the boxes and
+		   buttons: hard ink outlines with a flat offset shadow, square corners */
+		--edge: 2px solid var(--ink);
+		--hard: 4px 4px 0 var(--ink);
+		--hard-lg: 6px 6px 0 var(--ink);
+
 		--sheet-shadow:
 			0 1px 1px rgba(26, 32, 44, 0.06), 0 2px 6px rgba(54, 66, 96, 0.08),
 			0 14px 30px -16px rgba(54, 66, 96, 0.34);
