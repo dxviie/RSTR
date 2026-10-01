@@ -257,9 +257,10 @@
 
 		--hc-max-width: none;
 		--hc-aspect: 4 / 5;
-		/* a touch more than the default, so the photographed sheet edges
-		   stay out of this taller frame */
-		--hc-zoom: 1.28;
+		/* each photo brings its own zoom (framing in plots.ts); this taller
+		   frame needs a touch more of it to keep the sheet edges out */
+		--hc-zoom: 1.24;
+		--hc-zoom-boost: 1.06;
 		--hc-radius: 0;
 		--hc-shadow: 0 0 0 1px rgba(26, 32, 44, 0.07);
 		--hc-frame-bg: #f3f0e8;
