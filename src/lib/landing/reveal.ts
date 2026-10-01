@@ -11,7 +11,12 @@ export const reveal: Action<HTMLElement, { margin?: string } | undefined> = (nod
 	const rect = node.getBoundingClientRect();
 	if (rect.top < window.innerHeight && rect.bottom > 0) return;
 
+	// jump straight to the hidden state: a transition on the element would
+	// otherwise play the entrance backwards first
+	node.style.transition = 'none';
 	node.dataset.reveal = 'out';
+	void node.offsetWidth;
+	node.style.transition = '';
 	const io = new IntersectionObserver(
 		(entries) => {
 			if (!entries.some((entry) => entry.isIntersecting)) return;
