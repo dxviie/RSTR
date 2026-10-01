@@ -12,10 +12,15 @@
 	// play, holds while hovered, focused, off screen or in a hidden tab, and
 	// starts paused under prefers-reduced-motion (which also drops the drift).
 	//
+	// Each photo gets its own zoom and focal point from framing() in
+	// plots.ts, so paper and desk margins stay out of the frame. --hc-zoom
+	// is the minimum zoom; frames that aren't square can scale every
+	// photo's zoom up with --hc-zoom-boost (about 1.06 for a 4:5 frame).
+	//
 	// Theme it from the outside with the --hc-* custom properties below.
 	import { onMount, type Snippet } from 'svelte';
 	import { Carousel } from './carousel.svelte';
-	import { plotSrc, plotSrcset, shuffleTail, type Plot } from './plots';
+	import { framing, plotSrc, plotSrcset, shuffleTail, type Plot } from './plots';
 
 	const {
 		slides,
@@ -58,9 +63,10 @@
 		['0%', '2.4%', '0%', '-2.4%'],
 		['-1.8%', '2.2%', '1.8%', '-2.2%']
 	];
-	const driftStyle = (index: number) => {
+	const slideStyle = (plot: Plot, index: number) => {
 		const [x0, y0, x1, y1] = DRIFTS[index % DRIFTS.length];
-		return `--x0: ${x0}; --y0: ${y0}; --x1: ${x1}; --y1: ${y1}`;
+		const { zoom, x, y } = framing(plot.name);
+		return `--x0: ${x0}; --y0: ${y0}; --x1: ${x1}; --y1: ${y1}; --plot-zoom: ${zoom}; --ox: ${x}%; --oy: ${y}%`;
 	};
 </script>
 
@@ -81,7 +87,7 @@
 					class="hc-slide"
 					class:current={index === carousel.current}
 					class:leaving={index === carousel.leaving}
-					style={driftStyle(index)}
+					style={slideStyle(plot, index)}
 					aria-hidden={index !== carousel.current}
 					tabindex={index === carousel.current ? 0 : -1}
 					aria-label="open plot {index + 1} of {order.length}: {plot.alt}"
@@ -186,6 +192,9 @@
 	}
 
 	.hc-slide {
+		/* this photo's zoom: its own framing, never below the frame minimum */
+		--z: max(var(--hc-zoom, 1.2), calc(var(--plot-zoom, 1) * var(--hc-zoom-boost, 1)));
+
 		position: absolute;
 		inset: 0;
 		margin: 0;
@@ -222,7 +231,8 @@
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
-		transform: scale(var(--hc-zoom, 1.2));
+		transform: scale(var(--z));
+		transform-origin: var(--ox, 50%) var(--oy, 50%);
 		will-change: transform;
 		backface-visibility: hidden;
 	}
@@ -240,10 +250,10 @@
 
 	@keyframes hc-drift {
 		from {
-			transform: translate3d(var(--x0), var(--y0), 0) scale(var(--hc-zoom, 1.2));
+			transform: translate3d(var(--x0), var(--y0), 0) scale(var(--z));
 		}
 		to {
-			transform: translate3d(var(--x1), var(--y1), 0) scale(var(--hc-zoom, 1.2));
+			transform: translate3d(var(--x1), var(--y1), 0) scale(var(--z));
 		}
 	}
 

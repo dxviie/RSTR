@@ -12,6 +12,52 @@ export const plotSrc = (name: string, width: number) => `/gallery/${name}-${widt
 export const plotSrcset = (name: string) =>
 	PLOT_WIDTHS.map((w) => `${plotSrc(name, w)} ${w}w`).join(', ');
 
+/**
+ * How each photo crops into a square frame. The photos show paper on a
+ * wall, a desk or in a hand, and the margins differ per shot, so one zoom
+ * can't keep them all out of frame. `zoom` is the resting scale that keeps
+ * the margins cropped, `x` / `y` the transform origin in percent of the
+ * frame (moving it toward a side crops that side less). Measured on the
+ * -400w renditions: where the ink starts and ends. Zooming out on hover or
+ * drifting a few percent never brings the margins back as long as the
+ * scale stays at or above MIN_ZOOM below the resting value.
+ */
+export interface Framing {
+	zoom: number;
+	x: number;
+	y: number;
+}
+
+export const DEFAULT_FRAMING: Framing = { zoom: 1.18, x: 50, y: 50 };
+
+/** how far below its resting zoom a picture may ease (hover, drift) */
+export const FRAMING_SLACK = 0.07;
+
+const FRAMING: Record<string, Partial<Framing>> = {
+	// full sheets photographed on a wall: the ink spans the middle ~72%
+	'space-1-1': { zoom: 1.41 },
+	'space-2-1': { zoom: 1.44 },
+	'mona-1': { zoom: 1.46 },
+	// on a desk, pens below the sheet
+	'weave-1': { zoom: 1.52, x: 45, y: 40 },
+	// a small square of ink in the middle of a big sheet
+	'broken-gradient-2': { zoom: 2, x: 46, y: 40 },
+	// a thin paper border all round
+	'pearl-1': { zoom: 1.24 },
+	// paper held in a hand, tilted: the ink's level middle is off center
+	'siesta-1': { zoom: 1.52, x: 59, y: 38 },
+	// detail shots with a paper corner in view
+	'broken-gradient-2-2': { zoom: 1.35, x: 30, y: 70 },
+	'street-2': { zoom: 1.25, x: 40, y: 35 },
+	// landscape shot with paper above and below the plot
+	'webb-1': { zoom: 1.22 },
+	// desk at the left edge, paper edge at the right
+	'puma-1': { zoom: 1.26 },
+	melkmeisje: { zoom: 1.24, y: 45 }
+};
+
+export const framing = (name: string): Framing => ({ ...DEFAULT_FRAMING, ...FRAMING[name] });
+
 // gallery order: full pieces and detail shots interleaved
 export const GALLERY_PLOTS: Plot[] = [
 	{
