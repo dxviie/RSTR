@@ -1,20 +1,136 @@
 <script lang="ts">
-	// The real studio, framed as a browser window, with a few notes pencilled
-	// in the margin like annotations on a drawing. Each note sits at the
-	// height of the control it points to; on narrow screens the rings get
-	// numbers and the notes move into a list under the picture.
+	// The real studio, framed as a browser window, with every section of it
+	// outlined and numbered: the map from the help page, in ink only. Wide,
+	// the left pane's sections (and the render) are labelled in a column left
+	// of the window and the right pane's in a column to its right, each label
+	// tied to its outline by a thin leader. Narrow, the outlines keep their
+	// numbers and the labels become a legend under the picture. Pointing at
+	// a label or an outline lights up its partner; each label links to its
+	// part of the help page.
 	import type { LightboxImage } from '$lib/landing/Lightbox.svelte';
 	import { HOW_STUDIO } from '$lib/landing/how';
 	import { reveal } from '$lib/landing/reveal';
 
 	const { onzoom }: { onzoom: (image: LightboxImage) => void } = $props();
 
-	/** positions in % of the 1440 × 900 screenshot */
-	const NOTES = [
-		{ x: 85.7, y: 10.2, title: 'roll the dice', text: 'palettes from real fountain-pen inks' },
-		{ x: 90.2, y: 30.1, title: 'one layer per pen', text: 'each with its own color and angles' },
-		{ x: 96.7, y: 70.8, title: 'plot time', text: 'estimated per pen, before you plot' }
+	interface Part {
+		n: number;
+		name: string;
+		line: string;
+		/** the help page section that documents it */
+		help: string;
+		side: 'left' | 'right';
+		/** the outline: x, y, width, height in % of the 1440 × 900 screenshot */
+		box: [number, number, number, number];
+		/** where the leader meets the outline, in % of the screenshot height */
+		ly: number;
+		/** shares its top edge with the outline above, so that edge is drawn once */
+		joined?: boolean;
+		/** the number sits in the bottom corner, off the values at the top */
+		low?: boolean;
+	}
+
+	// Measured from the DOM of the studio in the screenshot's exact state (the
+	// panel groups, the render canvas, the stats box), padded 6px so the lines
+	// clear the controls. Export and stats sit only 7px apart, so they share an
+	// edge. The render's leader runs through the empty strip under the lines.
+	// The numbers sit top right, where the group titles leave room.
+	const PARTS: Part[] = [
+		{
+			n: 1,
+			name: 'image',
+			line: 'tune the photo before tracing',
+			help: 'image',
+			side: 'left',
+			box: [0.42, 5.27, 17.99, 27.1],
+			ly: 18.8
+		},
+		{
+			n: 2,
+			name: 'segmentation',
+			line: "how it's carved into regions",
+			help: 'segmentation',
+			side: 'left',
+			box: [0.42, 33.81, 17.99, 20.68],
+			ly: 43.5
+		},
+		{
+			n: 3,
+			name: 'lines',
+			line: 'pen width, spacing and ink',
+			help: 'lines',
+			side: 'left',
+			box: [0.42, 55.93, 17.99, 29.32],
+			ly: 67
+		},
+		{
+			n: 4,
+			name: 'the render',
+			line: 'drag, zoom and rotate to frame it',
+			// framing on the render is documented with the image controls
+			help: 'image',
+			side: 'left',
+			box: [23.73, 5.27, 52.54, 94.07],
+			ly: 90
+		},
+		{
+			n: 5,
+			name: 'presets',
+			line: 'roll the dice or save a look',
+			help: 'presets',
+			side: 'right',
+			box: [81.6, 5.27, 17.99, 17.74],
+			ly: 12.5
+		},
+		{
+			n: 6,
+			name: 'layers',
+			line: 'one pen each, own color and angles',
+			help: 'layers',
+			side: 'right',
+			box: [81.6, 24.44, 17.99, 15.64],
+			ly: 32
+		},
+		{
+			n: 7,
+			name: 'export',
+			line: 'SVG or PNG, any page size',
+			help: 'export',
+			side: 'right',
+			box: [81.6, 41.54, 17.99, 21.69],
+			ly: 51.5
+		},
+		{
+			n: 8,
+			name: 'stats',
+			line: 'lines, regions and plot time',
+			help: 'stats',
+			side: 'right',
+			box: [81.6, 63.23, 17.99, 12.61],
+			ly: 70.5,
+			joined: true,
+			low: true
+		}
 	];
+
+	/** entrance order: both columns at once, top to bottom (1 and 5, 2 and 6, ...) */
+	const row = (part: Part) => (part.n - 1) % 4;
+
+	/** the outline edge a label's leader runs to, in % of the screenshot width */
+	const edge = ({ side, box: [x, , w] }: Part) => (side === 'left' ? x : +(x + w).toFixed(2));
+
+	/** the part under the pointer or keyboard focus, lit on both sides */
+	let active = $state<number | null>(null);
+
+	// touch has no hover: a tap opens the picture or the help page instead
+	const point = (e: PointerEvent, n: number | null) => {
+		if (e.pointerType !== 'touch') active = n;
+	};
+
+	const pointShot = (e: PointerEvent) => {
+		const box = (e.target as Element).closest<HTMLElement>('[data-n]');
+		point(e, box ? Number(box.dataset.n) : null);
+	};
 
 	const zoom = () =>
 		onzoom({
@@ -28,40 +144,69 @@
 <figure class="studio" use:reveal>
 	<div class="window">
 		<div class="chrome" aria-hidden="true">
-			<span class="lights"><i></i><i></i><i></i></span>
+			<span class="dots"><i></i><i></i><i></i></span>
 			<span class="url">rstr.d17e.dev/studio</span>
 		</div>
-		<div class="shot">
-			<button type="button" class="zoom" aria-label="enlarge: {HOW_STUDIO.alt}" onclick={zoom}>
-				<img
-					src={HOW_STUDIO.src}
-					srcset={HOW_STUDIO.srcset}
-					sizes="(max-width: 900px) 92vw, 760px"
-					alt={HOW_STUDIO.alt}
-					width={HOW_STUDIO.width}
-					height={HOW_STUDIO.height}
-					loading="lazy"
-					decoding="async"
-				/>
-			</button>
-			{#each NOTES as note, i (note.title)}
-				<div class="callout" style="left: {note.x}%; top: {note.y}%; --n: {i}" aria-hidden="true">
-					<span class="ring"><span class="num">{i + 1}</span></span>
-					<span class="leader"></span>
-					<span class="note">
-						<span class="title">{note.title}</span>
-						<span class="text">{note.text}</span>
+		<button
+			type="button"
+			class="zoom"
+			aria-label="enlarge: {HOW_STUDIO.alt}"
+			onclick={zoom}
+			onpointerover={pointShot}
+			onpointerleave={(e) => point(e, null)}
+		>
+			<img
+				src={HOW_STUDIO.src}
+				srcset={HOW_STUDIO.srcset}
+				sizes="(min-width: 1081px) 620px, (min-width: 641px) calc(100vw - 9rem), 94vw"
+				alt={HOW_STUDIO.alt}
+				width={HOW_STUDIO.width}
+				height={HOW_STUDIO.height}
+				loading="lazy"
+				decoding="async"
+			/>
+			<span class="boxes" aria-hidden="true">
+				{#each PARTS as part (part.n)}
+					<span
+						class="box"
+						class:joined={part.joined}
+						class:low={part.low}
+						class:on={active === part.n}
+						data-n={part.n}
+						style:left="{part.box[0]}%"
+						style:top="{part.box[1]}%"
+						style:width="{part.box[2]}%"
+						style:height="{part.box[3]}%"
+						style:--i={row(part)}
+					>
+						<span class="tag">{part.n}</span>
 					</span>
-				</div>
-			{/each}
-		</div>
+				{/each}
+			</span>
+		</button>
 	</div>
 	<figcaption>
-		<ol class="notes">
-			{#each NOTES as note, i (note.title)}
-				<li style="--n: {i}">
-					<span class="num" aria-hidden="true">{i + 1}</span>
-					<span><span class="title">{note.title}</span>, {note.text}</span>
+		<ol class="labels">
+			{#each PARTS as part (part.n)}
+				<li
+					class="label {part.side}"
+					class:on={active === part.n}
+					style:--x={edge(part)}
+					style:--ly={part.ly}
+					style:--i={row(part)}
+				>
+					<a
+						href="/help#{part.help}"
+						onpointerenter={(e) => point(e, part.n)}
+						onpointerleave={(e) => point(e, null)}
+						onfocus={() => (active = part.n)}
+						onblur={() => (active = null)}
+					>
+						<span class="num">{part.n}</span>
+						<span class="name">{part.name}</span>
+						<span class="line">{part.line}</span>
+					</a>
+					<span class="leader" aria-hidden="true"></span>
 				</li>
 			{/each}
 		</ol>
@@ -70,91 +215,87 @@
 
 <style>
 	.studio {
+		/* the window's ink edge, and the chrome bar including its rule */
+		--frame: 2px;
+		--chrome: 1.9rem;
+		/* the numbered squares in the labels */
+		--tag: 1.05rem;
+		/* wide only: a margin column each side of the window for the labels
+		   and the start of their leaders, and the text width inside it */
+		--col: 11.75rem;
+		--text: 9.6rem;
+		/* the first line of a label, where its leader leaves */
+		--head: 1.3rem;
+
 		position: relative;
 		margin: 2rem 0 0;
-		/* room in the margin for the notes */
-		padding-right: 15.5rem;
-		transition:
-			opacity 0.7s ease,
-			transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1);
+		container: studio / inline-size;
 	}
+
+	/* ------------------------------------------------- the window */
 
 	.window {
 		position: relative;
-		border: 1px solid #d5dae3;
-		border-radius: 11px;
-		background: #fff;
-		box-shadow:
-			0 1px 2px rgba(26, 32, 44, 0.06),
-			0 18px 40px -18px rgba(54, 66, 96, 0.38);
+		/* room for the offset shadow, so the window still sits in the column */
+		margin-right: 6px;
+		border: var(--edge);
+		background: var(--sheet);
+		box-shadow: var(--hard-lg);
 	}
 
 	.chrome {
-		display: flex;
+		display: grid;
+		grid-template-columns: 1fr auto 1fr;
 		align-items: center;
-		gap: 0.9rem;
-		height: 2rem;
-		padding: 0 0.75rem;
-		border-bottom: 1px solid #e3e6ec;
-		border-radius: 10px 10px 0 0;
-		background: #f6f7fa;
+		height: var(--chrome);
+		padding: 0 0.6rem;
+		border-bottom: var(--edge);
+		background: var(--sheet);
 	}
 
-	.lights {
+	.dots {
 		display: flex;
-		gap: 0.35rem;
+		gap: 0.3rem;
 	}
 
-	.lights i {
-		width: 0.6rem;
-		height: 0.6rem;
-		border-radius: 50%;
-		background: var(--cyan);
-	}
-
-	.lights i:nth-child(2) {
-		background: var(--magenta);
-	}
-
-	.lights i:nth-child(3) {
-		background: var(--yellow);
+	.dots i {
+		width: 0.55rem;
+		height: 0.55rem;
+		border: 1.5px solid var(--ink);
 	}
 
 	.url {
-		flex: 0 1 18rem;
-		margin-inline: auto;
-		padding: 0.12rem 0.75rem;
-		border-radius: 999px;
-		background: #fff;
-		box-shadow: inset 0 0 0 1px #e3e6ec;
+		padding: 0.1rem 0.9rem;
+		border: 1.5px solid var(--ink);
+		background: var(--paper);
 		font-family: 'mono-light', monospace;
-		font-size: 0.68rem;
-		color: var(--muted);
-		text-align: center;
+		font-size: 0.7rem;
+		line-height: 1.35;
+		color: var(--ink);
 		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-
-	.shot {
-		position: relative;
 	}
 
 	.zoom {
+		position: relative;
 		display: block;
 		width: 100%;
 		margin: 0;
 		padding: 0;
 		border: none;
-		border-radius: 0 0 10px 10px;
+		border-radius: 0;
 		background: none !important;
-		overflow: hidden;
 		cursor: zoom-in;
+		transition: none;
+	}
+
+	/* the layout's global button press nudge would shake the whole picture */
+	.zoom:active {
+		transform: none;
 	}
 
 	.zoom:focus-visible {
 		outline: 2px solid var(--focus);
-		outline-offset: 3px;
+		outline-offset: -2px;
 	}
 
 	.zoom img {
@@ -163,170 +304,298 @@
 		height: auto;
 	}
 
-	/* ------------------------------------------------- margin notes */
+	/* ------------------------------------------------- the outlines */
 
-	.callout {
+	.boxes {
 		position: absolute;
-		/* from the ring on the control out into the margin */
-		right: -15.5rem;
-		display: flex;
-		align-items: center;
-		transform: translateY(-50%);
-		pointer-events: none;
-		transition:
-			opacity 0.5s ease,
-			transform 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
-		transition-delay: calc(0.45s + var(--n) * 0.18s);
+		inset: 0;
 	}
 
-	.ring {
-		position: relative;
-		flex: none;
-		width: 1.65rem;
-		height: 1.65rem;
-		margin-left: -0.825rem;
-		border: 2px solid var(--magenta);
-		border-radius: 50%;
-		box-shadow:
-			0 0 0 2px rgba(255, 255, 255, 0.85),
-			inset 0 0 0 2px rgba(255, 255, 255, 0.6);
+	.box {
+		position: absolute;
+		border: 1.5px solid var(--ink);
 	}
 
-	.ring .num {
-		display: none;
+	.box.joined {
+		border-top: none;
 	}
 
-	.leader {
-		flex: 1;
-		min-width: 1rem;
-		height: 0;
-		border-top: 1.5px dashed rgba(96, 115, 159, 0.75);
+	/* lit: a magenta wash and edge, faded in on its own layer */
+	.box::after {
+		content: '';
+		position: absolute;
+		inset: -1.5px;
+		border: 2px solid var(--magenta-ink);
+		background: rgba(255, 42, 166, 0.06);
+		opacity: 0;
+		transition: opacity 0.15s ease;
 	}
 
-	.note {
-		flex: none;
+	.box.on::after {
+		opacity: 1;
+	}
+
+	.tag {
+		position: absolute;
+		z-index: 1;
+		top: -1.5px;
+		right: -1.5px;
 		display: grid;
-		gap: 0.1rem;
-		width: 13.5rem;
-		padding: 0.5rem 0.7rem 0.55rem;
-		border-left: 3px solid var(--magenta);
-		border-radius: 2px 6px 6px 2px;
-		background: var(--sheet);
-		box-shadow: var(--sheet-shadow);
+		place-items: center;
+		width: 0.95rem;
+		height: 0.95rem;
+		background: var(--ink);
+		font-family: 'mono-bold', monospace;
+		font-size: 0.6rem;
+		line-height: 1;
+		color: var(--paper);
 	}
 
-	.title {
-		font-family: 'mono-bold', monospace;
-		font-size: 0.8rem;
+	.box.low .tag {
+		top: auto;
+		bottom: -1.5px;
+	}
+
+	.box.on .tag {
+		background: var(--magenta-ink);
+	}
+
+	/* ------------------------------------------------- the labels: legend */
+
+	figcaption {
+		margin-top: 1.6rem;
+	}
+
+	.labels {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		grid-template-rows: repeat(4, auto);
+		/* down the left column first, like the panes: 1-4 left, 5-8 right */
+		grid-auto-flow: column;
+		gap: 0.15rem clamp(1.5rem, 4vw, 3rem);
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	/* number and name, the line under the name */
+	.label a {
+		display: grid;
+		grid-template-columns: var(--tag) minmax(0, 1fr);
+		grid-template-areas: 'num name' '. line';
+		gap: 0.1rem 0.6rem;
+		align-items: center;
+		min-height: 2.5rem;
+		padding: 0.4rem 0;
+		border: none;
 		color: var(--ink);
 	}
 
-	.note .text {
+	.num {
+		grid-area: num;
+		display: grid;
+		place-items: center;
+		width: var(--tag);
+		height: var(--tag);
+		background: var(--ink);
+		font-family: 'mono-bold', monospace;
+		font-size: 0.64rem;
+		line-height: 1;
+		color: var(--paper);
+	}
+
+	.name {
+		grid-area: name;
+		font-family: 'mono-bold', monospace;
+		font-size: 0.84rem;
+		line-height: 1.3;
+	}
+
+	.line {
+		grid-area: line;
+		text-wrap: balance;
 		font-family: 'serif-text', serif;
-		font-size: 0.8rem;
+		font-size: 0.86rem;
 		line-height: 1.4;
 		color: var(--ink-soft);
 	}
 
-	/* the list version of the notes, for narrow screens */
-	figcaption {
+	.label a:hover .name {
+		text-decoration: underline;
+		text-decoration-thickness: 1.5px;
+		text-underline-offset: 0.2em;
+	}
+
+	.label a:focus-visible {
+		outline: 2px solid var(--focus);
+		outline-offset: 2px;
+	}
+
+	.label.on .num {
+		background: var(--magenta-ink);
+	}
+
+	.leader {
 		display: none;
+	}
+
+	@container studio (max-width: 560px) {
+		.labels {
+			grid-template-columns: minmax(0, 1fr);
+			grid-template-rows: none;
+			grid-auto-flow: row;
+		}
+
+		/* the outlines are small here: keep the numbers from covering them */
+		.tag {
+			width: 0.8rem;
+			height: 0.8rem;
+			font-size: 0.52rem;
+		}
+	}
+
+	/* room for a table: number, name and line on one row, names aligned */
+	@container studio (min-width: 760px) {
+		.label a {
+			grid-template-columns: var(--tag) 6.6rem minmax(0, 1fr);
+			grid-template-areas: 'num name line';
+			align-items: baseline;
+		}
+	}
+
+	/* ------------------------------------------------- the labels: margins */
+
+	@container studio (min-width: 940px) {
+		.window {
+			/* and room underneath for the render's label, which hangs low */
+			margin: 0 var(--col) 1rem;
+		}
+
+		figcaption {
+			position: absolute;
+			inset: 0;
+			margin: 0;
+			pointer-events: none;
+		}
+
+		/* exactly over the screenshot, so labels can sit at % of its height */
+		.labels {
+			position: absolute;
+			top: calc(var(--frame) + var(--chrome));
+			left: calc(var(--col) + var(--frame));
+			right: calc(var(--col) + var(--frame));
+			display: block;
+			aspect-ratio: 1440 / 900;
+		}
+
+		/* each label runs from the margin to the edge of its outline */
+		.label {
+			position: absolute;
+			top: calc(var(--ly) * 1%);
+			display: grid;
+			margin-top: calc(var(--head) / -2);
+		}
+
+		.label.left {
+			left: calc(-1 * (var(--col) + var(--frame)));
+			right: calc((100 - var(--x)) * 1%);
+			grid-template-columns: var(--text) minmax(0, 1fr);
+		}
+
+		.label.right {
+			left: calc(var(--x) * 1%);
+			right: calc(-1 * (var(--col) + var(--frame)));
+			grid-template-columns: minmax(0, 1fr) var(--text);
+		}
+
+		.label a {
+			grid-row: 1;
+			grid-template-columns: auto minmax(0, 1fr);
+			grid-template-areas: 'num name' 'line line';
+			gap: 0.1rem 0.45rem;
+			align-items: center;
+			min-height: 0;
+			padding: 0;
+			pointer-events: auto;
+		}
+
+		.label.left a {
+			grid-column: 1;
+			grid-template-columns: minmax(0, 1fr) auto;
+			grid-template-areas: 'name num' 'line line';
+			text-align: right;
+		}
+
+		.label.right a {
+			grid-column: 2;
+		}
+
+		.name {
+			line-height: var(--head);
+		}
+
+		.line {
+			font-size: 0.8rem;
+			line-height: 1.35;
+		}
+
+		.leader {
+			grid-row: 1;
+			display: block;
+			align-self: start;
+			height: 1px;
+			margin-top: calc(var(--head) / 2 - 0.5px);
+			background: var(--ink);
+		}
+
+		.label.left .leader {
+			grid-column: 2;
+			margin-left: 0.45rem;
+			transform-origin: left;
+		}
+
+		.label.right .leader {
+			grid-column: 1;
+			margin-right: 0.45rem;
+			transform-origin: right;
+		}
+
+		.label.on .leader {
+			background: var(--magenta-ink);
+		}
 	}
 
 	/* ------------------------------------------------- entrance */
 
-	.studio:global([data-reveal='out']) {
+	/* the outlines appear, the leaders draw out from the labels, the labels
+	   follow; transitions only on the way in, so hiding is instant */
+	.studio:global([data-reveal='out']) .box,
+	.studio:global([data-reveal='out']) .label a {
 		opacity: 0;
-		transform: translateY(18px);
 	}
 
-	.studio:global([data-reveal='out']) .callout {
-		opacity: 0;
-		transform: translate(-8px, -50%);
+	.studio:global([data-reveal='out']) .leader {
+		transform: scaleX(0);
 	}
 
-	/* ------------------------------------------------- narrow: numbered */
-
-	@media (max-width: 900px) {
-		.studio {
-			padding-right: 0;
-		}
-
-		.callout {
-			right: auto;
-		}
-
-		.leader,
-		.note {
-			display: none;
-		}
-
-		.ring {
-			width: 1.35rem;
-			height: 1.35rem;
-			margin-left: -0.675rem;
-		}
-
-		.ring .num {
-			position: absolute;
-			right: 70%;
-			bottom: 70%;
-			display: grid;
-			place-items: center;
-			width: 1.15rem;
-			height: 1.15rem;
-			border-radius: 50%;
-			background: var(--ink);
-			color: #fff;
-			font-family: 'mono-bold', monospace;
-			font-size: 0.66rem;
-			line-height: 1;
-		}
-
-		figcaption {
-			display: block;
-		}
-
-		.notes {
-			display: grid;
-			gap: 0.55rem;
-			margin: 1.1rem 0 0;
-			padding: 0;
-			list-style: none;
-		}
-
-		.notes li {
-			display: flex;
-			gap: 0.6rem;
-			align-items: baseline;
-			font-family: 'serif-text', serif;
-			font-size: 0.92rem;
-			line-height: 1.45;
-			color: var(--ink-soft);
-		}
-
-		.notes .num {
-			flex: none;
-			display: grid;
-			place-items: center;
-			width: 1.3rem;
-			height: 1.3rem;
-			border-radius: 50%;
-			background: var(--ink);
-			color: #fff;
-			font-family: 'mono-bold', monospace;
-			font-size: 0.7rem;
-			transform: translateY(0.15rem);
-		}
-
-		.notes .title {
-			font-size: 0.86rem;
-		}
+	.studio:global([data-reveal='in']) .box {
+		transition: opacity 0.4s ease calc(0.2s + var(--i) * 0.1s);
 	}
 
+	.studio:global([data-reveal='in']) .leader {
+		transition: transform 0.45s cubic-bezier(0.3, 0.7, 0.3, 1) calc(0.35s + var(--i) * 0.1s);
+	}
+
+	.studio:global([data-reveal='in']) .label a {
+		transition: opacity 0.4s ease calc(0.5s + var(--i) * 0.1s);
+	}
+
+	/* reveal() never hides anything under reduced motion; this covers the
+	   setting changing while the page is open */
 	@media (prefers-reduced-motion: reduce) {
-		.studio,
-		.callout {
+		.studio:global([data-reveal]) .box,
+		.studio:global([data-reveal]) .leader,
+		.studio:global([data-reveal]) .label a {
 			transition: none;
 		}
 	}

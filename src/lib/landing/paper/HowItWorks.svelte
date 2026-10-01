@@ -64,9 +64,9 @@
 					<div class="text">
 						<h3>shape the lines</h3>
 						<p>
-							RSTR carves your picture into regions of similar tone and fills each one with straight
-							lines. Pick a preset, then play with colors, angles, spacing and density. Or roll the
-							dice until something clicks.
+							Then mess with all the buttons. The lines redraw as you go, so you see right away what
+							each setting does. Stuck? Roll the dice for a random look in real ink colors, or start
+							from a preset.
 						</p>
 					</div>
 					<StudioShot {onzoom} />
