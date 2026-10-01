@@ -49,10 +49,13 @@
 		transform: rotate(var(--tilt));
 	}
 
+	/* a test swatch boxed in a thin ink edge, like the bullets up top but
+	   lighter: it lives in the margin */
 	svg {
 		display: block;
 		mix-blend-mode: multiply;
 		opacity: 0.38;
+		outline: 1.5px solid rgba(26, 32, 44, 0.75);
 	}
 
 	path {

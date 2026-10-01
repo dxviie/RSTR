@@ -164,7 +164,7 @@
 		place-items: center;
 		width: var(--node);
 		height: var(--node);
-		border: 1.5px solid var(--ink);
+		border: 2px solid var(--ink);
 		border-radius: 50%;
 		background: var(--paper);
 		font-family: 'mono-bold', monospace;
@@ -248,17 +248,17 @@
 	.card {
 		position: relative;
 		padding: 0.5rem clamp(1.25rem, 3vw, 1.9rem) clamp(1.4rem, 3vw, 1.9rem);
-		border-radius: 3px;
+		border: var(--edge);
 		background: var(--sheet);
-		box-shadow: var(--sheet-shadow);
+		box-shadow: var(--hard-lg);
 		transition:
-			box-shadow 0.35s ease,
-			transform 0.35s cubic-bezier(0.3, 0.7, 0.3, 1);
+			box-shadow 0.2s cubic-bezier(0.3, 0.7, 0.4, 1),
+			transform 0.2s cubic-bezier(0.3, 0.7, 0.4, 1);
 	}
 
 	.card:hover {
-		transform: translateY(-3px);
-		box-shadow: var(--sheet-shadow-lift);
+		transform: translate(-2px, -2px);
+		box-shadow: 8px 8px 0 var(--ink);
 	}
 
 	/* hovering a card fans its illustration out */
