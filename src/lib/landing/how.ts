@@ -2,7 +2,7 @@
 // pipeline. Vermeer's Milkmaid went through the rstr2 engine (the same
 // code the studio runs) and every stage was saved as a pixel-aligned
 // image in static/how/, at 600w and 1200w. The last stage is the real
-// thing: photos of the Milkmaid plot in the gallery.
+// thing: a photo of the Milkmaid plot from the gallery.
 
 import { plotSrc, plotSrcset } from './plots';
 
@@ -36,13 +36,7 @@ export const HOW_REGIONS = stage(
 	'the same painting carved into flat regions of similar tone, like a paint-by-numbers'
 );
 
-/** single black pen, transparent background */
-export const HOW_LINES = stage(
-	'milkmaid-lines',
-	'the painting redrawn as black hatch lines, dense in the shadows, sparse in the light wall'
-);
-
-/** the same lines on paper white */
+/** the single black pen's lines on paper white */
 export const HOW_LINES_PAPER = stage(
 	'milkmaid-lines-paper',
 	'the painting redrawn as black hatch lines on white paper'
@@ -66,29 +60,12 @@ export const HOW_PENS = [
 	{ ...stage('milkmaid-pen-c', 'the cyan pen layer on its own'), pen: 'C', ink: '#00bfe8' }
 ];
 
-/**
- * A coarser single-pen render (pen 0.8 mm, about 2,100 lines) for "the
- * plotter is drawing" animations: one <path> per region, in the order the
- * engine produced them, same viewBox as the stage images (HOW_WIDTH ×
- * HOW_HEIGHT), stroke set on the wrapping <g>. SVG restarts the dash
- * pattern at every subpath (each M), so a stroke-dashoffset animation on a
- * path draws all of its lines at once: stagger the paths, or split each d
- * on M to draw line by line.
- */
-export const HOW_COARSE_SVG = '/how/milkmaid-lines-coarse.svg';
-
-/** the real plot: a photo of the plotted Milkmaid, and one on the AxiDraw */
+/** the real plot: a photo of the plotted Milkmaid */
 export const HOW_PLOT = {
 	src: plotSrc('melkmeisje', 800),
 	srcset: plotSrcset('melkmeisje'),
 	alt: 'the real plot: the Milkmaid drawn in black pen on white paper',
 	name: 'melkmeisje'
-};
-export const HOW_PLOT_ON_MACHINE = {
-	src: plotSrc('melkmeisje-2', 800),
-	srcset: plotSrcset('melkmeisje-2'),
-	alt: 'the Milkmaid plot on the AxiDraw, the pen still in its holder above the paper',
-	name: 'melkmeisje-2'
 };
 
 /**
