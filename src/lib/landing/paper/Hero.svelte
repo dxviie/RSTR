@@ -94,8 +94,7 @@
 
 	.strokes i {
 		width: 3.4rem;
-		height: 4px;
-		border-radius: 2px;
+		height: 5px;
 		background: var(--cyan);
 		transform: rotate(var(--r, -2deg));
 		transform-origin: left center;
@@ -179,35 +178,35 @@
 
 	.usps {
 		display: grid;
-		gap: 0.5rem;
-		margin: 1.4rem 0 0;
+		gap: 0.55rem;
+		margin: 1.5rem 0 0;
 		padding: 0;
 		list-style: none;
 	}
 
 	.usps li {
-		position: relative;
-		padding-left: 1.65rem;
-		font-family: 'serif-text', serif;
-		font-size: 0.95rem;
-		color: var(--ink-soft);
+		display: flex;
+		align-items: center;
+		gap: 0.7rem;
+		font-family: 'mono-bold', monospace;
+		font-size: 0.9rem;
+		color: var(--ink);
 		animation: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
 		animation-delay: calc(0.4s + var(--n) * 0.08s);
 	}
 
-	/* each bullet is a tiny hatched test swatch in one of the three inks */
+	/* each bullet is a tiny test swatch: a hard ink edge around a hatch in
+	   one of the three inks */
 	.usps li::before {
 		content: '';
-		position: absolute;
-		left: 0;
-		top: 0.38em;
-		width: 1rem;
-		height: 0.72rem;
-		border-radius: 1px;
+		flex: none;
+		width: 0.95rem;
+		height: 0.95rem;
+		border: 1.5px solid var(--ink);
 		background: repeating-linear-gradient(
-			-50deg,
-			var(--c, var(--cyan)) 0 1.5px,
-			transparent 1.5px 3.6px
+			-45deg,
+			var(--c, var(--cyan)) 0 2px,
+			transparent 2px 4.5px
 		);
 	}
 
@@ -222,8 +221,8 @@
 	.ctas {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 0.75rem;
-		margin-top: 2.1rem;
+		gap: 1rem 1.1rem;
+		margin-top: 2.2rem;
 		animation: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) 0.62s both;
 	}
 
@@ -239,13 +238,10 @@
 	.bed {
 		position: relative;
 		padding: clamp(1.1rem, 2.4vw, 1.9rem);
-		border-radius: 16px;
+		border: var(--edge);
 		background-color: var(--bed);
 		background-image: var(--bed-grid);
 		background-position: center;
-		box-shadow:
-			inset 0 0 0 1px rgba(96, 115, 159, 0.13),
-			inset 0 1px 0 rgba(255, 255, 255, 0.8);
 	}
 
 	.sheet {

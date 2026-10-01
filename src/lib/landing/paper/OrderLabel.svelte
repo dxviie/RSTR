@@ -70,7 +70,7 @@
 		max-width: 57rem;
 		margin: clamp(3.5rem, 7vw, 5rem) auto 0;
 		padding: 8px;
-		border-radius: 10px;
+		border: var(--edge);
 		background: repeating-linear-gradient(
 			-45deg,
 			var(--cyan) 0 13px,
@@ -80,7 +80,7 @@
 			var(--yellow) 42px 55px,
 			var(--sheet) 55px 63px
 		);
-		box-shadow: var(--sheet-shadow-lift);
+		box-shadow: var(--hard-lg);
 		transition:
 			opacity 0.7s ease,
 			transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1);
@@ -94,7 +94,7 @@
 	.paper {
 		position: relative;
 		padding: clamp(1.6rem, 4vw, 2.6rem) clamp(1.25rem, 4vw, 2.75rem);
-		border-radius: 4px;
+		border: var(--edge);
 		background: var(--sheet);
 	}
 
@@ -200,12 +200,17 @@
 
 	/* ------------------------------------------------- text */
 
+	/* a little ink tag, like a label stuck on the envelope */
 	.kicker {
+		display: inline-block;
+		padding: 0.32rem 0.6rem 0.28rem;
+		background: var(--ink);
 		font-family: 'mono-bold', monospace;
-		font-size: 0.72rem;
-		letter-spacing: 0.16em;
-		text-transform: uppercase;
-		color: var(--magenta-ink);
+		font-size: 0.74rem;
+		letter-spacing: 0.04em;
+		color: var(--paper);
+		transform: rotate(-1.5deg);
+		transform-origin: left center;
 	}
 
 	h3 {
@@ -229,7 +234,6 @@
 
 	.key {
 		padding: 0.05rem 0.4rem;
-		border-radius: 4px;
 		background: var(--ink);
 		color: #fff;
 		font-family: 'mono-bold', monospace;
@@ -247,12 +251,11 @@
 	}
 
 	.facts li {
-		padding: 0.3rem 0.7rem;
-		border: 1px dashed rgba(96, 115, 159, 0.7);
-		border-radius: 4px;
+		padding: 0.3rem 0.65rem;
+		border: 1.5px solid var(--ink);
 		font-family: 'mono-bold', monospace;
 		font-size: 0.74rem;
-		color: var(--ink-soft);
+		color: var(--ink);
 	}
 
 	.go {

@@ -51,8 +51,7 @@
 
 	.strokes i {
 		width: 2.6rem;
-		height: 4px;
-		border-radius: 2px;
+		height: 5px;
 		background: var(--cyan);
 		/* same function list in both states so it interpolates cleanly */
 		transform: rotate(var(--r, -2deg)) scaleX(1);
@@ -84,9 +83,9 @@
 
 	h2 {
 		font-family: 'mono-bold', monospace;
-		font-size: clamp(1.75rem, 3.2vw, 2.45rem);
-		line-height: 1.12;
-		letter-spacing: -0.005em;
+		font-size: clamp(2rem, 4.2vw, 3.15rem);
+		line-height: 1.06;
+		letter-spacing: -0.02em;
 		color: var(--ink);
 	}
 

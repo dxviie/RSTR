@@ -85,9 +85,9 @@
 		width: clamp(3.9rem, 17vw, 5.4rem);
 		margin: 0 -0.32rem;
 		padding: 5px 5px 6px;
-		border-radius: 3px;
+		border: 1.5px solid var(--ink);
 		background: var(--sheet);
-		box-shadow: var(--sheet-shadow-lift);
+		box-shadow: 3px 3px 0 var(--ink);
 		transform: translate(
 				calc(var(--i) * (var(--spread, 1) - 1) * 1.6rem),
 				calc(var(--i) * var(--i) * 3px)

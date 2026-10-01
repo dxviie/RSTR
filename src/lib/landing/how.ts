@@ -55,14 +55,15 @@ export const HOW_CMY = stage(
 );
 
 /**
- * one image per pen, transparent backgrounds, in stacking order. Each pen
- * is drawn at the studio's 0.85 alpha, so stacking them with
- * mix-blend-mode: multiply over paper white (#fffef7) gives HOW_CMY.
+ * One image per pen, transparent backgrounds, in plotting order: yellow
+ * goes down first, then magenta, then cyan. Each pen is drawn at the
+ * studio's 0.85 alpha, so stacking them with mix-blend-mode: multiply over
+ * paper white (#fffef7) gives HOW_CMY (multiply doesn't care about order).
  */
 export const HOW_PENS = [
-	stage('milkmaid-pen-c', 'the cyan pen layer on its own'),
-	stage('milkmaid-pen-m', 'the magenta pen layer on its own'),
-	stage('milkmaid-pen-y', 'the yellow pen layer on its own')
+	{ ...stage('milkmaid-pen-y', 'the yellow pen layer on its own'), pen: 'Y', ink: '#ffb000' },
+	{ ...stage('milkmaid-pen-m', 'the magenta pen layer on its own'), pen: 'M', ink: '#ff2aa6' },
+	{ ...stage('milkmaid-pen-c', 'the cyan pen layer on its own'), pen: 'C', ink: '#00bfe8' }
 ];
 
 /**

@@ -1,8 +1,6 @@
 <script lang="ts">
-	// What's a plotter: the explanation, the AxiDraw pinned up as a print,
-	// and the spacing explainer to play with. Ends on a last call to action.
-	import Cta from './Cta.svelte';
-	import HatchDemo from './HatchDemo.svelte';
+	// What's a plotter: a short introduction to the machine, right under the
+	// hero, with the AxiDraw pinned up as a print next to it.
 	import Magnet from './Magnet.svelte';
 	import SectionHead from './SectionHead.svelte';
 	import Swatch from './Swatch.svelte';
@@ -26,17 +24,10 @@
 			<SectionHead id="plotter" title="what's a plotter?" />
 			<p>
 				A pen plotter is a machine that draws by moving a real pen across paper along vector paths.
-				It can't color in shapes the way software does. To get a colored square you draw a lot of
-				lines next to each other, tight for a solid block, spaced further apart for a lighter shade.
-				That technique is called
-				<a href="https://en.wikipedia.org/wiki/Hatching" target="_blank" rel="noopener"
-					><em>hatching</em></a
-				>, and it's probably as old as drawing itself.
 			</p>
 			<p>
-				RSTR does the hatching for you. It splits your image into regions of similar tone and fills
-				each one with lines, dense where the image is dark, sparse where it's light. What comes out
-				is your picture rebuilt entirely from straight lines.
+				Give it a sheet of paper, a pen and an SVG, and it draws the whole picture, one line after
+				another. What you get is real ink on real paper, not printed dots.
 			</p>
 			<p class="aside">
 				Curious about plotter art? Have a look at the
@@ -67,15 +58,6 @@
 			</figcaption>
 		</figure>
 	</div>
-
-	<div class="try" use:reveal>
-		<HatchDemo />
-	</div>
-
-	<div class="last">
-		<p>Got a photo in mind? Drop it in and see what the lines make of it.</p>
-		<Cta href="/studio">launch RSTR</Cta>
-	</div>
 </section>
 
 <style>
@@ -90,12 +72,14 @@
 		align-items: center;
 		max-width: var(--wrap);
 		margin: 0 auto;
-		padding: var(--section-pad) var(--gutter) 0;
+		/* right under the hero, which already leaves room above */
+		padding: clamp(1rem, 3vw, 2.5rem) var(--gutter) var(--section-pad);
 	}
 
 	.copy p {
-		max-width: 36rem;
+		max-width: 34rem;
 		margin-top: 1rem;
+		text-wrap: pretty;
 		font-family: 'serif-text', serif;
 		font-size: 1.04rem;
 		line-height: 1.7;
@@ -104,10 +88,6 @@
 
 	.copy > p:first-of-type {
 		margin-top: 1.4rem;
-	}
-
-	em {
-		font-style: italic;
 	}
 
 	.aside {
@@ -162,39 +142,9 @@
 		text-align: center;
 	}
 
-	/* the explainer gets a row of its own, under the text and the machine */
-	.try {
-		max-width: 50rem;
-		margin: clamp(3rem, 6vw, 4.5rem) auto 0;
-		padding: 0 var(--gutter);
-		transition:
-			opacity 0.8s ease,
-			transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1);
-	}
-
-	.machine:global([data-reveal='out']),
-	.try:global([data-reveal='out']) {
+	.machine:global([data-reveal='out']) {
 		opacity: 0;
 		transform: translateY(18px);
-	}
-
-	/* ------------------------------------------------- last call */
-
-	.last {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 1.2rem;
-		max-width: var(--wrap);
-		margin: 0 auto;
-		padding: clamp(4.5rem, 9vw, 7rem) var(--gutter) clamp(4rem, 8vw, 6rem);
-		text-align: center;
-	}
-
-	.last p {
-		font-family: 'serif-text', serif;
-		font-size: 1.12rem;
-		color: var(--ink-soft);
 	}
 
 	@media (max-width: 900px) {
@@ -210,8 +160,7 @@
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.machine,
-		.try {
+		.machine {
 			transition: none;
 		}
 	}

@@ -63,8 +63,7 @@
 		justify-content: flex-end;
 		gap: 0.35rem;
 		padding-bottom: 1.1rem;
-		border: 1.5px dashed rgba(96, 115, 159, 0.6);
-		border-radius: 14px;
+		border: 2px dashed var(--ink);
 		background:
 			radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0) 70%),
 			rgba(238, 241, 246, 0.55);
@@ -92,9 +91,9 @@
 		flex-direction: column;
 		gap: 0.3rem;
 		padding: 6px 6px 5px;
-		border-radius: 3px;
+		border: 1.5px solid var(--ink);
 		background: var(--sheet);
-		box-shadow: var(--sheet-shadow-lift);
+		box-shadow: 3px 3px 0 var(--ink);
 		transition:
 			opacity 0.6s ease,
 			transform 0.8s cubic-bezier(0.25, 1.25, 0.4, 1);

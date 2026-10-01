@@ -1,10 +1,11 @@
 <script lang="ts">
-	// #madewithrstr: the hashtag set huge in cyan, magenta and yellow
-	// hatching with a pen outline, a copy button that ticks itself off, where
+	// #madewithrstr: the hashtag set huge and drawn by RSTR in one black pen
+	// (a fresh roll every visit), a copy button that ticks itself off, where
 	// to post and tag, and the wall of plots with a spot left for yours.
 	import type { Plot } from '$lib/landing/plots';
 	import { reveal } from '$lib/landing/reveal';
 	import { CONTACT_FORM, HASHTAG, SHARE_LINKS, copyText } from '$lib/landing/share';
+	import PenTag from './PenTag.svelte';
 	import PlotWall from './PlotWall.svelte';
 	import Swatch from './Swatch.svelte';
 
@@ -47,7 +48,7 @@
 		<header class="head" use:reveal>
 			<p class="kicker">your turn</p>
 			<div class="title-row">
-				<h2 id="madewithrstr" class="tag">{HASHTAG}</h2>
+				<div class="tag"><PenTag id="madewithrstr" text={HASHTAG} /></div>
 				<button type="button" class="copy" class:done={copied} onclick={copy}>
 					<svg viewBox="0 0 24 24" aria-hidden="true">
 						<g class="sheets">
@@ -126,12 +127,17 @@
 		transform: translateY(16px);
 	}
 
+	/* a little ink tag, like a label stuck on the sheet */
 	.kicker {
+		display: inline-block;
+		padding: 0.32rem 0.6rem 0.28rem;
+		background: var(--ink);
 		font-family: 'mono-bold', monospace;
-		font-size: 0.78rem;
-		letter-spacing: 0.18em;
-		text-transform: uppercase;
-		color: var(--magenta-ink);
+		font-size: 0.74rem;
+		letter-spacing: 0.04em;
+		color: var(--paper);
+		transform: rotate(-1.5deg);
+		transform-origin: left center;
 	}
 
 	.title-row {
@@ -142,7 +148,7 @@
 		margin-top: 0.35rem;
 	}
 
-	/* ------------------------------------------------- the hatched tag */
+	/* ------------------------------------------------- the pen-drawn tag */
 
 	.tag {
 		/* fills the column on a phone (13 glyphs at 0.6em each), 108px max */
@@ -153,36 +159,6 @@
 		color: var(--ink);
 	}
 
-	/* where text can be clipped to a background: three inks of hatching,
-	   overprinted, inside a pen outline. The hatching slides on hover. */
-	@supports ((background-clip: text) or (-webkit-background-clip: text)) {
-		.tag {
-			color: transparent;
-			-webkit-text-stroke: max(1px, 0.013em) var(--ink);
-			background-image: var(--hatch-c), var(--hatch-m), var(--hatch-y);
-			/* in em, so the hatching keeps its proportions at every size */
-			background-size:
-				0.085em 0.085em,
-				0.085em 0.085em,
-				0.066em 0.066em;
-			background-position:
-				0 0,
-				0 0,
-				0 0;
-			background-blend-mode: multiply;
-			-webkit-background-clip: text;
-			background-clip: text;
-			transition: background-position 1.6s cubic-bezier(0.3, 0.7, 0.3, 1);
-		}
-
-		.tag:hover {
-			background-position:
-				0.255em 0,
-				-0.255em 0,
-				0 0.132em;
-		}
-	}
-
 	/* ------------------------------------------------- copy button */
 
 	.copy {
@@ -191,16 +167,17 @@
 		gap: 0.6rem;
 		min-height: 2.9rem;
 		margin: 0;
-		padding: 0.6rem 1.3rem 0.6rem 1.05rem;
-		border: 1.5px solid var(--ink);
-		border-radius: 999px;
+		padding: 0.6rem 1.25rem 0.6rem 1.05rem;
+		border: var(--edge);
+		border-radius: 0;
 		background: var(--sheet);
 		color: var(--ink);
-		font-size: 0.88rem !important;
+		font-size: 0.9rem !important;
 		cursor: copy;
+		box-shadow: var(--hard);
 		transition:
-			transform 0.18s ease,
-			box-shadow 0.18s ease,
+			transform 0.14s cubic-bezier(0.3, 0.7, 0.4, 1),
+			box-shadow 0.14s cubic-bezier(0.3, 0.7, 0.4, 1),
 			background-color 0.25s ease,
 			color 0.25s ease;
 	}
@@ -208,13 +185,14 @@
 	.copy:hover {
 		background-color: var(--sheet) !important;
 		color: var(--ink) !important;
-		transform: translateY(-1px);
-		box-shadow: 0 6px 14px -6px rgba(26, 32, 44, 0.35);
+		transform: translate(-2px, -2px);
+		box-shadow: var(--hard-lg);
 	}
 
 	.copy:active {
-		transform: translateY(1px);
-		box-shadow: none;
+		transform: translate(4px, 4px);
+		box-shadow: 0 0 0 var(--ink);
+		transition-duration: 0.05s;
 	}
 
 	.copy:focus-visible {
@@ -336,21 +314,26 @@
 		gap: 0.45rem;
 		min-height: 2.6rem;
 		padding: 0.62rem 0.9rem 0.6rem 1rem;
-		border: 1px solid #d3d9e3;
-		border-radius: 999px;
+		border: var(--edge) !important;
+		border-radius: 0;
 		background: var(--sheet);
 		color: var(--ink);
 		text-decoration: none;
+		box-shadow: 3px 3px 0 var(--ink);
 		transition:
-			border-color 0.15s ease,
-			transform 0.18s ease,
-			box-shadow 0.18s ease;
+			transform 0.14s cubic-bezier(0.3, 0.7, 0.4, 1),
+			box-shadow 0.14s cubic-bezier(0.3, 0.7, 0.4, 1);
 	}
 
 	.chip:hover {
-		border-color: var(--ink);
-		transform: translateY(-1px);
-		box-shadow: 0 5px 12px -6px rgba(26, 32, 44, 0.35);
+		transform: translate(-2px, -2px);
+		box-shadow: 5px 5px 0 var(--ink);
+	}
+
+	.chip:active {
+		transform: translate(3px, 3px);
+		box-shadow: 0 0 0 var(--ink);
+		transition-duration: 0.05s;
 	}
 
 	.chip:focus-visible {

@@ -203,13 +203,10 @@
 		position: relative;
 		margin-top: clamp(2.5rem, 5vw, 3.5rem);
 		padding: clamp(1.75rem, 4vw, 3.25rem) clamp(1.1rem, 4vw, 3.25rem);
-		border-radius: 18px;
+		border: var(--edge);
 		background-color: var(--bed);
 		background-image: var(--bed-grid);
 		background-position: center;
-		box-shadow:
-			inset 0 0 0 1px rgba(96, 115, 159, 0.13),
-			inset 0 1px 0 rgba(255, 255, 255, 0.8);
 	}
 
 	.wall {
@@ -319,8 +316,7 @@
 		/* the same footprint as a photo on the other prints */
 		aspect-ratio: 4 / 5;
 		padding: 1rem 0.5rem;
-		border: 1.5px dashed rgba(96, 115, 159, 0.75);
-		border-radius: 2px;
+		border: 2px dashed var(--ink);
 		background: rgba(255, 254, 247, 0.6);
 		text-align: center;
 		transition:

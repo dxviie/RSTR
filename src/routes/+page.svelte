@@ -46,11 +46,11 @@
 
 	<main>
 		<Hero onopen={openPlot} />
+		<Plotter />
 		<HowItWorks onzoom={openImage} />
 		<Yours />
 		<MadeWith onopen={openPlot} />
 		<Story />
-		<Plotter />
 	</main>
 
 	<footer class="footer">
@@ -105,10 +105,6 @@
 		--bed-grid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36'%3E%3Cpath d='M18.5 15.5v6M15.5 18.5h6' stroke='%2360739f' stroke-opacity='.42'/%3E%3C/svg%3E");
 		/* uneven rubber-stamp ink: mostly solid, with small speckled gaps */
 		--grain-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.7' numOctaves='3' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -3 0 0 0 2.55'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
-		/* the hashtag's three inks: two diagonals and a horizontal */
-		--hatch-c: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9'%3E%3Cpath d='M-1 1l2-2M0 9l9-9M8 10l2-2' stroke='%2300bfe8' stroke-width='1.8'/%3E%3C/svg%3E");
-		--hatch-m: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9'%3E%3Cpath d='M-1 8l2 2M0 0l9 9M8-1l2 2' stroke='%23ff2aa6' stroke-width='1.8'/%3E%3C/svg%3E");
-		--hatch-y: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='7' height='7'%3E%3Cpath d='M0 3.5h7' stroke='%23ffb000' stroke-width='1.8'/%3E%3C/svg%3E");
 
 		position: relative;
 		/* everything paints above the grain and the grid below */

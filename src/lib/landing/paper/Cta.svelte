@@ -1,6 +1,8 @@
 <script lang="ts">
-	// Pill-shaped call to action. "primary" is ink on paper with a small
-	// arrow that nudges forward on hover; "ghost" is an outlined pen line.
+	// Call to action with an edge: a square box with a hard ink outline,
+	// sitting on a flat offset plate. Hovering lifts it off the plate,
+	// pressing pushes it down onto it. "primary" is an ink face on a magenta
+	// plate, "ghost" a paper face on an ink plate.
 	import type { Snippet } from 'svelte';
 
 	const {
@@ -34,22 +36,24 @@
 
 <style>
 	.cta {
+		--plate: var(--ink, #1a202c);
+
 		display: inline-flex;
 		align-items: center;
 		gap: 0.6rem;
 		min-height: 2.9rem;
-		padding: 0.7rem 1.35rem 0.7rem 1.5rem;
-		border: 1.5px solid var(--ink, #1a202c);
-		border-radius: 999px;
+		padding: 0.7rem 1.25rem 0.7rem 1.35rem;
+		border: 2px solid var(--ink, #1a202c);
+		border-radius: 0;
 		font-family: 'mono-bold', monospace;
-		font-size: 0.88rem;
+		font-size: 0.9rem;
 		line-height: 1.1;
 		white-space: nowrap;
 		text-decoration: none;
+		box-shadow: 4px 4px 0 var(--plate);
 		transition:
-			transform 0.18s ease,
-			box-shadow 0.18s ease,
-			background-color 0.18s ease;
+			transform 0.14s cubic-bezier(0.3, 0.7, 0.4, 1),
+			box-shadow 0.14s cubic-bezier(0.3, 0.7, 0.4, 1);
 	}
 
 	.cta svg {
@@ -57,37 +61,27 @@
 		height: 1rem;
 		fill: none;
 		stroke: currentColor;
-		stroke-width: 1.7;
-		stroke-linecap: round;
-		stroke-linejoin: round;
+		stroke-width: 1.8;
+		stroke-linecap: square;
+		stroke-linejoin: miter;
 		transition: transform 0.25s cubic-bezier(0.3, 0.7, 0.3, 1);
 	}
 
 	.primary {
+		--plate: var(--magenta, #ff2aa6);
+
 		background: var(--ink, #1a202c);
 		color: var(--paper, #fdfaff);
-		/* a soft ink pool under the button */
-		box-shadow: 0 1px 0 rgba(26, 32, 44, 0.12);
-	}
-
-	.primary:hover {
-		background: var(--ink-soft, #2d3748);
-		transform: translateY(-1px);
-		box-shadow:
-			0 6px 14px -6px rgba(26, 32, 44, 0.45),
-			0 2px 0 rgba(26, 32, 44, 0.08);
 	}
 
 	.ghost {
-		background: transparent;
+		background: var(--sheet, #fffef7);
 		color: var(--ink, #1a202c);
-		border-color: rgba(26, 32, 44, 0.32);
 	}
 
-	.ghost:hover {
-		border-color: var(--ink, #1a202c);
-		background: var(--sheet, #fffef7);
-		transform: translateY(-1px);
+	.cta:hover {
+		transform: translate(-2px, -2px);
+		box-shadow: 6px 6px 0 var(--plate);
 	}
 
 	.cta:hover svg {
@@ -95,13 +89,14 @@
 	}
 
 	.cta:active {
-		transform: translateY(1px);
-		box-shadow: none;
+		transform: translate(4px, 4px);
+		box-shadow: 0 0 0 var(--plate);
+		transition-duration: 0.05s;
 	}
 
 	.cta:focus-visible {
 		outline: 2px solid var(--focus, #df0079);
-		outline-offset: 3px;
+		outline-offset: 4px;
 	}
 
 	@media (max-width: 420px) {

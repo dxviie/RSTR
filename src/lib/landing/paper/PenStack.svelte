@@ -1,17 +1,17 @@
 <script lang="ts">
 	// The three pen layers of the CMY Milkmaid, pulled apart like sheets of
-	// tracing paper in an exploded view. One layer per pen is exactly what
-	// the exported SVG holds: one group each. The card around it fans the
-	// sheets further apart by setting --pen-gap (on hover, for instance).
+	// tracing paper in an exploded view, stacked in plotting order: yellow
+	// goes down first, so it sits at the bottom, then magenta, then cyan.
+	// One layer per pen is exactly what the exported SVG holds: one group
+	// each. The card around it fans the sheets further apart by setting
+	// --pen-gap (on hover, for instance).
 	import { HOW_PENS } from '$lib/landing/how';
-
-	const TABS = ['C', 'M', 'Y'];
 </script>
 
 <div
 	class="stack"
 	role="img"
-	aria-label="the Milkmaid's cyan, magenta and yellow pen layers, pulled apart like sheets of tracing paper"
+	aria-label="the Milkmaid's yellow, magenta and cyan pen layers in plotting order, pulled apart like sheets of tracing paper"
 >
 	<div class="plane">
 		{#each HOW_PENS as pen, i (pen.src)}
@@ -26,7 +26,7 @@
 					loading="lazy"
 					decoding="async"
 				/>
-				<span class="tab">{TABS[i]}</span>
+				<span class="tab" style="--tab: {pen.ink}">{pen.pen}</span>
 			</span>
 		{/each}
 	</div>
@@ -67,29 +67,20 @@
 		height: 100%;
 	}
 
+	/* a tab per sheet, like an index tab cut in the pen's color, near the
+	   front corner: the sheets above cover the rest of each edge */
 	.tab {
 		position: absolute;
-		top: -1px;
-		left: 100%;
+		top: calc(100% - 2.4rem);
+		left: calc(100% - 1px);
 		display: grid;
 		place-items: center;
-		width: 1.1rem;
+		width: 1.2rem;
 		height: 1.5rem;
-		border-radius: 0 3px 3px 0;
-		background: var(--cyan);
+		border: 1.5px solid var(--ink);
+		background: var(--tab);
 		font-family: 'mono-bold', monospace;
 		font-size: 0.62rem;
-		color: #fff;
-	}
-
-	.layer:nth-child(2) .tab {
-		top: calc(1.5rem + 1px);
-		background: var(--magenta);
-	}
-
-	.layer:nth-child(3) .tab {
-		top: calc(3rem + 3px);
-		background: var(--yellow);
 		color: var(--ink);
 	}
 
