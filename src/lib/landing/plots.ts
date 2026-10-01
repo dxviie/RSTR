@@ -51,9 +51,10 @@ const FRAMING: Record<string, Partial<Framing>> = {
 	'street-2': { zoom: 1.25, x: 40, y: 35 },
 	// landscape shot with paper above and below the plot
 	'webb-1': { zoom: 1.22 },
-	// desk at the left edge, paper edge at the right
+	// desk at the left edge
 	'puma-1': { zoom: 1.26 },
-	melkmeisje: { zoom: 1.24, y: 45 }
+	// paper and magnets below the plot: zoom toward the top
+	melkmeisje: { zoom: 1.34, y: 36 }
 };
 
 export const framing = (name: string): Framing => ({ ...DEFAULT_FRAMING, ...FRAMING[name] });
