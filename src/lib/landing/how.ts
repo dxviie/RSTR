@@ -90,11 +90,14 @@ export const HOW_PLOT_ON_MACHINE = {
 	name: 'melkmeisje-2'
 };
 
-/** the studio with the Milkmaid loaded and the "Black classic" preset */
+/**
+ * The studio with the Milkmaid loaded and the same settings as the stage
+ * renders, so its stats panel shows exactly the HOW_STATS numbers.
+ */
 export const HOW_STUDIO = {
 	src: '/how/studio-720w.webp',
 	srcset: '/how/studio-720w.webp 720w, /how/studio-1440w.webp 1440w',
-	alt: 'the RSTR studio: image and line settings on the left, the hatched Milkmaid in the middle, pens, export buttons and the plot time estimate on the right',
+	alt: 'the RSTR studio: image and line settings on the left, the hatched Milkmaid in the middle, the pen, export buttons and the stats on the right: 278 regions, 3,831 lines, about 1h 37m of plotting',
 	width: 1440,
 	height: 900
 };

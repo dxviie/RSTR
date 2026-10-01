@@ -221,9 +221,24 @@
 		opacity: 1;
 	}
 
+	/* the focus ring sits on a layer above the zoomed picture, which would
+	   cover an inset outline */
+	.hc-slide::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		z-index: 1;
+		box-shadow: inset 0 0 0 3px var(--accent);
+		opacity: 0;
+		pointer-events: none;
+	}
+
 	.hc-slide:focus-visible {
-		outline: 3px solid var(--accent);
-		outline-offset: -3px;
+		outline: none;
+	}
+
+	.hc-slide:focus-visible::after {
+		opacity: 1;
 	}
 
 	.hc-slide img {
@@ -272,8 +287,9 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		width: 2.1rem;
-		height: 2.1rem;
+		/* 40px: a comfortable tap target */
+		width: 2.5rem;
+		height: 2.5rem;
 		padding: 0;
 		border: 1px solid var(--btn-border);
 		border-radius: 999px;
@@ -313,8 +329,8 @@
 	}
 
 	.hc-play {
-		width: 2.5rem;
-		height: 2.5rem;
+		width: 2.875rem;
+		height: 2.875rem;
 	}
 
 	/* progress ring around the pause button: fills over one slide and
