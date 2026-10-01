@@ -54,7 +54,11 @@ export const HOW_CMY = stage(
 	'the painting redrawn with three pens, cyan, magenta and yellow hatching layered on top of each other'
 );
 
-/** one image per pen, transparent backgrounds, in stacking order */
+/**
+ * one image per pen, transparent backgrounds, in stacking order. Each pen
+ * is drawn at the studio's 0.85 alpha, so stacking them with
+ * mix-blend-mode: multiply over paper white (#fffef7) gives HOW_CMY.
+ */
 export const HOW_PENS = [
 	stage('milkmaid-pen-c', 'the cyan pen layer on its own'),
 	stage('milkmaid-pen-m', 'the magenta pen layer on its own'),
@@ -62,9 +66,13 @@ export const HOW_PENS = [
 ];
 
 /**
- * A coarser single-pen render as one SVG path in plotting order, for
- * stroke-dashoffset "the plotter is drawing" animations. Same viewBox as
- * the stage images (HOW_WIDTH × HOW_HEIGHT).
+ * A coarser single-pen render (pen 0.8 mm, about 2,100 lines) for "the
+ * plotter is drawing" animations: one <path> per region, in the order the
+ * engine produced them, same viewBox as the stage images (HOW_WIDTH ×
+ * HOW_HEIGHT), stroke set on the wrapping <g>. SVG restarts the dash
+ * pattern at every subpath (each M), so a stroke-dashoffset animation on a
+ * path draws all of its lines at once: stagger the paths, or split each d
+ * on M to draw line by line.
  */
 export const HOW_COARSE_SVG = '/how/milkmaid-lines-coarse.svg';
 
@@ -91,12 +99,26 @@ export const HOW_STUDIO = {
 	height: 900
 };
 
-/** what the engine reported for these renders (filled in from the generator) */
+/**
+ * What the engine reported for these renders (watershed, output 200 mm
+ * wide; plot times from the studio's saxi-style estimate with its default
+ * plotter profile, formatted the way the studio formats them).
+ */
 export const HOW_STATS = {
-	regions: 0,
-	lines: 0,
-	plotTime: '',
-	pens: 3
+	/** the single black pen behind HOW_LINES */
+	regions: 278,
+	lines: 3831,
+	lengthM: 38,
+	plotTime: '1h 37m',
+	/** the three pens behind HOW_CMY / HOW_PENS */
+	cmy: {
+		pens: 3,
+		lines: 9633,
+		lengthM: 105,
+		plotTime: '4h 18m'
+	},
+	widthMm: 200,
+	heightMm: 224
 };
 
 export const MILKMAID_CREDIT =
