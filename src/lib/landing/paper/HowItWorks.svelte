@@ -8,7 +8,7 @@
 	import Exports from './Exports.svelte';
 	import OrderLabel from './OrderLabel.svelte';
 	import PenStack from './PenStack.svelte';
-	import Pipeline from './Pipeline.svelte';
+	import Stages from './Stages.svelte';
 	import SectionHead from './SectionHead.svelte';
 	import StudioShot from './StudioShot.svelte';
 	import Swatch from './Swatch.svelte';
@@ -41,7 +41,7 @@
 			Here's one painting going all the way through RSTR, from photo to pen on paper.
 		</SectionHead>
 
-		<Pipeline {onzoom} />
+		<Stages {onzoom} />
 
 		<ol class="steps">
 			<li class="step" use:reveal>
