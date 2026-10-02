@@ -59,6 +59,8 @@
 			0 10px 18px -12px rgba(26, 32, 44, 0.35);
 		transform: translateZ(calc(var(--i) * var(--pen-gap, 2.1rem)));
 		transition: transform 0.6s cubic-bezier(0.3, 0.7, 0.3, 1);
+		/* the sheets fan out on hover: each on its own layer */
+		will-change: transform;
 	}
 
 	.layer img {

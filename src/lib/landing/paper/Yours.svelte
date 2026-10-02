@@ -93,6 +93,8 @@
 	h2:global([data-reveal='out']) {
 		opacity: 0;
 		transform: translateY(14px);
+		/* promoted while it waits to scroll in, released once it has arrived */
+		will-change: opacity, transform;
 	}
 
 	h2:global([data-reveal='out']) .circled path {
@@ -170,6 +172,7 @@
 	.stamps:global([data-reveal='out']) li {
 		opacity: 0;
 		transform: rotate(var(--tilt)) scale(1.45);
+		will-change: opacity, transform;
 	}
 
 	@media (max-width: 480px) {

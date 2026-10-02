@@ -1,28 +1,31 @@
 <script lang="ts">
-	// "d17e", signed in fineliner: each stroke inks itself in at an even
+	// "David", signed in fineliner: each stroke inks itself in at an even
 	// writing speed, with short pen lifts between them, once it scrolls in.
+	// The pen goes D, "avi", "d", then back for the dot on the i, and
+	// finishes with the underline.
 	import { reveal } from '$lib/landing/reveal';
 
 	// [path, start (s), duration (s)]: durations follow each stroke's length
 	const STROKES: [string, number, number][] = [
+		['M31 21C31 38 30 56 28 72', 0, 0.17],
+		['M22 26C40 13 68 17 71 40C74 63 50 76 25 71', 0.29, 0.42],
 		[
-			'M46 53C42 46 32 46 27 51c-6 6-6 17 2 20 8 3 15-5 18-14 3-10 7-28 10-43 1-5-3-6-4-1-2 16-3 38-3 50 0 7 4 9 9 4',
-			0,
-			0.58
+			'M97 52C91 46 81 47 78 55C75 63 80 72 87 70C92 68 95 60 97 52C96 60 96 68 100 72C104 66 106 57 108 51C110 60 112 68 115 72C119 64 123 56 126 50C127 57 127 66 131 72',
+			0.83,
+			0.6
 		],
-		['M67 27c4-3 9-8 12-14-1 17-4 39-7 58', 0.68, 0.24],
-		['M88 17c8 1 17-1 27-4-6 15-15 37-21 59', 1, 0.28],
-		['M96 45c5-1 11-2 16-3', 1.36, 0.12],
 		[
-			'M123 61c8 0 18-4 18-11 0-6-7-7-12-2-6 6-6 18 1 22 8 5 21-1 31-10 8-7 17-10 16-2-2 14-52 27-153 30',
-			1.56,
-			0.85
-		]
+			'M154 52C148 46 137 48 134 56C131 64 136 73 143 71C150 69 154 60 156 50C158 38 160 26 162 16C162 30 160 52 161 68C162 73 167 72 171 68',
+			1.55,
+			0.57
+		],
+		['M127 39l3.5-1.5', 2.27, 0.1],
+		['M40 84C82 80 132 79 184 73', 2.52, 0.48]
 	];
 </script>
 
 <span class="signature" use:reveal>
-	<svg viewBox="0 0 220 100" role="img" aria-label="signed, d17e">
+	<svg viewBox="0 0 220 100" role="img" aria-label="signed, David">
 		<g transform="translate(18 0) skewX(-13)">
 			{#each STROKES as [d, at, duration] (d)}
 				<path pathLength="1" {d} style="--at: {at}s; --duration: {duration}s" />

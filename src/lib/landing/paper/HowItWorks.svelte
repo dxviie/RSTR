@@ -50,8 +50,9 @@
 					<div class="text">
 						<h3>drop in a photo or video</h3>
 						<p>
-							Any image works, and so does video. Crop, zoom and rotate right on the render. Nothing
-							gets uploaded. It all runs in your browser, on your own machine.
+							Click to choose a photo or video from your device, or drag and drop one in. Any image
+							works, and so does video. Crop, zoom and rotate it right on the render. Nothing gets
+							uploaded. It all runs in your browser, on your own machine.
 						</p>
 					</div>
 					<DropZone />
@@ -107,7 +108,9 @@
 			</li>
 		</ol>
 
-		<OrderLabel />
+		<div class="order">
+			<OrderLabel />
+		</div>
 	</div>
 </section>
 
@@ -117,6 +120,10 @@
 	}
 
 	.wrap {
+		/* the steps' timeline column: the numbered node, then the gap */
+		--node: 2.75rem;
+		--col-gap: clamp(1rem, 3vw, 2.25rem);
+
 		position: relative;
 		max-width: var(--wrap);
 		margin: 0 auto;
@@ -134,12 +141,17 @@
 	}
 
 	.step {
-		--node: 2.75rem;
-
 		position: relative;
 		display: grid;
 		grid-template-columns: var(--node) minmax(0, 1fr);
-		column-gap: clamp(1rem, 3vw, 2.25rem);
+		column-gap: var(--col-gap);
+	}
+
+	/* the plot service closes the section, centered under the steps'
+	   content rather than the whole width: the timeline's numbers hold the
+	   strip on the left */
+	.order {
+		padding-left: calc(var(--node) + var(--col-gap));
 	}
 
 	/* the timeline: a segment from each node down to the next one */
@@ -225,15 +237,19 @@
 	.step:global([data-reveal='out']) .node {
 		opacity: 0;
 		transform: scale(0.6);
+		/* promoted while it waits to scroll in, released once it has arrived */
+		will-change: opacity, transform;
 	}
 
 	.step:global([data-reveal='out']) .body {
 		opacity: 0;
 		transform: translateY(16px);
+		will-change: opacity, transform;
 	}
 
 	.step:global([data-reveal='out'])::before {
 		transform: scaleY(0);
+		will-change: transform;
 	}
 
 	/* ------------------------------------------------- take it home */
@@ -254,6 +270,8 @@
 		transition:
 			box-shadow 0.2s cubic-bezier(0.3, 0.7, 0.4, 1),
 			transform 0.2s cubic-bezier(0.3, 0.7, 0.4, 1);
+		/* moves on hover and press: keep it on its own layer */
+		will-change: transform;
 	}
 
 	.card:hover {
@@ -315,6 +333,10 @@
 	@media (max-width: 640px) {
 		.step {
 			display: block;
+		}
+
+		.order {
+			padding-left: 0;
 		}
 
 		.step:not(:last-child)::before {

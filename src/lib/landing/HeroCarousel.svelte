@@ -207,6 +207,8 @@
 		pointer-events: none;
 		cursor: zoom-in;
 		transition: opacity var(--hc-fade) ease-in-out;
+		/* slides crossfade all the time: each on its own layer */
+		will-change: opacity;
 	}
 
 	/* the incoming slide fades in on top while the outgoing one stays fully
@@ -300,6 +302,8 @@
 			background 0.15s ease,
 			border-color 0.15s ease,
 			transform 0.15s ease;
+		/* moves on hover and press: keep it on its own layer */
+		will-change: transform;
 	}
 
 	.hc-btn:hover {

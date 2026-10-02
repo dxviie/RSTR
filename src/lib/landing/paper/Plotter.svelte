@@ -145,6 +145,8 @@
 	.machine:global([data-reveal='out']) {
 		opacity: 0;
 		transform: translateY(18px);
+		/* promoted while it waits to scroll in, released once it has arrived */
+		will-change: opacity, transform;
 	}
 
 	@media (max-width: 900px) {

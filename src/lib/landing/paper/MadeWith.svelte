@@ -125,6 +125,8 @@
 	.head:global([data-reveal='out']) {
 		opacity: 0;
 		transform: translateY(16px);
+		/* promoted while it waits to scroll in, released once it has arrived */
+		will-change: opacity, transform;
 	}
 
 	/* a little ink tag, like a label stuck on the sheet */
@@ -180,6 +182,8 @@
 			box-shadow 0.14s cubic-bezier(0.3, 0.7, 0.4, 1),
 			background-color 0.25s ease,
 			color 0.25s ease;
+		/* moves on hover and press: keep it on its own layer */
+		will-change: transform;
 	}
 
 	.copy:hover {
@@ -291,6 +295,7 @@
 	.post:global([data-reveal='out']) {
 		opacity: 0;
 		transform: translateY(14px);
+		will-change: opacity, transform;
 	}
 
 	.label-post {
@@ -323,6 +328,8 @@
 		transition:
 			transform 0.14s cubic-bezier(0.3, 0.7, 0.4, 1),
 			box-shadow 0.14s cubic-bezier(0.3, 0.7, 0.4, 1);
+		/* moves on hover and press: keep it on its own layer */
+		will-change: transform;
 	}
 
 	.chip:hover {
@@ -362,6 +369,7 @@
 		stroke-linecap: round;
 		stroke-linejoin: round;
 		transition: transform 0.2s ease;
+		will-change: transform;
 	}
 
 	.chip:hover svg {

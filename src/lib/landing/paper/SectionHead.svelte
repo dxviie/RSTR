@@ -75,10 +75,13 @@
 	.head:global([data-reveal='out']) {
 		opacity: 0;
 		transform: translateY(14px);
+		/* promoted while it waits to scroll in, released once it has arrived */
+		will-change: opacity, transform;
 	}
 
 	.head:global([data-reveal='out']) .strokes i {
 		transform: rotate(var(--r, -2deg)) scaleX(0);
+		will-change: transform;
 	}
 
 	h2 {

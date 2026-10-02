@@ -89,6 +89,8 @@
 	.envelope:global([data-reveal='out']) {
 		opacity: 0;
 		transform: translateY(18px) rotate(-0.6deg);
+		/* promoted while it waits to scroll in, released once it has arrived */
+		will-change: opacity, transform;
 	}
 
 	.paper {

@@ -91,6 +91,8 @@
 	.letter:global([data-reveal='out']) {
 		opacity: 0;
 		transform: translateY(20px) rotate(0.5deg);
+		/* promoted while it waits to scroll in, released once it has arrived */
+		will-change: opacity, transform;
 	}
 
 	.place {

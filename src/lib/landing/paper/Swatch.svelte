@@ -47,6 +47,8 @@
 		z-index: 0;
 		pointer-events: none;
 		transform: rotate(var(--tilt));
+		/* drifts with the scroll: keep it on its own layer */
+		will-change: transform;
 	}
 
 	/* a test swatch boxed in a thin ink edge, like the bullets up top but

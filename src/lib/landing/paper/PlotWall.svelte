@@ -13,7 +13,6 @@
 	import { reveal } from '$lib/landing/reveal';
 	import { HASHTAG } from '$lib/landing/share';
 	import Magnet from './Magnet.svelte';
-	import RegMark from './RegMark.svelte';
 
 	const {
 		onopen,
@@ -136,11 +135,6 @@
 </script>
 
 <div class="bed" bind:this={wall} use:reveal>
-	<RegMark style="top: -11px; left: -11px" />
-	<RegMark style="top: -11px; right: -11px" />
-	<RegMark style="bottom: -11px; left: -11px" />
-	<RegMark style="bottom: -11px; right: -11px" />
-
 	<ul class="wall">
 		{#each slots as plotIndex, slot (slot)}
 			{@const plot = GALLERY_PLOTS[plotIndex]}
@@ -200,13 +194,47 @@
 
 <style>
 	.bed {
+		--bleed: 2rem;
+		--fade: 5rem;
+
 		position: relative;
+		isolation: isolate;
 		margin-top: clamp(2.5rem, 5vw, 3.5rem);
 		padding: clamp(1.75rem, 4vw, 3.25rem) clamp(1.1rem, 4vw, 3.25rem);
-		border: var(--edge);
+	}
+
+	/* the plotter bed under the print: the page's grid of crosses on a faint
+	   tint that fades out at its edges, so the print sits on the page rather
+	   than in a box. Two crossing fades make a soft-edged rectangle. */
+	.bed::before {
+		content: '';
+		position: absolute;
+		inset: calc(-1 * var(--bleed));
+		z-index: -1;
 		background-color: var(--bed);
 		background-image: var(--bed-grid);
 		background-position: center;
+		-webkit-mask-image:
+			linear-gradient(
+				90deg,
+				transparent,
+				#000 var(--fade),
+				#000 calc(100% - var(--fade)),
+				transparent
+			),
+			linear-gradient(transparent, #000 var(--fade), #000 calc(100% - var(--fade)), transparent);
+		-webkit-mask-composite: source-in;
+		mask-image:
+			linear-gradient(
+				90deg,
+				transparent,
+				#000 var(--fade),
+				#000 calc(100% - var(--fade)),
+				transparent
+			),
+			linear-gradient(transparent, #000 var(--fade), #000 calc(100% - var(--fade)), transparent);
+		mask-composite: intersect;
+		pointer-events: none;
 	}
 
 	.wall {
@@ -228,6 +256,8 @@
 	.bed:global([data-reveal='out']) .pin {
 		opacity: 0;
 		transform: translateY(22px);
+		/* promoted while it waits to scroll in, released once it has arrived */
+		will-change: opacity, transform;
 	}
 
 	/* once a print has settled, its magnets snap on, like in the hero */
@@ -258,6 +288,8 @@
 		transition:
 			transform 0.45s cubic-bezier(0.3, 0.7, 0.3, 1),
 			box-shadow 0.45s ease;
+		/* lifts on hover: keep it on its own layer */
+		will-change: transform;
 	}
 
 	/* straightened and lifted off the bed */

@@ -9,7 +9,6 @@
 	import { HASHTAG } from '$lib/landing/share';
 	import Cta from './Cta.svelte';
 	import Magnet from './Magnet.svelte';
-	import RegMark from './RegMark.svelte';
 
 	const { onopen }: { onopen: (plot: Plot) => void } = $props();
 
@@ -50,8 +49,6 @@
 	</div>
 
 	<div class="bed">
-		<RegMark style="top: -11px; left: -11px" />
-		<RegMark style="bottom: -11px; right: -11px" />
 		<div class="sheet">
 			<HeroCarousel
 				slides={HERO_PLOTS}
@@ -236,12 +233,46 @@
 	/* ------------------------------------------------- the print on the bed */
 
 	.bed {
+		--bleed: 2.5rem;
+		--fade: 4.5rem;
+
 		position: relative;
+		isolation: isolate;
 		padding: clamp(1.1rem, 2.4vw, 1.9rem);
-		border: var(--edge);
+	}
+
+	/* the plotter bed under the print: the page's grid of crosses on a faint
+	   tint that fades out at its edges, so the print sits on the page rather
+	   than in a box. Two crossing fades make a soft-edged rectangle. */
+	.bed::before {
+		content: '';
+		position: absolute;
+		inset: calc(-1 * var(--bleed));
+		z-index: -1;
 		background-color: var(--bed);
 		background-image: var(--bed-grid);
 		background-position: center;
+		-webkit-mask-image:
+			linear-gradient(
+				90deg,
+				transparent,
+				#000 var(--fade),
+				#000 calc(100% - var(--fade)),
+				transparent
+			),
+			linear-gradient(transparent, #000 var(--fade), #000 calc(100% - var(--fade)), transparent);
+		-webkit-mask-composite: source-in;
+		mask-image:
+			linear-gradient(
+				90deg,
+				transparent,
+				#000 var(--fade),
+				#000 calc(100% - var(--fade)),
+				transparent
+			),
+			linear-gradient(transparent, #000 var(--fade), #000 calc(100% - var(--fade)), transparent);
+		mask-composite: intersect;
+		pointer-events: none;
 	}
 
 	.sheet {
@@ -333,6 +364,8 @@
 		transition:
 			transform 0.25s cubic-bezier(0.3, 0.7, 0.3, 1),
 			box-shadow 0.25s ease;
+		/* moves on hover and press: keep it on its own layer */
+		will-change: transform;
 	}
 
 	.stamp:hover {

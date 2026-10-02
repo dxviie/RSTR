@@ -5,8 +5,9 @@
 	// of the window and the right pane's in a column to its right, each label
 	// tied to its outline by a thin leader. Narrow, the outlines keep their
 	// numbers and the labels become a legend under the picture. Pointing at
-	// a label or an outline lights up its partner; each label links to its
-	// part of the help page.
+	// a label or an outline lights up its partner. The labels only inform:
+	// nothing here links away, so a stray tap on a phone can't send anyone
+	// off to the help page.
 	import type { LightboxImage } from '$lib/landing/Lightbox.svelte';
 	import { HOW_STUDIO } from '$lib/landing/how';
 	import { reveal } from '$lib/landing/reveal';
@@ -17,8 +18,6 @@
 		n: number;
 		name: string;
 		line: string;
-		/** the help page section that documents it */
-		help: string;
 		side: 'left' | 'right';
 		/** the outline: x, y, width, height in % of the 1440 × 900 screenshot */
 		box: [number, number, number, number];
@@ -40,7 +39,6 @@
 			n: 1,
 			name: 'image',
 			line: 'tune the photo before tracing',
-			help: 'image',
 			side: 'left',
 			box: [0.42, 5.27, 17.99, 27.1],
 			ly: 18.8
@@ -49,7 +47,6 @@
 			n: 2,
 			name: 'segmentation',
 			line: "how it's carved into regions",
-			help: 'segmentation',
 			side: 'left',
 			box: [0.42, 33.81, 17.99, 20.68],
 			ly: 43.5
@@ -58,7 +55,6 @@
 			n: 3,
 			name: 'lines',
 			line: 'pen width, spacing and ink',
-			help: 'lines',
 			side: 'left',
 			box: [0.42, 55.93, 17.99, 29.32],
 			ly: 67
@@ -68,7 +64,6 @@
 			name: 'the render',
 			line: 'drag, zoom and rotate to frame it',
 			// framing on the render is documented with the image controls
-			help: 'image',
 			side: 'left',
 			box: [23.73, 5.27, 52.54, 94.07],
 			ly: 90
@@ -77,7 +72,6 @@
 			n: 5,
 			name: 'presets',
 			line: 'roll the dice or save a look',
-			help: 'presets',
 			side: 'right',
 			box: [81.6, 5.27, 17.99, 17.74],
 			ly: 12.5
@@ -86,7 +80,6 @@
 			n: 6,
 			name: 'layers',
 			line: 'one pen each, own color and angles',
-			help: 'layers',
 			side: 'right',
 			box: [81.6, 24.44, 17.99, 15.64],
 			ly: 32
@@ -95,7 +88,6 @@
 			n: 7,
 			name: 'export',
 			line: 'SVG or PNG, any page size',
-			help: 'export',
 			side: 'right',
 			box: [81.6, 41.54, 17.99, 21.69],
 			ly: 51.5
@@ -104,7 +96,6 @@
 			n: 8,
 			name: 'stats',
 			line: 'lines, regions and plot time',
-			help: 'stats',
 			side: 'right',
 			box: [81.6, 63.23, 17.99, 12.61],
 			ly: 70.5,
@@ -122,7 +113,7 @@
 	/** the part under the pointer or keyboard focus, lit on both sides */
 	let active = $state<number | null>(null);
 
-	// touch has no hover: a tap opens the picture or the help page instead
+	// touch has no hover: a tap only opens the picture
 	const point = (e: PointerEvent, n: number | null) => {
 		if (e.pointerType !== 'touch') active = n;
 	};
@@ -195,17 +186,16 @@
 					style:--ly={part.ly}
 					style:--i={row(part)}
 				>
-					<a
-						href="/help#{part.help}"
+					<span
+						class="text"
+						role="presentation"
 						onpointerenter={(e) => point(e, part.n)}
 						onpointerleave={(e) => point(e, null)}
-						onfocus={() => (active = part.n)}
-						onblur={() => (active = null)}
 					>
 						<span class="num">{part.n}</span>
 						<span class="name">{part.name}</span>
 						<span class="line">{part.line}</span>
-					</a>
+					</span>
 					<span class="leader" aria-hidden="true"></span>
 				</li>
 			{/each}
@@ -286,6 +276,8 @@
 		background: none !important;
 		cursor: zoom-in;
 		transition: none;
+		/* a button: it presses down */
+		will-change: transform;
 	}
 
 	/* the layout's global button press nudge would shake the whole picture */
@@ -329,6 +321,7 @@
 		background: rgba(255, 42, 166, 0.06);
 		opacity: 0;
 		transition: opacity 0.15s ease;
+		will-change: opacity;
 	}
 
 	.box.on::after {
@@ -379,7 +372,7 @@
 	}
 
 	/* number and name, the line under the name */
-	.label a {
+	.label .text {
 		display: grid;
 		grid-template-columns: var(--tag) minmax(0, 1fr);
 		grid-template-areas: 'num name' '. line';
@@ -420,17 +413,6 @@
 		color: var(--ink-soft);
 	}
 
-	.label a:hover .name {
-		text-decoration: underline;
-		text-decoration-thickness: 1.5px;
-		text-underline-offset: 0.2em;
-	}
-
-	.label a:focus-visible {
-		outline: 2px solid var(--focus);
-		outline-offset: 2px;
-	}
-
 	.label.on .num {
 		background: var(--magenta-ink);
 	}
@@ -456,7 +438,7 @@
 
 	/* room for a table: number, name and line on one row, names aligned */
 	@container studio (min-width: 760px) {
-		.label a {
+		.label .text {
 			grid-template-columns: var(--tag) 6.6rem minmax(0, 1fr);
 			grid-template-areas: 'num name line';
 			align-items: baseline;
@@ -508,7 +490,7 @@
 			grid-template-columns: minmax(0, 1fr) var(--text);
 		}
 
-		.label a {
+		.label .text {
 			grid-row: 1;
 			grid-template-columns: auto minmax(0, 1fr);
 			grid-template-areas: 'num name' 'line line';
@@ -519,14 +501,14 @@
 			pointer-events: auto;
 		}
 
-		.label.left a {
+		.label.left .text {
 			grid-column: 1;
 			grid-template-columns: minmax(0, 1fr) auto;
 			grid-template-areas: 'name num' 'line line';
 			text-align: right;
 		}
 
-		.label.right a {
+		.label.right .text {
 			grid-column: 2;
 		}
 
@@ -570,12 +552,14 @@
 	/* the outlines appear, the leaders draw out from the labels, the labels
 	   follow; transitions only on the way in, so hiding is instant */
 	.studio:global([data-reveal='out']) .box,
-	.studio:global([data-reveal='out']) .label a {
+	.studio:global([data-reveal='out']) .label .text {
 		opacity: 0;
 	}
 
 	.studio:global([data-reveal='out']) .leader {
 		transform: scaleX(0);
+		/* promoted while it waits to scroll in, released once it has arrived */
+		will-change: transform;
 	}
 
 	.studio:global([data-reveal='in']) .box {
@@ -586,7 +570,7 @@
 		transition: transform 0.45s cubic-bezier(0.3, 0.7, 0.3, 1) calc(0.35s + var(--i) * 0.1s);
 	}
 
-	.studio:global([data-reveal='in']) .label a {
+	.studio:global([data-reveal='in']) .label .text {
 		transition: opacity 0.4s ease calc(0.5s + var(--i) * 0.1s);
 	}
 
@@ -595,7 +579,7 @@
 	@media (prefers-reduced-motion: reduce) {
 		.studio:global([data-reveal]) .box,
 		.studio:global([data-reveal]) .leader,
-		.studio:global([data-reveal]) .label a {
+		.studio:global([data-reveal]) .label .text {
 			transition: none;
 		}
 	}

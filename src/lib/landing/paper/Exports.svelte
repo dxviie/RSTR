@@ -94,6 +94,8 @@
 			)
 			rotate(calc(var(--i) * 4deg * var(--spread, 1)));
 		transition: transform 0.5s cubic-bezier(0.3, 0.7, 0.3, 1);
+		/* fans out on hover: keep it on its own layer */
+		will-change: transform;
 	}
 
 	.thumb {

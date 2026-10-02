@@ -54,6 +54,8 @@
 		transition:
 			transform 0.14s cubic-bezier(0.3, 0.7, 0.4, 1),
 			box-shadow 0.14s cubic-bezier(0.3, 0.7, 0.4, 1);
+		/* moves on hover and press: keep it on its own layer */
+		will-change: transform;
 	}
 
 	.cta svg {
@@ -65,6 +67,7 @@
 		stroke-linecap: square;
 		stroke-linejoin: miter;
 		transition: transform 0.25s cubic-bezier(0.3, 0.7, 0.3, 1);
+		will-change: transform;
 	}
 
 	.primary {

@@ -20,15 +20,23 @@
 
 	const close = () => (image = null);
 
-	// lock the page behind the overlay so only the image scrolls/zooms
+	// Lock the page behind the overlay so only the image scrolls/zooms.
+	// Hiding the scrollbar would widen the page and shift it sideways, so
+	// the body is padded by the scrollbar's width for as long as it's gone.
 	$effect(() => {
 		if (!image) return;
 		const opener = document.activeElement as HTMLElement | null;
-		const overflow = document.body.style.overflow;
+		const { overflow, paddingRight } = document.body.style;
+		const scrollbar = window.innerWidth - document.documentElement.clientWidth;
 		document.body.style.overflow = 'hidden';
+		if (scrollbar > 0) {
+			const padding = parseFloat(getComputedStyle(document.body).paddingRight) || 0;
+			document.body.style.paddingRight = `${padding + scrollbar}px`;
+		}
 		closeButton?.focus();
 		return () => {
 			document.body.style.overflow = overflow;
+			document.body.style.paddingRight = paddingRight;
 			opener?.focus?.({ preventScroll: true });
 		};
 	});
@@ -80,6 +88,8 @@
 		padding: 4vmin;
 		background: rgba(26, 32, 44, 0.92);
 		cursor: zoom-out;
+		/* fades in and out */
+		will-change: opacity;
 	}
 
 	/* Fill the padded box and letterbox the picture inside it. Sizing the
@@ -107,6 +117,7 @@
 		cursor: pointer;
 		opacity: 0.8;
 		transition: opacity 0.1s ease;
+		will-change: opacity;
 	}
 
 	.lightbox-close:hover,
