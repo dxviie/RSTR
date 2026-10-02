@@ -1,7 +1,8 @@
 // Tally form wiring for the plot funnel: embed URL construction and the
 // postMessage protocol. Two forms share it. The order form takes a priced
 // studio design straight to payment; the inquiry form starts a free chat
-// about a plot instead, from the landing page or the studio.
+// about a plot instead, from the landing page or the studio. The landing
+// page's #madewithrstr share form ($lib/landing/share) uses it too.
 //
 // The studio used to hand off to Tally's widget script, but the widget loads
 // its popup from a `tally.so/popup/…` URL — a path adblock filter lists block

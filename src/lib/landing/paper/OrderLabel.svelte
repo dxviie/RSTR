@@ -6,6 +6,7 @@
 	// free chat about a plot. A plain click on the chat opens the inquiry
 	// form in the page's dialog (onask); the link itself goes to the same
 	// form, for new tabs and for visitors without JS.
+	import { opensDialog } from '$lib/landing/modal';
 	import { plotSrc } from '$lib/landing/plots';
 	import { reveal } from '$lib/landing/reveal';
 	import { landingInquiryFields, PRICING } from '$lib/rstr2/order';
@@ -17,14 +18,6 @@
 	const PRICE = PRICING.tiers.A6.base + PRICING.tiers.A6.shippingEur;
 	const INQUIRY_URL = formUrl(INQUIRY_FORM_ID, landingInquiryFields());
 	const uid = $props.id();
-
-	const ask = (event: MouseEvent) => {
-		// modified clicks (new tab, new window) follow the link as usual
-		if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
-			return;
-		event.preventDefault();
-		onask();
-	};
 </script>
 
 <div class="envelope" use:reveal>
@@ -78,7 +71,7 @@
 		</ul>
 		<div class="go">
 			<Cta href="/studio">make something to plot</Cta>
-			<Cta href={INQUIRY_URL} variant="ghost" onclick={ask}>plan a plot with me</Cta>
+			<Cta href={INQUIRY_URL} variant="ghost" onclick={opensDialog(onask)}>plan a plot with me</Cta>
 		</div>
 	</div>
 </div>

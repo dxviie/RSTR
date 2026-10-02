@@ -2,14 +2,34 @@
 	// #madewithrstr: the hashtag set huge and drawn by RSTR in one black pen
 	// (a fresh roll every visit), a copy button that ticks itself off, where
 	// to post and tag, and the wall of plots with a spot left for yours.
+	// Rather not post it? A plain click on "send it to me directly" opens the
+	// share form in the page's dialog (onsend); the link itself goes to the
+	// same form, for new tabs and for visitors without JS.
+	import { opensDialog } from '$lib/landing/modal';
 	import type { Plot } from '$lib/landing/plots';
 	import { reveal } from '$lib/landing/reveal';
-	import { CONTACT_FORM, HASHTAG, SHARE_LINKS, copyText } from '$lib/landing/share';
+	import {
+		HASHTAG,
+		SHARE_FORM_ID,
+		SHARE_LINKS,
+		copyText,
+		shareFormFields
+	} from '$lib/landing/share';
+	import { formUrl } from '$lib/rstr2/orderForm';
 	import PenTag from './PenTag.svelte';
 	import PlotWall from './PlotWall.svelte';
 	import Swatch from './Swatch.svelte';
 
-	const { onopen }: { onopen: (plot: Plot) => void } = $props();
+	const {
+		onopen,
+		onsend
+	}: {
+		onopen: (plot: Plot) => void;
+		/** open the share form, from "send it to me directly" */
+		onsend: () => void;
+	} = $props();
+
+	const SHARE_URL = formUrl(SHARE_FORM_ID, shareFormFields());
 
 	let copied = $state(false);
 	/** read out by screen readers through the live region */
@@ -87,7 +107,9 @@
 			</ul>
 			<p class="direct">
 				Rather not post it?
-				<a href={CONTACT_FORM} target="_blank" rel="noopener">Send it to me directly</a>.
+				<a href={SHARE_URL} target="_blank" rel="noopener" onclick={opensDialog(onsend)}
+					>Send it to me directly</a
+				>.
 			</p>
 		</div>
 

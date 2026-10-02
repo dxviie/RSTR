@@ -6,19 +6,23 @@
 	// calibration sheet. Animations behave like ink: lines draw themselves,
 	// stamps press down, prints settle. Each section is its own component in
 	// $lib/landing/paper; this file holds the shared look, the lightbox and
-	// the inquiry dialog the plot service opens.
+	// the two form dialogs: the plot service's inquiry and #madewithrstr's
+	// share form.
 
 	import BrandFooter from '$lib/components/BrandFooter.svelte';
 	import TopBar from '$lib/components/TopBar.svelte';
 	import Lightbox, { type LightboxImage } from '$lib/landing/Lightbox.svelte';
 	import { plotSrc, plotSrcset, type Plot } from '$lib/landing/plots';
+	import { SHARE_FORM_ID, shareFormFields } from '$lib/landing/share';
+	import FormDialog from '$lib/landing/paper/FormDialog.svelte';
 	import Hero from '$lib/landing/paper/Hero.svelte';
 	import HowItWorks from '$lib/landing/paper/HowItWorks.svelte';
-	import InquiryDialog from '$lib/landing/paper/InquiryDialog.svelte';
 	import MadeWith from '$lib/landing/paper/MadeWith.svelte';
 	import Plotter from '$lib/landing/paper/Plotter.svelte';
 	import Story from '$lib/landing/paper/Story.svelte';
 	import Yours from '$lib/landing/paper/Yours.svelte';
+	import { landingInquiryFields } from '$lib/rstr2/order';
+	import { INQUIRY_FORM_ID } from '$lib/rstr2/orderForm';
 
 	// clicking any plot or stage picture opens it near-fullscreen
 	let lightbox = $state<LightboxImage | null>(null);
@@ -32,8 +36,12 @@
 	};
 	const openImage = (image: LightboxImage) => (lightbox = image);
 
-	// the plot service's "plan a plot with me" opens the inquiry form
+	// the plot service's "plan a plot with me" opens the inquiry form,
+	// #madewithrstr's "send it to me directly" the share form
 	let asking = $state(false);
+	let sending = $state(false);
+	const INQUIRY_FIELDS = landingInquiryFields();
+	const SHARE_FIELDS = shareFormFields();
 </script>
 
 <svelte:head>
@@ -54,7 +62,7 @@
 		<Plotter />
 		<HowItWorks onzoom={openImage} onask={() => (asking = true)} />
 		<Yours />
-		<MadeWith onopen={openPlot} />
+		<MadeWith onopen={openPlot} onsend={() => (sending = true)} />
 		<Story />
 	</main>
 
@@ -62,8 +70,21 @@
 		<BrandFooter />
 	</footer>
 
-	<!-- inside .landing, so it picks up the paper tokens -->
-	<InquiryDialog bind:open={asking} />
+	<!-- inside .landing, so they pick up the paper tokens -->
+	<FormDialog
+		bind:open={asking}
+		formId={INQUIRY_FORM_ID}
+		fields={INQUIRY_FIELDS}
+		heading="plan a plot with me"
+		frameTitle="RSTR inquiry form"
+	/>
+	<FormDialog
+		bind:open={sending}
+		formId={SHARE_FORM_ID}
+		fields={SHARE_FIELDS}
+		heading="send it to me directly"
+		frameTitle="RSTR #madewithrstr form"
+	/>
 </div>
 
 <Lightbox bind:image={lightbox} />

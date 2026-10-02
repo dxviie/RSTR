@@ -1,4 +1,4 @@
-// Page manners for the landing's modals (the lightbox, the inquiry dialog):
+// Page manners for the landing's modals (the lightbox, the form dialogs):
 // lock the page behind the overlay, move focus into it, and hand focus back
 // to whatever opened it once it closes. Hiding the scrollbar would widen the
 // page and shift it sideways, so the body is padded by the scrollbar's width
@@ -21,3 +21,17 @@ export const lockPage = (target?: HTMLElement): (() => void) => {
 		opener?.focus?.({ preventScroll: true });
 	};
 };
+
+/**
+ * The click handler for a link that opens a dialog: a plain click runs
+ * `open` instead of following the link, while modified clicks (new tab,
+ * new window) follow it as usual.
+ */
+export const opensDialog =
+	(open: () => void) =>
+	(event: MouseEvent): void => {
+		if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+			return;
+		event.preventDefault();
+		open();
+	};
