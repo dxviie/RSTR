@@ -8,6 +8,9 @@
 	// - the landing variant shows a single "launch the app" call to action;
 	//   every other page gets the studio / prep / classic switcher (+ help)
 	//   with the active page highlighted
+	// - both wear the landing page's edge, flat: square boxes with a hard ink
+	//   outline and bold mono type, but none of the offset shadow its big
+	//   buttons sit on
 	const {
 		variant = 'app',
 		active = null,
@@ -48,7 +51,10 @@
 	{/if}
 	<div class="spacer"></div>
 	{#if variant === 'landing'}
-		<a class="top-cta" href="/studio">launch RSTR</a>
+		<a class="top-cta" href="/studio">
+			launch RSTR
+			<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 8h11M9 3.5 13.5 8 9 12.5" /></svg>
+		</a>
 	{:else}
 		<nav class="top-nav" aria-label="RSTR tools">
 			<a class="top-link" class:active={active === 'studio'} href="/studio">studio</a>
@@ -85,6 +91,9 @@
 		--tb-border: #e1e4e8;
 		--tb-muted: #60739f;
 		--tb-muted-light: #eef1f6;
+		--tb-magenta: #ff2aa6;
+		--tb-focus: #df0079;
+		--tb-edge: 2px solid var(--tb-ink);
 
 		position: sticky;
 		top: 0;
@@ -149,50 +158,93 @@
 		flex: 1;
 	}
 
+	/* the switcher: one ink box split by hard rules, as tall as the logo so
+	   the bar keeps its height in the studio and prep app shells */
 	.top-nav {
 		display: flex;
-		align-items: center;
-		gap: 0.35rem;
+		flex-shrink: 0;
+		height: 26px;
+		border: var(--tb-edge);
+		background: var(--tb-bg);
 	}
 
 	.topbar .top-link {
+		display: flex;
+		align-items: center;
+		padding: 0 0.6rem;
 		font-family: 'mono-bold', monospace;
 		font-size: 0.75rem;
-		padding: 0.15rem 0.6rem;
-		border: 1px solid var(--tb-border);
-		border-radius: 999px;
+		line-height: 1;
 		white-space: nowrap;
 		transition:
-			border-color 0.1s ease,
-			background 0.1s ease;
+			background-color 0.1s ease,
+			color 0.1s ease;
+	}
+
+	.topbar .top-link + .top-link {
+		border-left: var(--tb-edge);
 	}
 
 	.topbar .top-link:hover {
-		border-color: var(--tb-ink);
 		background: var(--tb-muted-light);
 	}
 
 	.topbar .top-link.active {
 		background: var(--tb-ink);
-		border-color: var(--tb-ink);
 		color: var(--tb-bg);
 	}
 
+	/* the landing call to action: the hero's ink button, flat. Hovering
+	   brings the magenta up from the plate its big siblings sit on */
 	.topbar .top-cta {
-		font-family: 'mono-bold', monospace;
-		font-size: 0.75rem;
-		padding: 0.25rem 0.8rem;
-		border: 1px solid var(--tb-ink);
-		border-radius: 999px;
+		display: inline-flex;
+		flex-shrink: 0;
+		align-items: center;
+		gap: 0.45rem;
+		height: 28px;
+		padding: 0 0.65rem 0 0.8rem;
+		border: var(--tb-edge);
 		background: var(--tb-ink);
 		color: var(--tb-bg);
+		font-family: 'mono-bold', monospace;
+		font-size: 0.75rem;
+		line-height: 1;
 		white-space: nowrap;
-		transition: background 0.1s ease;
+		transition:
+			background-color 0.12s ease,
+			color 0.12s ease;
+	}
+
+	.topbar .top-cta svg {
+		width: 0.85rem;
+		height: 0.85rem;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.8;
+		stroke-linecap: square;
+		stroke-linejoin: miter;
+		transition: transform 0.25s cubic-bezier(0.3, 0.7, 0.3, 1);
+		/* nudges on hover: keep it on its own layer */
+		will-change: transform;
 	}
 
 	.topbar .top-cta:hover {
-		background: var(--tb-ink-soft);
-		color: #fff;
+		border-color: var(--tb-ink);
+		background: var(--tb-magenta);
+		color: var(--tb-ink);
+	}
+
+	.topbar .top-cta:hover svg {
+		transform: translateX(2px);
+	}
+
+	/* above the neighbouring tools, so the ring isn't painted over */
+	.topbar .top-link:focus-visible,
+	.topbar .top-cta:focus-visible {
+		position: relative;
+		z-index: 1;
+		outline: 2px solid var(--tb-focus);
+		outline-offset: 2px;
 	}
 
 	.sr-only {
@@ -222,11 +274,31 @@
 		}
 
 		.topbar .top-link {
-			padding: 0.15rem 0.45rem;
+			padding: 0 0.45rem;
 		}
 
 		.wordmark {
 			font-size: 1rem;
+		}
+	}
+
+	/* the smallest phones: tighter still, so the switcher never spills */
+	@media (max-width: 350px) {
+		.topbar {
+			gap: 0.3rem;
+			padding-inline: 0.5rem;
+		}
+
+		.topbar .top-link {
+			padding: 0 0.35rem;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.topbar .top-link,
+		.topbar .top-cta,
+		.topbar .top-cta svg {
+			transition: none;
 		}
 	}
 </style>
