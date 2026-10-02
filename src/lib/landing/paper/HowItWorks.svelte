@@ -13,7 +13,14 @@
 	import StudioShot from './StudioShot.svelte';
 	import Swatch from './Swatch.svelte';
 
-	const { onzoom }: { onzoom: (image: LightboxImage) => void } = $props();
+	const {
+		onzoom,
+		onask
+	}: {
+		onzoom: (image: LightboxImage) => void;
+		/** open the inquiry form, from the plot service's letter */
+		onask: () => void;
+	} = $props();
 </script>
 
 <section class="how" aria-labelledby="how">
@@ -109,7 +116,7 @@
 		</ol>
 
 		<div class="order">
-			<OrderLabel />
+			<OrderLabel {onask} />
 		</div>
 	</div>
 </section>

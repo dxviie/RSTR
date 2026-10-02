@@ -5,7 +5,8 @@
 	// test strokes and registration marks sit at the edges like notes on a
 	// calibration sheet. Animations behave like ink: lines draw themselves,
 	// stamps press down, prints settle. Each section is its own component in
-	// $lib/landing/paper; this file holds the shared look and the lightbox.
+	// $lib/landing/paper; this file holds the shared look, the lightbox and
+	// the inquiry dialog the plot service opens.
 
 	import BrandFooter from '$lib/components/BrandFooter.svelte';
 	import TopBar from '$lib/components/TopBar.svelte';
@@ -13,6 +14,7 @@
 	import { plotSrc, plotSrcset, type Plot } from '$lib/landing/plots';
 	import Hero from '$lib/landing/paper/Hero.svelte';
 	import HowItWorks from '$lib/landing/paper/HowItWorks.svelte';
+	import InquiryDialog from '$lib/landing/paper/InquiryDialog.svelte';
 	import MadeWith from '$lib/landing/paper/MadeWith.svelte';
 	import Plotter from '$lib/landing/paper/Plotter.svelte';
 	import Story from '$lib/landing/paper/Story.svelte';
@@ -29,6 +31,9 @@
 		};
 	};
 	const openImage = (image: LightboxImage) => (lightbox = image);
+
+	// the plot service's "plan a plot with me" opens the inquiry form
+	let asking = $state(false);
 </script>
 
 <svelte:head>
@@ -47,7 +52,7 @@
 	<main>
 		<Hero onopen={openPlot} />
 		<Plotter />
-		<HowItWorks onzoom={openImage} />
+		<HowItWorks onzoom={openImage} onask={() => (asking = true)} />
 		<Yours />
 		<MadeWith onopen={openPlot} />
 		<Story />
@@ -56,6 +61,9 @@
 	<footer class="footer">
 		<BrandFooter />
 	</footer>
+
+	<!-- inside .landing, so it picks up the paper tokens -->
+	<InquiryDialog bind:open={asking} />
 </div>
 
 <Lightbox bind:image={lightbox} />

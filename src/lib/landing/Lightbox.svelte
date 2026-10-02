@@ -13,6 +13,7 @@
 	// close; focus moves to the close button and returns to whatever opened
 	// the box. "open full size" hands off to a new tab for unlimited zoom.
 	import { fade } from 'svelte/transition';
+	import { lockPage } from './modal';
 
 	let { image = $bindable(null) }: { image?: LightboxImage | null } = $props();
 
@@ -21,24 +22,9 @@
 	const close = () => (image = null);
 
 	// Lock the page behind the overlay so only the image scrolls/zooms.
-	// Hiding the scrollbar would widen the page and shift it sideways, so
-	// the body is padded by the scrollbar's width for as long as it's gone.
 	$effect(() => {
 		if (!image) return;
-		const opener = document.activeElement as HTMLElement | null;
-		const { overflow, paddingRight } = document.body.style;
-		const scrollbar = window.innerWidth - document.documentElement.clientWidth;
-		document.body.style.overflow = 'hidden';
-		if (scrollbar > 0) {
-			const padding = parseFloat(getComputedStyle(document.body).paddingRight) || 0;
-			document.body.style.paddingRight = `${padding + scrollbar}px`;
-		}
-		closeButton?.focus();
-		return () => {
-			document.body.style.overflow = overflow;
-			document.body.style.paddingRight = paddingRight;
-			opener?.focus?.({ preventScroll: true });
-		};
+		return lockPage(closeButton);
 	});
 </script>
 

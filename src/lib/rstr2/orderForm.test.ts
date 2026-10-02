@@ -1,25 +1,28 @@
 import { describe, it, expect } from 'vitest';
 import {
-	orderEmbedUrl,
-	orderFormSignal,
-	orderFormUrl,
+	formEmbedUrl,
+	formSignal,
+	formUrl,
+	INQUIRY_FORM_ID,
 	ORDER_FORM_ID,
 	TALLY_ORIGIN
 } from './orderForm';
 
-describe('order form urls', () => {
+describe('form urls', () => {
 	it('builds the plain form url with the payload as query params', () => {
-		expect(orderFormUrl({ price: '45', tier: 'A5' })).toBe(
+		expect(formUrl(ORDER_FORM_ID, { price: '45', tier: 'A5' })).toBe(
 			`https://tally.so/r/${ORDER_FORM_ID}?price=45&tier=A5`
 		);
 	});
 
 	it('leaves the plain url bare when there is no payload', () => {
-		expect(orderFormUrl({})).toBe(`https://tally.so/r/${ORDER_FORM_ID}`);
+		expect(formUrl(ORDER_FORM_ID, {})).toBe(`https://tally.so/r/${ORDER_FORM_ID}`);
 	});
 
 	it('embeds via the standard embed path, never the widget popup path', () => {
-		const url = new URL(orderEmbedUrl({ price: '45', inks: 'Copic Fineliner 0.4mm' }));
+		const url = new URL(
+			formEmbedUrl(ORDER_FORM_ID, { price: '45', inks: 'Copic Fineliner 0.4mm' })
+		);
 		expect(url.origin).toBe(TALLY_ORIGIN);
 		expect(url.pathname).toBe(`/embed/${ORDER_FORM_ID}`);
 		expect(url.searchParams.get('price')).toBe('45');
@@ -28,17 +31,24 @@ describe('order form urls', () => {
 		// '/popup/' URLs sit on adblock filter lists — the bug that killed the widget
 		expect(url.pathname).not.toContain('popup');
 	});
+
+	it('points each url at the form it is asked for', () => {
+		expect(formUrl(INQUIRY_FORM_ID, { from: 'landing' })).toBe(
+			`https://tally.so/r/${INQUIRY_FORM_ID}?from=landing`
+		);
+		expect(new URL(formEmbedUrl(INQUIRY_FORM_ID, {})).pathname).toBe(`/embed/${INQUIRY_FORM_ID}`);
+		expect(INQUIRY_FORM_ID).not.toBe(ORDER_FORM_ID);
+	});
 });
 
-describe('orderFormSignal', () => {
-	const submitted = JSON.stringify({
-		event: 'Tally.FormSubmitted',
-		payload: { formId: ORDER_FORM_ID }
-	});
+describe('formSignal', () => {
+	const submittedBy = (formId: string) =>
+		JSON.stringify({ event: 'Tally.FormSubmitted', payload: { formId } });
+	const submitted = submittedBy(ORDER_FORM_ID);
 
 	it('ignores messages from other origins', () => {
-		expect(orderFormSignal('https://evil.example', submitted)).toBeNull();
-		expect(orderFormSignal('https://tally.so.evil.example', submitted)).toBeNull();
+		expect(formSignal(ORDER_FORM_ID, 'https://evil.example', submitted)).toBeNull();
+		expect(formSignal(ORDER_FORM_ID, 'https://tally.so.evil.example', submitted)).toBeNull();
 	});
 
 	it('treats any tally.so message as proof the embed is alive', () => {
@@ -46,18 +56,26 @@ describe('orderFormSignal', () => {
 			event: 'Tally.FormLoaded',
 			payload: { formId: ORDER_FORM_ID }
 		});
-		expect(orderFormSignal(TALLY_ORIGIN, loaded)).toBe('alive');
+		expect(formSignal(ORDER_FORM_ID, TALLY_ORIGIN, loaded)).toBe('alive');
 		// iframe-resizer heartbeats are plain strings, not JSON
-		expect(orderFormSignal(TALLY_ORIGIN, '[iFrameSizer]iFrameResizer0:0:0:init')).toBe('alive');
-		expect(orderFormSignal(TALLY_ORIGIN, { event: 'not-a-string-payload' })).toBe('alive');
+		expect(formSignal(ORDER_FORM_ID, TALLY_ORIGIN, '[iFrameSizer]iFrameResizer0:0:0:init')).toBe(
+			'alive'
+		);
+		expect(formSignal(ORDER_FORM_ID, TALLY_ORIGIN, { event: 'not-a-string-payload' })).toBe(
+			'alive'
+		);
 	});
 
-	it('reports a submission of this form', () => {
-		expect(orderFormSignal(TALLY_ORIGIN, submitted)).toBe('submitted');
+	it('reports a submission of the open form', () => {
+		expect(formSignal(ORDER_FORM_ID, TALLY_ORIGIN, submitted)).toBe('submitted');
+		expect(formSignal(INQUIRY_FORM_ID, TALLY_ORIGIN, submittedBy(INQUIRY_FORM_ID))).toBe(
+			'submitted'
+		);
 	});
 
 	it("keeps another form's submission as merely alive", () => {
-		const other = JSON.stringify({ event: 'Tally.FormSubmitted', payload: { formId: 'xyz123' } });
-		expect(orderFormSignal(TALLY_ORIGIN, other)).toBe('alive');
+		expect(formSignal(ORDER_FORM_ID, TALLY_ORIGIN, submittedBy('xyz123'))).toBe('alive');
+		// the two funnel forms never close each other's modal
+		expect(formSignal(INQUIRY_FORM_ID, TALLY_ORIGIN, submitted)).toBe('alive');
 	});
 });

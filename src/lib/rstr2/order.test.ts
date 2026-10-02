@@ -3,9 +3,13 @@ import {
 	allowedPens,
 	checkOrder,
 	designFingerprint,
+	inquiryHiddenFields,
+	landingInquiryFields,
 	orderHiddenFields,
+	orderIssues,
 	quoteOrder,
 	tierFor,
+	INQUIRY_PAYLOAD_VERSION,
 	ORDER_MARGIN_MM,
 	PRICING
 } from './order';
@@ -228,6 +232,81 @@ describe('orderHiddenFields', () => {
 			uploaded: true
 		});
 		expect(fields.upload).toBe('ok');
+	});
+});
+
+describe('orderIssues', () => {
+	it('is empty for an orderable design', () => {
+		const { params, layers } = presetSettings('CMY classic');
+		expect(orderIssues(checkOrder(params, layers, 0.75))).toEqual([]);
+	});
+
+	it('names every reason a design needs a chat first', () => {
+		const { params, layers } = presetSettings('CMY classic');
+		layers[0].color = '#7b3b8c';
+		params.outputWidthMm = 500;
+		expect(orderIssues(checkOrder(params, layers, 1))).toEqual(['inks', 'size']);
+		for (const layer of layers) layer.enabled = false;
+		expect(orderIssues(checkOrder(params, layers, 1))).toEqual(['size', 'layers']);
+	});
+});
+
+describe('inquiryHiddenFields', () => {
+	const context = {
+		plotSeconds: 45 * 60,
+		sourceName: '/bbrasa-imp.png',
+		presetName: 'CMY classic',
+		designHash: 'abc123def456',
+		uploaded: true
+	};
+
+	it('carries an orderable design with what an instant order would cost', () => {
+		const { params, layers } = presetSettings('CMY classic');
+		const check = checkOrder(params, layers, 0.75);
+		const quote = quoteOrder(check, 45 * 60)!;
+		expect(inquiryHiddenFields(check, quote, context)).toEqual({
+			from: 'studio',
+			size: '200x150mm',
+			tier: 'A4',
+			pens: '3',
+			inks: expect.stringContaining('Octopus Blue Sloth 0.4mm'),
+			plotmin: '45',
+			price: String(quote.totalEur),
+			preset: 'CMY classic',
+			image: 'bbrasa-imp',
+			design: 'abc123def456',
+			upload: 'ok',
+			v: INQUIRY_PAYLOAD_VERSION
+		});
+	});
+
+	it('names the issues and the unstocked inks of a design I cannot order', () => {
+		const { params, layers } = presetSettings('CMY classic');
+		layers[1].name = 'Violet Lion';
+		layers[1].color = '#7B3B8C';
+		params.outputWidthMm = 500;
+		const check = checkOrder(params, layers, 1);
+		const fields = inquiryHiddenFields(check, quoteOrder(check, 60), {
+			...context,
+			presetName: '',
+			designHash: '',
+			uploaded: false
+		});
+		expect(fields.issue).toBe('inks,size');
+		// no shelf name to go by, so the hex says which ink was asked for
+		expect(fields.inks).toContain('Violet Lion #7b3b8c 0.4mm');
+		expect(fields.inks).toContain('Octopus Blue Sloth 0.4mm');
+		expect(fields.size).toBe('500x500mm');
+		// beyond A3 there is no tier or price, and a file kept at home leaves no fingerprint
+		for (const key of ['tier', 'price', 'preset', 'design', 'upload']) {
+			expect(key in fields).toBe(false);
+		}
+	});
+});
+
+describe('landingInquiryFields', () => {
+	it('only says where the chat started', () => {
+		expect(landingInquiryFields()).toEqual({ from: 'landing', v: INQUIRY_PAYLOAD_VERSION });
 	});
 });
 

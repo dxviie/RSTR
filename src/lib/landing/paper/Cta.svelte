@@ -9,11 +9,14 @@
 		href,
 		variant = 'primary',
 		external = false,
+		onclick,
 		children
 	}: {
 		href: string;
 		variant?: 'primary' | 'ghost';
 		external?: boolean;
+		/** runs before the link is followed, e.g. to open a dialog instead */
+		onclick?: (event: MouseEvent) => void;
 		children: Snippet;
 	} = $props();
 </script>
@@ -23,6 +26,7 @@
 	{href}
 	target={external ? '_blank' : undefined}
 	rel={external ? 'noopener' : undefined}
+	{onclick}
 >
 	<span>{@render children()}</span>
 	<svg viewBox="0 0 16 16" aria-hidden="true">

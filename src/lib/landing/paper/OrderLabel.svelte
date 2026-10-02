@@ -2,13 +2,29 @@
 	// The plot service, as an airmail envelope: cyan, magenta and yellow
 	// stripes round the edge, and a postage stamp of the Milkmaid plot whose
 	// value is the real starting price, computed from the shop's pricing.
+	// Two ways in: make a design in the studio and order it, or start with a
+	// free chat about a plot. A plain click on the chat opens the inquiry
+	// form in the page's dialog (onask); the link itself goes to the same
+	// form, for new tabs and for visitors without JS.
 	import { plotSrc } from '$lib/landing/plots';
 	import { reveal } from '$lib/landing/reveal';
-	import { PRICING } from '$lib/rstr2/order';
+	import { landingInquiryFields, PRICING } from '$lib/rstr2/order';
+	import { formUrl, INQUIRY_FORM_ID } from '$lib/rstr2/orderForm';
 	import Cta from './Cta.svelte';
 
+	const { onask }: { onask: () => void } = $props();
+
 	const PRICE = PRICING.tiers.A6.base + PRICING.tiers.A6.shippingEur;
+	const INQUIRY_URL = formUrl(INQUIRY_FORM_ID, landingInquiryFields());
 	const uid = $props.id();
+
+	const ask = (event: MouseEvent) => {
+		// modified clicks (new tab, new window) follow the link as usual
+		if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+			return;
+		event.preventDefault();
+		onask();
+	};
 </script>
 
 <div class="envelope" use:reveal>
@@ -51,6 +67,10 @@
 			Make something in the studio, hit <span class="key">⚡ order this plot</span>, and I'll draw
 			it with real pens on real paper and ship it to your door. From €{PRICE} for an A6, shipping included.
 		</p>
+		<p class="pitch">
+			Not sure where to start, or want something the presets can't do? Send me a picture and a few
+			words, and we'll plan it together. That first chat is free.
+		</p>
 		<ul class="facts">
 			<li>A6 to A3</li>
 			<li>inks from the built-in presets</li>
@@ -58,6 +78,7 @@
 		</ul>
 		<div class="go">
 			<Cta href="/studio">make something to plot</Cta>
+			<Cta href={INQUIRY_URL} variant="ghost" onclick={ask}>plan a plot with me</Cta>
 		</div>
 	</div>
 </div>
@@ -262,6 +283,9 @@
 
 	.go {
 		clear: both;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 1rem 1.1rem;
 		margin-top: 1.6rem;
 	}
 
