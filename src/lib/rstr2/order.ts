@@ -1,9 +1,10 @@
 // Ordering a physical plot of the current design.
 //
 // Pure logic only: which designs are physically plottable (pens I own, paper
-// the machine takes), what a plot costs, and the metadata payload handed to
-// the order form. The UI wiring (button, dialogs, Tally embed) lives with the
-// studio page; keeping this file DOM-free makes the rules unit-testable.
+// the machine takes), what a plot costs, and the metadata payloads handed to
+// the order form and the inquiry form. The UI wiring (button, dialogs, Tally
+// embed) lives with the pages; keeping this file DOM-free makes the rules
+// unit-testable.
 
 import { PAGES, type PageId } from '../prep/pages';
 import { builtinPresets } from './presets';
@@ -214,6 +215,21 @@ export interface OrderContext {
 	uploaded: boolean;
 }
 
+/** The drawn extent as both forms show it, e.g. "200x150mm". */
+const sizeLabel = (check: OrderCheck): string =>
+	`${Math.round(check.widthMm)}x${Math.round(check.heightMm)}mm`;
+
+/**
+ * A pen as both forms list it: its shelf name, or for an ink I don't stock,
+ * the layer name plus its hex, so I can see exactly what was asked for.
+ */
+const inkLabel = (pen: OrderPenCheck): string =>
+	`${pen.pen ? pen.pen.name : `${pen.layerName} ${pen.color}`} ${pen.widthMm}mm`;
+
+/** Empty values would still show up as `key=` in the URL, so drop them. */
+const withoutEmpty = (fields: Record<string, string>): Record<string, string> =>
+	Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== ''));
+
 /**
  * The hidden-field payload for the Tally order form. Everything the form (and
  * my inbox) needs to make sense of the attached SVG: what it costs, how big
@@ -224,13 +240,13 @@ export const orderHiddenFields = (
 	check: OrderCheck,
 	quote: OrderQuote,
 	context: OrderContext
-): Record<string, string> => {
-	const fields: Record<string, string> = {
+): Record<string, string> =>
+	withoutEmpty({
 		price: String(quote.totalEur),
 		tier: quote.tier,
-		size: `${Math.round(check.widthMm)}x${Math.round(check.heightMm)}mm`,
+		size: sizeLabel(check),
 		pens: String(check.pens.length),
-		inks: check.pens.map((pen) => `${pen.pen?.name ?? pen.layerName} ${pen.widthMm}mm`).join(', '),
+		inks: check.pens.map(inkLabel).join(', '),
 		plotmin: String(Math.ceil(context.plotSeconds / 60)),
 		lines: String(context.lineCount),
 		image: fileSlug(context.sourceName),
@@ -239,13 +255,65 @@ export const orderHiddenFields = (
 		// exactly 'ok' switches the form to its nothing-to-attach face
 		upload: context.uploaded ? 'ok' : '',
 		v: ORDER_PAYLOAD_VERSION
-	};
-	// empty values would still show up as `key=` in the URL — drop them
-	for (const [key, value] of Object.entries(fields)) {
-		if (value === '') delete fields[key];
-	}
-	return fields;
+	});
+
+//***************************************************************
+// 										INQUIRY FORM HANDOFF
+//***************************************************************
+
+/**
+ * Version marker for the inquiry payload. It is kept apart from the order's,
+ * so each form's submissions stay readable as the other one changes.
+ */
+export const INQUIRY_PAYLOAD_VERSION = '1';
+
+/** Something that keeps a design from going straight to an order. */
+export type OrderIssue = 'inks' | 'size' | 'layers';
+
+/** What stands between a design and an instant order. Empty when orderable. */
+export const orderIssues = (check: OrderCheck): OrderIssue[] => {
+	const issues: OrderIssue[] = [];
+	if (check.pens.some((pen) => pen.pen === null)) issues.push('inks');
+	if (check.tier === null) issues.push('size');
+	if (check.pens.length === 0) issues.push('layers');
+	return issues;
 };
+
+/**
+ * The hidden-field payload for the inquiry form when a chat starts from a
+ * studio design, orderable or not. It uses the order's vocabulary where it
+ * applies, adds what keeps the design from an instant order (issue), and
+ * what an instant order would cost when nothing does (price). designHash is
+ * '' when the customer kept the plot file to themselves.
+ */
+export const inquiryHiddenFields = (
+	check: OrderCheck,
+	quote: OrderQuote | null,
+	context: Omit<OrderContext, 'lineCount'>
+): Record<string, string> =>
+	withoutEmpty({
+		// exactly 'studio' shows the form's design summary line
+		from: 'studio',
+		issue: orderIssues(check).join(','),
+		size: sizeLabel(check),
+		tier: check.tier ?? '',
+		pens: String(check.pens.length),
+		inks: check.pens.map(inkLabel).join(', '),
+		plotmin: String(Math.ceil(context.plotSeconds / 60)),
+		price: quote ? String(quote.totalEur) : '',
+		preset: context.presetName,
+		image: fileSlug(context.sourceName),
+		design: context.designHash,
+		// exactly 'ok' tells the form (and me) the plot file came along
+		upload: context.uploaded ? 'ok' : '',
+		v: INQUIRY_PAYLOAD_VERSION
+	});
+
+/** The inquiry payload from the landing page: no design yet, only the source. */
+export const landingInquiryFields = (): Record<string, string> => ({
+	from: 'landing',
+	v: INQUIRY_PAYLOAD_VERSION
+});
 
 /**
  * A short fingerprint of the exported SVG text. Sent as a hidden field so an

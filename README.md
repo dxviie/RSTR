@@ -2,7 +2,7 @@
 
 **Turn any image or video into plottable, multi-pen hatched line art — entirely in your browser.**
 
-RSTR splits a picture into regions of similar tone and refills each one with parallel pen strokes: dense where the image is dark, sparse where it's light. The result is a layered SVG a [pen plotter](https://d17e.dev/projects/plotter-art/) can draw with real ink on real paper — or a PNG to share and print. Everything runs in your browser and your image never leaves your device. The one exception is deliberate: when you order a physical plot, the finished plot file (the drawn lines as SVG — never your photo) is uploaded into the plot queue.
+RSTR splits a picture into regions of similar tone and refills each one with parallel pen strokes: dense where the image is dark, sparse where it's light. The result is a layered SVG a [pen plotter](https://d17e.dev/projects/plotter-art/) can draw with real ink on real paper — or a PNG to share and print. Everything runs in your browser and your image never leaves your device. The one exception is deliberate: when you order a physical plot, the finished plot file (the drawn lines as SVG — never your photo) is uploaded into the plot queue. Asking me about a plot from the studio sends the same file along, unless you untick it.
 
 🎨 **Live app:** [rstr.d17e.dev](https://rstr.d17e.dev) · 📖 **How to use it:** the in-app [help page](https://rstr.d17e.dev/help) documents every control · 🖋️ **The art:** [#madewithrstr](https://d17e.dev/projects/rstr/)
 
@@ -97,7 +97,8 @@ Other notable areas:
 - `src/lib/rstr/` + `src/lib/ccp/` — the **classic** engine, the original Paper.js-based RSTR, kept intact for nostalgia. Marked `@ts-nocheck` and intentionally left as-is.
 - `src/lib/fsm.svelte.ts` — a small state machine for the render lifecycle (`config → render → done / error / exporting`).
 - `src/service-worker.ts` — precaches the app shell so it works offline; RSTR is an installable PWA.
-- `workers/order-upload/` — the Cloudflare Worker behind **⚡ order this plot**: takes the exported plot SVG (only the drawn lines — never the source image), verifies it against its design fingerprint and stores it, rate-limited, in a private R2 bucket. Deploy and retention notes live in `workers/order-upload/README.md`.
+- `workers/order-upload/` — the Cloudflare Worker behind **⚡ order this plot**: takes the exported plot SVG (only the drawn lines — never the source image), verifies it against its design fingerprint and stores it, rate-limited, in a private R2 bucket. Studio inquiries use it too when the design goes along. Deploy and retention notes live in `workers/order-upload/README.md`.
+- `src/lib/rstr2/order.ts` · `orderForm.ts` · `src/lib/components/TallyEmbed.svelte` — the plot funnel, built on two Tally forms: the order form (a priced design, straight to payment) and the inquiry form (a free chat about a plot, from the landing page or the studio). `order.ts` decides what can be ordered, prices it and builds both forms' hidden fields. `TallyEmbed` shows either form in a page's own dialog and falls back to a plain link when a content blocker stops the iframe.
 
 ### Routes
 

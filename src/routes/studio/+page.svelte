@@ -1,10 +1,15 @@
 <script lang="ts">
-	import { flushSync } from 'svelte';
+	import { flushSync, onMount } from 'svelte';
+	import { replaceState } from '$app/navigation';
+	import { page } from '$app/state';
+	import { exampleById } from '$lib/rstr2/examples';
+	import { takeHandedOffFile } from '$lib/studioHandoff';
 	import DualRangeInput from '@stanko/dual-range-input';
 	import '@stanko/dual-range-input/dist/index.css';
 	import { inkRange } from '$lib/inkRange';
 	import BrandFooter from '$lib/components/BrandFooter.svelte';
 	import InkSwatchPicker from '$lib/components/InkSwatchPicker.svelte';
+	import TallyEmbed, { type EmbedStatus } from '$lib/components/TallyEmbed.svelte';
 	import TopBar from '$lib/components/TopBar.svelte';
 	import { computeCellGrid, type CellGrid } from '$lib/rstr2/grid';
 	import { adjustColors, isNeutralAdjustment } from '$lib/rstr2/imageAdjust';
@@ -100,6 +105,7 @@
 		allowedPens,
 		checkOrder,
 		designFingerprint,
+		inquiryHiddenFields,
 		orderHiddenFields,
 		quoteOrder,
 		ORDER_MARGIN_MM,
@@ -107,13 +113,7 @@
 		type OrderCheck,
 		type OrderQuote
 	} from '$lib/rstr2/order';
-	import {
-		orderEmbedUrl,
-		orderFormSignal,
-		orderFormUrl,
-		ORDER_AUTOCLOSE_MS,
-		ORDER_EMBED_TIMEOUT_MS
-	} from '$lib/rstr2/orderForm';
+	import { INQUIRY_FORM_ID, ORDER_FORM_ID } from '$lib/rstr2/orderForm';
 	import { uploadOrderSvg } from '$lib/rstr2/orderUpload';
 
 	//***************************************************************
@@ -362,7 +362,7 @@
 		}
 	});
 
-	const openFile = (files: FileList | null | undefined) => {
+	const openFile = (files: ArrayLike<File> | null | undefined) => {
 		const file = files?.[0];
 		if (!file) return;
 		inputError = null;
@@ -1511,6 +1511,38 @@
 		layers = clone.layers;
 	};
 
+	//***************************************************************
+	// 										OPENING FROM THE LANDING PAGE
+	//***************************************************************
+
+	// The landing page can open the studio on something: a file picked there
+	// (handed over in memory, see $lib/studioHandoff) or one of its examples
+	// (/studio?example=milkmaid: a lossless source plus the exact settings of
+	// the drawing shown there). Either one takes the random sample's place.
+	// The example's look isn't saved until you edit something, like any
+	// other preset.
+	const handedOver = takeHandedOffFile();
+	const example = handedOver ? null : exampleById(page.url.searchParams.get('example'));
+	if (handedOver) {
+		sampleOffered = true;
+		openFile([handedOver]);
+	} else if (example) {
+		sampleOffered = true;
+		inputImage = example.src;
+		inputName = example.name;
+		applySettings(example.settings);
+		selectedPreset = '';
+	}
+
+	onMount(() => {
+		// Drop ?example= from the address, so a reload keeps your edits. The
+		// router only takes calls once it has finished starting up, which on a
+		// fresh page load is just after this mounts: wait one turn.
+		if (!page.url.searchParams.has('example')) return;
+		const timer = setTimeout(() => replaceState('/studio', page.state));
+		return () => clearTimeout(timer);
+	});
+
 	const isUserPreset = $derived(userPresets.some((preset) => preset.name === selectedPreset));
 
 	// the dice — gaussian rolls by default, curves live in $lib/rstr2/randomize.ts;
@@ -1732,27 +1764,28 @@
 	// modal. Everything stays in the browser until the customer deliberately
 	// confirms; the only artifact that leaves is the exported plot SVG — sent
 	// straight into my queue, or downloaded and attached by hand when that
-	// upload fails — never the source image. The embed is a plain tally.so iframe (no
-	// third-party script — Tally's widget loaded its popup from a /popup/ URL
-	// that adblock filter lists kill, stranding those visitors on a spinner);
-	// when even the iframe shows no sign of life, the dialog falls back to the
-	// same form as a plain link in a new tab. Unsupported configurations (inks
-	// I don't stock, larger than A3) keep the button clickable and explain
-	// themselves in a dialog instead.
+	// upload fails — never the source image. The embed is a plain tally.so
+	// iframe (see TallyEmbed.svelte for why, and for its blocked fallback).
+	// Next to the instant order there's always a slower path: a free chat
+	// about the plot through the inquiry form. Designs I can't take as they
+	// are (inks I don't stock, larger than A3) lead there, and the order
+	// summary offers it to anyone who'd rather talk first. An inquiry sends
+	// the plot file along too, unless the customer unticks it.
 
-	let orderDialog: 'closed' | 'summary' | 'unsupported' | 'form' = $state('closed');
+	let orderDialog: 'closed' | 'summary' | 'unsupported' | 'ask' | 'form' = $state('closed');
 	let orderCheck: OrderCheck | null = $state(null);
 	let orderQuote: OrderQuote | null = $state(null);
-	// the embedded form and its plain-link fallback, built together at confirm
-	let orderEmbedSrc = $state('');
-	let orderFallback = $state('');
-	let orderEmbedState: 'loading' | 'ready' | 'blocked' = $state('loading');
+	// the form the last step embeds and its payload, set by the step before
+	let orderFormId = $state(ORDER_FORM_ID);
+	let orderFields: Record<string, string> = $state({});
+	let orderEmbedStatus: EmbedStatus = $state('loading');
 	// the exact file name the order download used, echoed in the form modal
 	let orderFileName = $state('');
 	// silent upload into the plot queue: in flight / confirmed landed
 	let orderUploading = $state(false);
 	let orderUploaded = $state(false);
-	let orderTimer = 0;
+	// the inquiry's opt-out: the design goes along unless this is unticked
+	let inquiryWithDesign = $state(true);
 
 	const ORDER_FROM_EUR = PRICING.tiers.A6.base + PRICING.tiers.A6.shippingEur;
 
@@ -1785,6 +1818,15 @@
 		return shelf;
 	})();
 
+	// each step's heading, which doubles as the dialog's accessible name
+	const orderDialogTitle = $derived.by(() => {
+		if (orderDialog === 'ask') return 'talk it through first';
+		if (orderDialog === 'unsupported')
+			return orderCheck?.pens.length ? "let's talk about this one" : 'nothing to plot yet';
+		if (orderDialog === 'form' && orderFormId === INQUIRY_FORM_ID) return 'plan a plot with me';
+		return 'order this plot';
+	});
+
 	const orderPlot = () => {
 		if (!hatchReady || status.busy || !imgWidth || !imgHeight) return;
 		const check = orderCheckNow();
@@ -1794,18 +1836,21 @@
 	};
 
 	const closeOrderDialog = () => {
-		window.clearTimeout(orderTimer);
 		orderDialog = 'closed';
-		orderEmbedSrc = '';
-		orderFallback = '';
+	};
+
+	// the last step: the given form, embedded with its payload
+	const showOrderForm = (formId: string, fields: Record<string, string>) => {
+		orderFormId = formId;
+		orderFields = fields;
+		orderEmbedStatus = 'loading';
+		orderDialog = 'form';
 	};
 
 	// Fingerprint the SVG, send it into the plot queue, and swap the dialog
 	// over to the embedded order form. The upload is best-effort: only when it
 	// fails does the file download, because then the customer has to attach it
-	// in the form themselves. When the embed itself shows no sign of life
-	// within the timeout — content blockers are the usual reason — the dialog
-	// offers the same form as a plain link instead.
+	// in the form themselves.
 	const confirmOrder = async () => {
 		const check = orderCheck;
 		const quote = orderQuote;
@@ -1822,36 +1867,50 @@
 		// an unconditional download stalls the flow on mobile (iOS pauses on
 		// the native save sheet), so the happy path skips it entirely
 		if (!orderUploaded) downloadBlob(new Blob([svg], { type: 'image/svg+xml' }), orderFileName);
-		const fields = orderHiddenFields(check, quote, {
-			plotSeconds: plotEstimate?.seconds ?? 0,
-			lineCount: status.lines,
-			sourceName: videoName || inputName,
-			presetName: selectedPreset,
-			designHash,
-			uploaded: orderUploaded
-		});
-		orderEmbedSrc = orderEmbedUrl(fields);
-		orderFallback = orderFormUrl(fields);
-		orderEmbedState = 'loading';
-		orderDialog = 'form';
-		window.clearTimeout(orderTimer);
-		orderTimer = window.setTimeout(() => {
-			if (orderEmbedState === 'loading') orderEmbedState = 'blocked';
-		}, ORDER_EMBED_TIMEOUT_MS);
+		showOrderForm(
+			ORDER_FORM_ID,
+			orderHiddenFields(check, quote, {
+				plotSeconds: plotEstimate?.seconds ?? 0,
+				lineCount: status.lines,
+				sourceName: videoName || inputName,
+				presetName: selectedPreset,
+				designHash,
+				uploaded: orderUploaded
+			})
+		);
 	};
 
-	// Sign-of-life watcher for the embedded form. The iframe stays mounted
-	// behind the blocked fallback, so a slow form still flips the dialog back
-	// the moment it reports in.
-	const onOrderMessage = (event: MessageEvent) => {
-		if (orderDialog !== 'form') return;
-		const signal = orderFormSignal(event.origin, event.data);
-		if (!signal) return;
-		orderEmbedState = 'ready';
-		if (signal === 'submitted') {
-			window.clearTimeout(orderTimer);
-			orderTimer = window.setTimeout(closeOrderDialog, ORDER_AUTOCLOSE_MS);
+	// The chat instead of the order: hand the design over to the inquiry
+	// form, from the unsupported dialog or the ask step. The plot file goes
+	// into the same queue an order's would, unless the customer unticked it.
+	// That upload is best-effort as well, and nothing downloads when it
+	// fails: an inquiry needs no attachment, so the form step just says so.
+	const startInquiry = async () => {
+		const check = orderCheck;
+		const step = orderDialog;
+		if (!check || orderUploading) return;
+		const svg = inquiryWithDesign ? buildSvgText() : null;
+		let designHash = '';
+		orderUploaded = false;
+		if (svg) {
+			orderUploading = true;
+			orderFileName = exportName('', 'svg');
+			designHash = await designFingerprint(svg);
+			orderUploaded = await uploadOrderSvg(svg, designHash, orderFileName);
+			orderUploading = false;
 		}
+		// the customer may have closed the dialog while the upload ran
+		if (orderDialog !== step) return;
+		showOrderForm(
+			INQUIRY_FORM_ID,
+			inquiryHiddenFields(check, orderQuote, {
+				plotSeconds: plotEstimate?.seconds ?? 0,
+				sourceName: videoName || inputName,
+				presetName: selectedPreset,
+				designHash,
+				uploaded: orderUploaded
+			})
+		);
 	};
 
 	//***************************************************************
@@ -3556,18 +3615,29 @@
 		}}
 	/>
 
+	<!-- the inquiry's opt-out, shown on both steps that start one -->
+	{#snippet inquiryDesignOptIn()}
+		<label class="order-optin">
+			<input type="checkbox" bind:checked={inquiryWithDesign} disabled={orderUploading} />
+			<span>
+				send my design along
+				<small>the plot file (.svg) with the lines to draw, never your image</small>
+			</span>
+		</label>
+	{/snippet}
+
 	{#if orderDialog !== 'closed' && orderCheck}
 		<div class="order-overlay">
 			<div
 				class="order-dialog"
 				class:order-dialog-form={orderDialog === 'form'}
-				class:order-dialog-blocked={orderDialog === 'form' && orderEmbedState === 'blocked'}
+				class:order-dialog-blocked={orderDialog === 'form' && orderEmbedStatus === 'blocked'}
 				role="dialog"
 				aria-modal="true"
-				aria-label="order this plot"
+				aria-label={orderDialogTitle}
 			>
 				{#if orderDialog === 'summary' && orderQuote}
-					<div class="order-title">order this plot</div>
+					<div class="order-title">{orderDialogTitle}</div>
 					<div class="order-rows">
 						<div class="order-row">
 							<span>design</span>
@@ -3607,57 +3677,67 @@
 							>{orderUploading ? 'sending your plot…' : '⚡ continue to order'}</button
 						>
 					</div>
+					<p class="order-note order-alt">
+						not sure yet?
+						<button
+							class="order-link-btn"
+							onclick={() => (orderDialog = 'ask')}
+							disabled={orderUploading}>talk it through with me first</button
+						>. it's free, and you can still order after.
+					</p>
+				{:else if orderDialog === 'ask'}
+					<div class="order-title">{orderDialogTitle}</div>
+					<p class="order-note">
+						tell me what you'd like to change or ask about: inks, paper, size, the image itself,
+						anything. I'll reply by email, and if you'd rather talk, we can set up a short call. the
+						chat is free, and you can still order this design afterwards.
+					</p>
+					{@render inquiryDesignOptIn()}
+					<div class="order-actions">
+						<button onclick={() => (orderDialog = 'summary')} disabled={orderUploading}>back</button
+						>
+						<button class="order-confirm" onclick={startInquiry} disabled={orderUploading}
+							>{orderUploading ? 'sending your design…' : '✉ continue'}</button
+						>
+					</div>
 				{:else if orderDialog === 'form'}
 					<div class="order-form-head">
-						<div class="order-title">order this plot</div>
-						<button class="order-close" onclick={closeOrderDialog} aria-label="close the order form"
+						<div class="order-title">{orderDialogTitle}</div>
+						<button class="order-close" onclick={closeOrderDialog} aria-label="close the form"
 							>✕</button
 						>
 					</div>
-					{#if !orderUploaded}
+					{#if orderFormId === ORDER_FORM_ID && !orderUploaded}
 						<p class="order-note">
 							the automatic upload didn't work here, so your plot file <b>{orderFileName}</b> just downloaded
 							— attach it where the form asks for your .svg.
 						</p>
-					{/if}
-					{#if orderEmbedState === 'blocked'}
+					{:else if orderFormId === INQUIRY_FORM_ID && orderFields.design && !orderUploaded}
 						<p class="order-note">
-							the form isn't loading in here — usually a strict ad/content blocker being careful. no
-							worries: the same form with your design details works in its own tab —
-							<a class="order-link" href={orderFallback} target="_blank" rel="noreferrer"
-								>open the order form ↗</a
-							>
-						</p>
-						<div class="order-actions">
-							<button onclick={closeOrderDialog}>close</button>
-						</div>
-					{/if}
-					<div class="order-frame" class:blocked={orderEmbedState === 'blocked'}>
-						{#if orderEmbedState === 'loading'}
-							<div class="order-frame-loading">
-								<div class="busy-dot"></div>
-								loading the order form…
-							</div>
-						{/if}
-						<iframe
-							class="order-iframe"
-							src={orderEmbedSrc}
-							title="RSTR order form"
-							allow="fullscreen"
-						></iframe>
-					</div>
-					{#if orderEmbedState !== 'blocked'}
-						<p class="order-note">
-							form stuck?
-							<a class="order-link" href={orderFallback} target="_blank" rel="noreferrer"
-								>open it in a new tab ↗</a
-							>
+							your design didn't make it through this time. if it matters, export it with ↓ SVG and
+							attach it in the form.
 						</p>
 					{/if}
-				{:else}
-					<div class="order-title">can't plot this one (yet)</div>
+					<TallyEmbed
+						formId={orderFormId}
+						fields={orderFields}
+						title={orderFormId === INQUIRY_FORM_ID ? 'RSTR inquiry form' : 'RSTR order form'}
+						onclose={closeOrderDialog}
+						bind:status={orderEmbedStatus}
+					/>
+				{:else if orderCheck.pens.length === 0}
+					<div class="order-title">{orderDialogTitle}</div>
 					<p class="order-note">
-						plot orders are limited to what my machine and pen shelf physically do:
+						every layer is switched off, so there are no lines to draw. turn at least one back on,
+						then order away.
+					</p>
+					<div class="order-actions">
+						<button onclick={closeOrderDialog}>got it</button>
+					</div>
+				{:else}
+					<div class="order-title">{orderDialogTitle}</div>
+					<p class="order-note">
+						instant orders stick to what my machine and pen shelf do out of the box:
 					</p>
 					<ul class="order-limits">
 						<li class:issue={orderCheck.tier === null}>
@@ -3679,17 +3759,22 @@
 									.join(', ')}
 							{/if}
 						</li>
-						{#if orderCheck.pens.length === 0}
-							<li class="issue">at least one layer has to be enabled</li>
-						{/if}
 					</ul>
 					<p class="order-note">
-						quickest fix: apply a built-in preset (or roll the dice with “stick to built-in presets”
-						on), pick an output format up to A3 (or keep the width within one) — then order away.
+						outside those limits I'm happy to see what I can do. tell me what you're after and we'll
+						work it out together. the chat is free.
 					</p>
+					{@render inquiryDesignOptIn()}
 					<div class="order-actions">
-						<button onclick={closeOrderDialog}>got it</button>
+						<button onclick={closeOrderDialog} disabled={orderUploading}>not now</button>
+						<button class="order-confirm" onclick={startInquiry} disabled={orderUploading}
+							>{orderUploading ? 'sending your design…' : '✉ ask me about it'}</button
+						>
 					</div>
+					<p class="order-note order-alt">
+						rather fix it yourself? apply a built-in preset, or roll the dice with "stick to
+						built-in presets" on, and pick an output format up to A3. then order away.
+					</p>
 				{/if}
 			</div>
 		</div>
@@ -3723,7 +3808,6 @@
 	onkeydown={(event) => {
 		if (event.key === 'Escape' && orderDialog !== 'closed') closeOrderDialog();
 	}}
-	onmessage={onOrderMessage}
 />
 
 <style>
@@ -4807,9 +4891,46 @@
 		color: #b3261e;
 	}
 
-	.order-link {
+	/* the other way forward, under a step's own actions */
+	.order-alt {
+		padding-top: 0.55rem;
+		border-top: 1px dashed var(--border);
+	}
+
+	/* an inline action that reads as a link; .app button forces the font */
+	.order-note .order-link-btn {
+		display: inline;
+		padding: 0;
+		border: 0;
+		background: none;
 		color: var(--ink);
+		font-size: inherit !important;
 		text-decoration: underline;
+		cursor: pointer;
+	}
+
+	.order-optin {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.5rem;
+		padding: 0.5rem 0.55rem;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: #fff;
+		font-size: 0.72rem;
+		line-height: 1.4;
+		cursor: pointer;
+	}
+
+	.order-optin input {
+		margin: 0.1rem 0 0;
+		accent-color: var(--ink);
+	}
+
+	.order-optin small {
+		display: block;
+		font-size: 0.68rem;
+		color: var(--muted);
 	}
 
 	.order-actions {
@@ -4875,41 +4996,6 @@
 
 	.order-close:hover {
 		border-color: var(--ink);
-	}
-
-	.order-frame {
-		position: relative;
-		flex: 1 1 auto;
-		min-height: 200px;
-		border: 1px solid var(--border);
-		border-radius: 8px;
-		overflow: hidden;
-		background: #fff;
-	}
-
-	/* kept mounted (display:none still loads) so a late form can revive it */
-	.order-frame.blocked {
-		display: none;
-	}
-
-	.order-frame-loading {
-		position: absolute;
-		inset: 0;
-		z-index: 1;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 0.5rem;
-		font-size: 0.75rem;
-		color: var(--muted);
-		background: #fff;
-	}
-
-	.order-iframe {
-		display: block;
-		width: 100%;
-		height: 100%;
-		border: 0;
 	}
 
 	/* details readout below the export buttons */
