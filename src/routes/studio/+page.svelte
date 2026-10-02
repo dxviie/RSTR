@@ -1,5 +1,9 @@
 <script lang="ts">
-	import { flushSync } from 'svelte';
+	import { flushSync, onMount } from 'svelte';
+	import { replaceState } from '$app/navigation';
+	import { page } from '$app/state';
+	import { exampleById } from '$lib/rstr2/examples';
+	import { takeHandedOffFile } from '$lib/studioHandoff';
 	import DualRangeInput from '@stanko/dual-range-input';
 	import '@stanko/dual-range-input/dist/index.css';
 	import { inkRange } from '$lib/inkRange';
@@ -362,7 +366,7 @@
 		}
 	});
 
-	const openFile = (files: FileList | null | undefined) => {
+	const openFile = (files: ArrayLike<File> | null | undefined) => {
 		const file = files?.[0];
 		if (!file) return;
 		inputError = null;
@@ -1510,6 +1514,38 @@
 		Object.assign(params, clone.params);
 		layers = clone.layers;
 	};
+
+	//***************************************************************
+	// 										OPENING FROM THE LANDING PAGE
+	//***************************************************************
+
+	// The landing page can open the studio on something: a file picked there
+	// (handed over in memory, see $lib/studioHandoff) or one of its examples
+	// (/studio?example=milkmaid: a lossless source plus the exact settings of
+	// the drawing shown there). Either one takes the random sample's place.
+	// The example's look isn't saved until you edit something, like any
+	// other preset.
+	const handedOver = takeHandedOffFile();
+	const example = handedOver ? null : exampleById(page.url.searchParams.get('example'));
+	if (handedOver) {
+		sampleOffered = true;
+		openFile([handedOver]);
+	} else if (example) {
+		sampleOffered = true;
+		inputImage = example.src;
+		inputName = example.name;
+		applySettings(example.settings);
+		selectedPreset = '';
+	}
+
+	onMount(() => {
+		// Drop ?example= from the address, so a reload keeps your edits. The
+		// router only takes calls once it has finished starting up, which on a
+		// fresh page load is just after this mounts: wait one turn.
+		if (!page.url.searchParams.has('example')) return;
+		const timer = setTimeout(() => replaceState('/studio', page.state));
+		return () => clearTimeout(timer);
+	});
 
 	const isUserPreset = $derived(userPresets.some((preset) => preset.name === selectedPreset));
 

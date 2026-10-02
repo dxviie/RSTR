@@ -40,6 +40,7 @@
 	import { plotSrc } from '$lib/landing/plots';
 	import { reveal } from '$lib/landing/reveal';
 	import { formatCount } from './hatch';
+	import Cta from './Cta.svelte';
 
 	const { onzoom }: { onzoom: (image: LightboxImage) => void } = $props();
 
@@ -508,6 +509,11 @@
 			</div>
 		</div>
 
+		<div class="open">
+			<Cta href="/studio?example=milkmaid">open in RSTR</Cta>
+			<p class="open-note">the Milkmaid, with the exact settings of this drawing</p>
+		</div>
+
 		<p class="credit">{MILKMAID_CREDIT}</p>
 	</div>
 </div>
@@ -597,6 +603,8 @@
 		   it until the fade is done, so a switch never dips to paper */
 		opacity: 0;
 		transition: opacity 0.3s ease 0.3s;
+		/* stages crossfade: each picture on its own layer */
+		will-change: opacity;
 	}
 
 	.layer.on {
@@ -718,6 +726,8 @@
 		transition:
 			transform 0.13s ease,
 			box-shadow 0.13s ease;
+		/* rides the split: keep it on its own layer */
+		will-change: transform;
 	}
 
 	@supports (width: 1cqw) {
@@ -774,6 +784,8 @@
 		transition:
 			transform 0.13s ease,
 			box-shadow 0.13s ease;
+		/* moves on hover and press: keep it on its own layer */
+		will-change: transform;
 	}
 
 	.enlarge svg {
@@ -835,6 +847,8 @@
 		transition:
 			transform 0.13s ease,
 			box-shadow 0.13s ease;
+		/* moves on hover and press: keep it on its own layer */
+		will-change: transform;
 	}
 
 	/* the radio covers the whole tab: one click target, native arrow keys */
@@ -948,6 +962,19 @@
 			opacity: 0;
 			transform: translateY(4px);
 		}
+	}
+
+	/* open this very drawing in the studio: same picture, same settings */
+	.open {
+		margin-top: 1.75rem;
+	}
+
+	.open-note {
+		margin-top: 0.8rem;
+		font-family: 'mono-light', monospace;
+		font-size: 0.75rem;
+		line-height: 1.5;
+		color: var(--muted);
 	}
 
 	.credit {

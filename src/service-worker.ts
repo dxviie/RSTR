@@ -9,8 +9,16 @@ import { build, files, version } from '$service-worker';
 
 const CACHE = `rstr-${version}`;
 
-// sample/test images are big and only used in dev — no point precaching them
-const SKIP_PRECACHE = ['/test-rstr.png', '/bbrasa-imp.png', '/knest-imp.png', '/rstr-og.png'];
+// sample/test images are big and only used in dev — no point precaching them.
+// The Milkmaid example source is lossless and only loads when someone opens
+// the example; it gets cached the first time it is fetched.
+const SKIP_PRECACHE = [
+	'/test-rstr.png',
+	'/bbrasa-imp.png',
+	'/knest-imp.png',
+	'/rstr-og.png',
+	'/how/milkmaid-source.webp'
+];
 
 const ASSETS = [
 	...build, // the app itself
