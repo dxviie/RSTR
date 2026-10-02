@@ -1,18 +1,35 @@
 <script lang="ts">
-	// The inquiry form in a dialog on the landing page: a sheet with the house
-	// edge laid over the page, opened from the plot service's letter. It keeps
-	// the lightbox's manners (the page stops scrolling, focus moves in and
-	// back out, Escape closes it), and the form inside is the same TallyEmbed
-	// the studio uses, blocked fallback and auto-close included.
+	// A Tally form in a dialog on the landing page: a sheet with the house
+	// edge laid over the page, opened from the plot service's letter (the
+	// inquiry form) or from #madewithrstr (the share form). It keeps the
+	// lightbox's manners (the page stops scrolling, focus moves in and back
+	// out, Escape closes it), and the form inside is the same TallyEmbed the
+	// studio uses, blocked fallback and auto-close included.
 	import { fade } from 'svelte/transition';
 	import TallyEmbed, { type EmbedStatus } from '$lib/components/TallyEmbed.svelte';
 	import { lockPage } from '$lib/landing/modal';
-	import { landingInquiryFields } from '$lib/rstr2/order';
-	import { INQUIRY_FORM_ID } from '$lib/rstr2/orderForm';
 
-	let { open = $bindable(false) }: { open?: boolean } = $props();
+	// $props() is destructured in one go and only the bindable open is ever
+	// reassigned, which the core prefer-const rule can't see
+	/* eslint-disable prefer-const */
+	let {
+		open = $bindable(false),
+		formId,
+		fields,
+		heading,
+		frameTitle
+	}: {
+		open?: boolean;
+		formId: string;
+		/** hidden-field payload, sent as query params */
+		fields: Record<string, string>;
+		/** the dialog's title, which also names it for screen readers */
+		heading: string;
+		/** the form frame's accessible name */
+		frameTitle: string;
+	} = $props();
+	/* eslint-enable prefer-const */
 
-	const FIELDS = landingInquiryFields();
 	const uid = $props.id();
 
 	let closeButton = $state<HTMLButtonElement>();
@@ -38,7 +55,7 @@
 			aria-labelledby="{uid}-title"
 		>
 			<div class="head">
-				<h2 id="{uid}-title">plan a plot with me</h2>
+				<h2 id="{uid}-title">{heading}</h2>
 				<button
 					class="close"
 					type="button"
@@ -49,13 +66,7 @@
 					×
 				</button>
 			</div>
-			<TallyEmbed
-				formId={INQUIRY_FORM_ID}
-				fields={FIELDS}
-				title="RSTR inquiry form"
-				onclose={close}
-				bind:status
-			/>
+			<TallyEmbed {formId} {fields} title={frameTitle} onclose={close} bind:status />
 		</div>
 	</div>
 {/if}

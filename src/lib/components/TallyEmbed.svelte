@@ -5,7 +5,7 @@
 
 <script lang="ts">
 	// One embedded Tally form with a sign-of-life watchdog, shared by the
-	// studio's order dialog and the landing page's inquiry dialog. The frame
+	// studio's order dialog and the landing page's form dialogs. The frame
 	// is a plain iframe on Tally's /embed/ path, and the messages it posts
 	// flip it from loading to ready. When none arrive within the timeout (a
 	// strict content blocker is the usual reason), it offers the same form as
